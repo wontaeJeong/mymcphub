@@ -2,17 +2,19 @@ import { randomUUID } from "node:crypto";
 
 import { McpGrantSchema, McpServerManifestSchema, seedIds } from "@mcp-hub/db";
 
+import { createAuditArgumentSnapshot } from "./audit";
 import { notFound, validationError } from "./errors";
 import type {
   ApiApproval,
   ApiAuditEvent,
   ApiEmergencyPolicyState,
+  AuditContext,
+  AuditEventSearchFilters,
   ApiGrant,
   ApiMcpServer,
   ApiMcpTool,
   ApiServerHealth,
   ApiToolCallEvent,
-  AuthContext,
   GrantSubjectType,
   ListResponse
 } from "./types";
@@ -35,7 +37,7 @@ export function createControlPlaneStore(initialState = createSeedState()) {
 
   return {
     listServers: () => ({ items: state.servers }),
-    createServer: (body: unknown, auth: AuthContext) => {
+    createServer: (body: unknown, context: AuditContext) => {
       const manifest = McpServerManifestSchema.parse(body);
       const now = currentTimestamp();
       const server: ApiMcpServer = {
@@ -65,11 +67,11 @@ export function createControlPlaneStore(initialState = createSeedState()) {
           discoveredAt: now
         });
       }
-      recordAudit(state, auth, "mcp_server.created", server.id, undefined, "allow");
+      recordAudit(state, context, "mcp_server.created", server.id, undefined, "allow", undefined, body);
       return server;
     },
     getServer: (serverId: string) => findServer(state, serverId),
-    patchServer: (serverId: string, body: unknown, auth: AuthContext) => {
+    patchServer: (serverId: string, body: unknown, context: AuditContext) => {
       const server = findServer(state, serverId);
       const patch = recordBody(body);
 
@@ -83,21 +85,21 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         server.enabled = patch.enabled;
       }
       server.updatedAt = currentTimestamp();
-      recordAudit(state, auth, "mcp_server.updated", server.id, undefined, "allow");
+      recordAudit(state, context, "mcp_server.updated", server.id, undefined, "allow", undefined, body);
       return server;
     },
-    setServerEnabled: (serverId: string, enabled: boolean, auth: AuthContext) => {
+    setServerEnabled: (serverId: string, enabled: boolean, context: AuditContext) => {
       const server = findServer(state, serverId);
       server.enabled = enabled;
       server.updatedAt = currentTimestamp();
-      recordAudit(state, auth, enabled ? "mcp_server.enabled" : "mcp_server.disabled", server.id, undefined, "allow");
+      recordAudit(state, context, enabled ? "mcp_server.enabled" : "server.disabled", server.id, undefined, "allow");
       return server;
     },
     listTools: (serverId: string) => {
       findServer(state, serverId);
       return { items: state.tools.filter((tool) => tool.serverId === serverId) };
     },
-    patchTool: (serverId: string, toolId: string, body: unknown, auth: AuthContext) => {
+    patchTool: (serverId: string, toolId: string, body: unknown, context: AuditContext) => {
       findServer(state, serverId);
       const tool = findTool(state, toolId);
       const patch = recordBody(body);
@@ -112,18 +114,18 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         tool.riskLevel = patch.riskLevel;
       }
       tool.lastSeenAt = currentTimestamp();
-      recordAudit(state, auth, "mcp_tool.updated", serverId, tool.name, "allow");
+      recordAudit(state, context, "mcp_tool.updated", serverId, tool.name, "allow", undefined, body);
       return tool;
     },
-    setToolEnabled: (serverId: string, toolId: string, enabled: boolean, auth: AuthContext) => {
+    setToolEnabled: (serverId: string, toolId: string, enabled: boolean, context: AuditContext) => {
       const tool = findTool(state, toolId);
       tool.enabled = enabled;
       tool.lastSeenAt = currentTimestamp();
-      recordAudit(state, auth, enabled ? "mcp_tool.enabled" : "mcp_tool.disabled", serverId, tool.name, "allow");
+      recordAudit(state, context, enabled ? "mcp_tool.enabled" : "tool.disabled", serverId, tool.name, "allow");
       return tool;
     },
     listGrants: () => ({ items: state.grants }),
-    createGrant: (body: unknown, auth: AuthContext) => {
+    createGrant: (body: unknown, context: AuditContext) => {
       const input = McpGrantSchema.parse(body);
       findServer(state, input.serverId);
       const grant: ApiGrant = {
@@ -135,17 +137,17 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         allowedTools: input.allowedTools,
         environment: input.environment,
         expiresAt: input.expiresAt,
-        approvedBy: input.approvedBy ?? auth.userId,
+        approvedBy: input.approvedBy ?? context.auth.userId,
         reason: input.reason,
         ticketUrl: input.ticketUrl,
         enabled: input.enabled,
         createdAt: currentTimestamp()
       };
       state.grants.push(grant);
-      recordAudit(state, auth, "mcp_grant.created", grant.serverId, undefined, "allow");
+      recordAudit(state, context, "grant.created", grant.serverId, undefined, "allow", grant.projectId, body);
       return grant;
     },
-    patchGrant: (grantId: string, body: unknown, auth: AuthContext) => {
+    patchGrant: (grantId: string, body: unknown, context: AuditContext) => {
       const grant = findGrant(state, grantId);
       const patch = recordBody(body);
 
@@ -155,17 +157,17 @@ export function createControlPlaneStore(initialState = createSeedState()) {
       if (Array.isArray(patch.allowedTools) && patch.allowedTools.every((tool) => typeof tool === "string")) {
         grant.allowedTools = patch.allowedTools;
       }
-      recordAudit(state, auth, "mcp_grant.updated", grant.serverId, undefined, "allow");
+      recordAudit(state, context, "mcp_grant.updated", grant.serverId, undefined, "allow", grant.projectId, body);
       return grant;
     },
-    revokeGrant: (grantId: string, auth: AuthContext) => {
+    revokeGrant: (grantId: string, context: AuditContext) => {
       const grant = findGrant(state, grantId);
       grant.enabled = false;
-      recordAudit(state, auth, "mcp_grant.revoked", grant.serverId, undefined, "allow");
+      recordAudit(state, context, "grant.revoked", grant.serverId, undefined, "allow", grant.projectId);
       return grant;
     },
     listApprovals: () => ({ items: state.approvals }),
-    createApproval: (body: unknown, auth: AuthContext) => {
+    createApproval: (body: unknown, context: AuditContext) => {
       const input = recordBody(body);
       const serverId = requiredString(input.serverId, "serverId");
       const server = findServer(state, serverId);
@@ -173,9 +175,9 @@ export function createControlPlaneStore(initialState = createSeedState()) {
       const requestedTools = readRequestedTools(input);
       const approval: ApiApproval = {
         id: randomUUID(),
-        requesterId: auth.userId,
+        requesterId: context.auth.userId,
         subjectType: readSubjectType(input.subjectType) ?? "user",
-        subjectId: optionalString(input.subjectId) ?? auth.userId,
+        subjectId: optionalString(input.subjectId) ?? context.auth.userId,
         projectId: requiredString(input.projectId, "projectId"),
         serverId,
         requestedTools,
@@ -190,17 +192,17 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         updatedAt: now
       };
       state.approvals.push(approval);
-      recordAudit(state, auth, "approval.created", approval.serverId, approval.toolName, "needs_approval");
+      recordAudit(state, context, "approval.created", approval.serverId, approval.toolName, "needs_approval", approval.projectId, body);
       return approval;
     },
-    decideApproval: (approvalId: string, decision: "approved" | "rejected", auth: AuthContext, body: unknown = {}) => {
+    decideApproval: (approvalId: string, decision: "approved" | "rejected", context: AuditContext, body: unknown = {}) => {
       const approval = findApproval(state, approvalId);
       if (approval.status !== "pending") {
         throw validationError("Approval has already been decided", { status: approval.status });
       }
       const input = recordBody(body);
       const now = currentTimestamp();
-      const reviewerId = optionalString(input.reviewerId) ?? auth.userId;
+      const reviewerId = optionalString(input.reviewerId) ?? context.auth.userId;
       approval.status = decision;
       approval.reviewerId = reviewerId;
       approval.reviewComment = optionalString(input.reviewComment);
@@ -211,13 +213,60 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         const grant = createGrantFromApproval(approval, input, reviewerId, now);
         state.grants.push(grant);
       }
-      recordAudit(state, auth, `approval.${decision}`, approval.serverId, approval.toolName, decision === "approved" ? "allow" : "deny");
+      recordAudit(
+        state,
+        context,
+        decision === "approved" ? "approval.approved" : "approval.rejected",
+        approval.serverId,
+        approval.toolName,
+        decision === "approved" ? "allow" : "deny",
+        approval.projectId,
+        body
+      );
       return approval;
     },
-    listAuditEvents: (limit: number, cursor?: string): ListResponse<ApiAuditEvent> => paginate(state.auditEvents, limit, cursor),
+    listAuditEvents: (limit: number, cursor?: string, filters: AuditEventSearchFilters = {}): ListResponse<ApiAuditEvent> =>
+      paginate(filterAuditEvents(state.auditEvents, filters), limit, cursor),
+    ingestGatewayAuditEvent: (body: unknown, context: AuditContext) => {
+      const input = recordBody(body);
+      const serverId = optionalString(input.serverId);
+      const toolName = optionalString(input.toolName);
+      const riskLevel = readRiskLevel(input.riskLevel) ?? deriveAuditRisk(state, serverId, toolName);
+      const argumentJson = readAuditJsonValue(input.argumentRedactedJson);
+      const argumentSnapshot = argumentJson === undefined ? undefined : createAuditArgumentSnapshot(argumentJson);
+      const event: ApiAuditEvent = {
+        id: randomUUID(),
+        timestamp: optionalDateTime(input.timestamp, "timestamp") ?? currentTimestamp(),
+        userId: optionalString(input.userId),
+        teamId: optionalString(input.teamId),
+        projectId: optionalString(input.projectId),
+        clientId: optionalString(input.clientId),
+        sessionId: optionalString(input.sessionId),
+        serverId,
+        toolName,
+        eventType: requiredString(input.eventType, "eventType"),
+        riskLevel,
+        policyDecision: readPolicyDecision(input.policyDecision),
+        traceId: optionalString(input.traceId) ?? context.traceId,
+        argumentHash: argumentSnapshot?.argumentHash ?? optionalString(input.argumentHash),
+        argumentRedactedJson: argumentSnapshot?.argumentRedactedJson,
+        latencyMs: optionalNumber(input.latencyMs, "latencyMs"),
+        upstreamStatus: optionalNumber(input.upstreamStatus, "upstreamStatus"),
+        errorCode: optionalString(input.errorCode),
+        metadataJson: {
+          source: "gateway",
+          ingestedBy: context.auth.userId,
+          upstreamStatus: optionalNumber(input.upstreamStatus, "upstreamStatus"),
+          latencyMs: optionalNumber(input.latencyMs, "latencyMs"),
+          errorCode: optionalString(input.errorCode)
+        }
+      };
+      state.auditEvents.unshift(event);
+      return event;
+    },
     listToolCallEvents: () => ({ items: state.toolCallEvents }),
     listServerHealth: () => ({ items: state.serverHealth }),
-    enableEmergencyDeny: (body: unknown, auth: AuthContext) => {
+    enableEmergencyDeny: (body: unknown, context: AuditContext) => {
       const input = typeof body === "string" ? { reason: body } : recordBody(body);
       state.emergencyDeny = {
         enabled: true,
@@ -231,10 +280,26 @@ export function createControlPlaneStore(initialState = createSeedState()) {
         clientIds: readStringArray(input.clientIds),
         createdAt: currentTimestamp()
       };
-      recordAudit(state, auth, "admin.emergency_deny.enabled", undefined, undefined, "deny");
+      recordAudit(state, context, "emergency_policy.enabled", undefined, undefined, "deny", undefined, body);
       return state.emergencyDeny;
     },
-    revokeServerGrants: (serverId: string, auth: AuthContext) => {
+    disableEmergencyDeny: (context: AuditContext) => {
+      state.emergencyDeny = {
+        enabled: false,
+        reason: "Emergency deny disabled",
+        global: false,
+        highCritical: false,
+        serverIds: [],
+        serverSlugs: [],
+        toolNames: [],
+        subjectIds: [],
+        clientIds: [],
+        createdAt: currentTimestamp()
+      };
+      recordAudit(state, context, "emergency_policy.disabled", undefined, undefined, "allow");
+      return state.emergencyDeny;
+    },
+    revokeServerGrants: (serverId: string, context: AuditContext) => {
       findServer(state, serverId);
       let revoked = 0;
       for (const grant of state.grants) {
@@ -243,7 +308,7 @@ export function createControlPlaneStore(initialState = createSeedState()) {
           revoked += 1;
         }
       }
-      recordAudit(state, auth, "admin.server_grants.revoked", serverId, undefined, "deny");
+      recordAudit(state, context, "admin.server_grants.revoked", serverId, undefined, "deny");
       return { revoked, serverId };
     }
   };
@@ -459,26 +524,90 @@ function createGrantFromApproval(
 
 function recordAudit(
   state: StoreState,
-  auth: AuthContext,
+  context: AuditContext,
   eventType: string,
   serverId: string | undefined,
   toolName: string | undefined,
-  policyDecision: ApiAuditEvent["policyDecision"]
+  policyDecision: ApiAuditEvent["policyDecision"],
+  projectId?: string,
+  argumentSource?: unknown
 ) {
+  const argumentSnapshot = argumentSource === undefined ? {} : createAuditArgumentSnapshot(argumentSource);
+
   state.auditEvents.unshift({
     id: randomUUID(),
     timestamp: currentTimestamp(),
-    userId: auth.userId,
-    teamId: auth.teamIds[0],
-    clientId: auth.clientId,
+    userId: context.auth.userId,
+    teamId: context.auth.teamIds[0],
+    projectId,
+    clientId: context.auth.clientId,
     serverId,
     toolName,
     eventType,
-    riskLevel: "low",
+    riskLevel: deriveAuditRisk(state, serverId, toolName),
     policyDecision,
-    traceId: randomUUID(),
-    metadataJson: { issuer: auth.issuer }
+    traceId: context.traceId,
+    ...argumentSnapshot,
+    metadataJson: { issuer: context.auth.issuer }
   });
+}
+
+function filterAuditEvents(events: ApiAuditEvent[], filters: AuditEventSearchFilters) {
+  return events.filter((event) => {
+    const eventTime = Date.parse(event.timestamp);
+    if (filters.from && eventTime < Date.parse(filters.from)) {
+      return false;
+    }
+    if (filters.to && eventTime > Date.parse(filters.to)) {
+      return false;
+    }
+    if (filters.user && event.userId !== filters.user) {
+      return false;
+    }
+    if (filters.team && event.teamId !== filters.team) {
+      return false;
+    }
+    if (filters.project && event.projectId !== filters.project) {
+      return false;
+    }
+    if (filters.server && event.serverId !== filters.server) {
+      return false;
+    }
+    if (filters.tool && event.toolName !== filters.tool) {
+      return false;
+    }
+    if (filters.eventType && event.eventType !== filters.eventType) {
+      return false;
+    }
+    if (filters.policyDecision && event.policyDecision !== filters.policyDecision) {
+      return false;
+    }
+    if (filters.riskLevel && event.riskLevel !== filters.riskLevel) {
+      return false;
+    }
+    if (filters.traceId && event.traceId !== filters.traceId) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function deriveAuditRisk(state: StoreState, serverId: string | undefined, toolName: string | undefined): ApiAuditEvent["riskLevel"] {
+  if (serverId && toolName) {
+    const tool = state.tools.find((candidate) => candidate.serverId === serverId && candidate.name === toolName);
+    if (tool) {
+      return tool.riskLevel;
+    }
+  }
+  if (serverId) {
+    const server = state.servers.find((candidate) => candidate.id === serverId);
+    if (server) {
+      return server.riskLevel;
+    }
+  }
+
+  return "low";
 }
 
 function paginate<Item extends { id: string }>(items: Item[], limit: number, cursor?: string): ListResponse<Item> {
@@ -486,12 +615,13 @@ function paginate<Item extends { id: string }>(items: Item[], limit: number, cur
   const safeStartIndex = startIndex < 0 ? 0 : startIndex;
   const pageItems = items.slice(safeStartIndex, safeStartIndex + limit);
   const nextItem = items[safeStartIndex + limit];
+  const lastPageItem = pageItems[pageItems.length - 1];
 
   return {
     items: pageItems,
     pageInfo: {
       limit,
-      nextCursor: nextItem?.id
+      nextCursor: nextItem ? lastPageItem?.id : undefined
     }
   };
 }
@@ -514,6 +644,64 @@ function requiredString(value: unknown, fieldName: string) {
 
 function optionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function optionalNumber(value: unknown, fieldName: string) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw validationError(`${fieldName} must be a finite number`);
+  }
+
+  return value;
+}
+
+function readPolicyDecision(value: unknown): ApiAuditEvent["policyDecision"] {
+  if (value === "allow" || value === "deny" || value === "needs_approval") {
+    return value;
+  }
+
+  throw validationError("policyDecision must be allow, deny, or needs_approval");
+}
+
+function readRiskLevel(value: unknown): ApiAuditEvent["riskLevel"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (isRiskLevel(value)) {
+    return value;
+  }
+
+  throw validationError("riskLevel must be low, medium, high, or critical");
+}
+
+function readAuditJsonValue(value: unknown): ApiAuditEvent["argumentRedactedJson"] {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (isAuditJsonValue(value)) {
+    return value;
+  }
+
+  throw validationError("argumentRedactedJson must be JSON-compatible");
+}
+
+function isAuditJsonValue(value: unknown): value is ApiAuditEvent["argumentRedactedJson"] {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.every((item) => isAuditJsonValue(item));
+  }
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).every((nestedValue) => isAuditJsonValue(nestedValue));
+  }
+
+  return false;
 }
 
 function readRequestedTools(input: Record<string, unknown>) {
