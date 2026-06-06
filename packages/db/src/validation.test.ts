@@ -55,5 +55,7 @@ describe("db shared schemas", () => {
     expect(dbTableNames).toContain("mcp_servers");
     expect(dbTableNames).toContain("audit_events");
     expect(seedStatements.length).toBeGreaterThanOrEqual(6);
+    expect(seedStatements.join("\n")).toContain("stdio-sample");
+    expect(seedStatements.join("\n")).toContain("stdio_adapter");
   });
 });
