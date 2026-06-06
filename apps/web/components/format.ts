@@ -1,4 +1,4 @@
-import type { PolicyEffect, RiskLevel } from "../lib/api";
+import type { ApiApproval, PolicyEffect, RiskLevel } from "../lib/api";
 import type { StatusTone } from "@mcp-hub/ui";
 
 export function formatDate(value: string | undefined) {
@@ -58,4 +58,20 @@ export function policyTone(effect: PolicyEffect): StatusTone {
 
 export function enabledTone(enabled: boolean): StatusTone {
   return enabled ? "success" : "danger";
+}
+
+export function approvalTone(status: ApiApproval["status"]): StatusTone {
+  if (status === "pending") {
+    return "warning";
+  }
+
+  if (status === "approved") {
+    return "success";
+  }
+
+  if (status === "cancelled" || status === "expired") {
+    return "neutral";
+  }
+
+  return "danger";
 }
