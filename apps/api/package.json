@@ -11,7 +11,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "openapi:write": "tsx src/write-openapi.ts",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run src/audit.test.ts",
+    "test:integration": "vitest run src/index.test.ts"
   },
   "dependencies": {
     "@mcp-hub/auth": "workspace:*",
