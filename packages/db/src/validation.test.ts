@@ -4,12 +4,14 @@ import { dbTableNames } from "./schema";
 import { seedStatements } from "./seed-data";
 import {
   ApprovalRequestSchema,
+  CreateMcpServerVersionSchema,
   EmergencyPolicyStateSchema,
   HealthCheckResultSchema,
   McpGrantSchema,
   McpServerManifestSchema,
   PolicyDecisionInputSchema,
-  PolicyDecisionResultSchema
+  PolicyDecisionResultSchema,
+  ServerVersionStatusSchema
 } from "./validation";
 
 describe("db shared schemas", () => {
@@ -53,6 +55,41 @@ describe("db shared schemas", () => {
         checkedAt: new Date("2026-01-01T00:00:00.000Z").toISOString()
       }).metadataJson
     ).toEqual({});
+  });
+
+  it("validates prompt-14 server version release metadata", () => {
+    expect(ServerVersionStatusSchema.options).toEqual(["draft", "pending", "active", "deprecated", "rolled_back"]);
+
+    expect(
+      CreateMcpServerVersionSchema.parse({
+        serverId: "00000000-0000-4000-8000-000000000100",
+        version: "1.0.0",
+        imageRef: "ghcr.io/mcp-hub/echo:1.0.0",
+        imageRepository: "ghcr.io/mcp-hub/echo",
+        imageTag: "1.0.0",
+        imageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        configHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        toolSchemaHash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        createdBy: "00000000-0000-4000-8000-000000000001",
+        activatedAt: "2026-06-07T01:00:00.000Z",
+        manifestJson: { schemaVersion: 1 }
+      })
+    ).toMatchObject({ status: "draft", imageRepository: "ghcr.io/mcp-hub/echo", manifestJson: { schemaVersion: 1 } });
+
+    expect(
+      CreateMcpServerVersionSchema.parse({
+        serverId: "00000000-0000-4000-8000-000000000100",
+        version: "1.0.1"
+      })
+    ).toMatchObject({ status: "draft", manifestJson: {} });
+
+    expect(
+      CreateMcpServerVersionSchema.safeParse({
+        serverId: "00000000-0000-4000-8000-000000000100",
+        version: "1.0.0",
+        status: "rollback"
+      }).success
+    ).toBe(false);
   });
 
   it("validates prompt-08 approval, policy result, and emergency policy inputs", () => {
