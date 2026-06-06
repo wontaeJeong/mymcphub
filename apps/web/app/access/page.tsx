@@ -25,9 +25,32 @@ export default async function AccessPage() {
       <div className="form-grid">
         <form className="form-card" action={createApprovalAction}>
           <h2>Request Access Approval</h2>
-          <p>Create a pending approval request via /api/approvals. Ticket URL and expiry are Control Plane API pending fields and are appended to the reason until the endpoint accepts them directly.</p>
+          <p>Create a pending approval request via /api/approvals with subject, tools, environment, ticket, expiry, and reason sent as first-class fields.</p>
           {servers.ok && serverItems.length > 0 ? (
             <>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="approvalSubjectType">Subject type</label>
+                  <select id="approvalSubjectType" name="subjectType" required>
+                    <option value="team">Team</option>
+                    <option value="user">User</option>
+                    <option value="service_account">Service account</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="approvalEnvironment">Environment</label>
+                  <select id="approvalEnvironment" name="environment" required>
+                    <option value="dev">dev</option>
+                    <option value="stg">stg</option>
+                    <option value="prod">prod</option>
+                    <option value="shared">shared</option>
+                  </select>
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="approvalSubjectId">Subject ID</label>
+                <input id="approvalSubjectId" name="subjectId" required placeholder="User, team, or service account UUID" />
+              </div>
               <div className="field">
                 <label htmlFor="approvalServerId">Server</label>
                 <select id="approvalServerId" name="serverId" required>
@@ -39,20 +62,20 @@ export default async function AccessPage() {
                 <input id="approvalProjectId" name="projectId" required placeholder="UUID from your project record" />
               </div>
               <div className="field">
-                <label htmlFor="toolName">Tool name</label>
-                <input id="toolName" name="toolName" placeholder="Optional tool scope" />
+                <label htmlFor="approvalRequestedTools">Requested tools</label>
+                <input id="approvalRequestedTools" name="requestedTools" required placeholder="Single tool or comma-separated tools" />
               </div>
               <div className="field">
                 <label htmlFor="requestedAction">Requested action</label>
                 <input id="requestedAction" name="requestedAction" required defaultValue="grant_access" />
               </div>
               <div className="field">
-                <label htmlFor="approvalTicketUrl">Ticket URL pending field</label>
-                <input id="approvalTicketUrl" name="approvalTicketUrl" type="url" placeholder="Optional ticket link; appended to reason for now" />
+                <label htmlFor="approvalTicketUrl">Ticket URL</label>
+                <input id="approvalTicketUrl" name="ticketUrl" type="url" placeholder="Optional approval ticket" />
               </div>
               <div className="field">
-                <label htmlFor="approvalExpiresAt">Expiry pending field</label>
-                <input id="approvalExpiresAt" name="approvalExpiresAt" placeholder="Optional ISO timestamp; appended to reason for now" />
+                <label htmlFor="approvalRequestedExpiresAt">Requested expiry</label>
+                <input id="approvalRequestedExpiresAt" name="requestedExpiresAt" placeholder="Optional ISO timestamp" />
               </div>
               <div className="field">
                 <label htmlFor="approvalReason">Reason</label>

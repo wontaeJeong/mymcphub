@@ -26,8 +26,14 @@ import {
 
 export async function approveApprovalAction(formData: FormData) {
   const approvalId = readRequired(formData, "approvalId");
+  const reviewComment = readOptional(formData, "reviewComment");
   try {
-    await approveApproval(approvalId);
+    await approveApproval(approvalId, {
+      allowedTools: readCsvOptional(formData, "allowedTools"),
+      expiresAt: readOptional(formData, "expiresAt"),
+      reviewComment,
+      reason: reviewComment
+    });
     revalidatePath("/approvals");
     revalidatePath("/");
   } catch {
@@ -38,7 +44,9 @@ export async function approveApprovalAction(formData: FormData) {
 export async function rejectApprovalAction(formData: FormData) {
   const approvalId = readRequired(formData, "approvalId");
   try {
-    await rejectApproval(approvalId);
+    await rejectApproval(approvalId, {
+      reviewComment: readOptional(formData, "reviewComment")
+    });
     revalidatePath("/approvals");
     revalidatePath("/");
   } catch {
@@ -49,11 +57,16 @@ export async function rejectApprovalAction(formData: FormData) {
 export async function createApprovalAction(formData: FormData) {
   try {
     await createApproval({
+      subjectType: readSubjectType(formData),
+      subjectId: readRequired(formData, "subjectId"),
       projectId: readRequired(formData, "projectId"),
       serverId: readRequired(formData, "serverId"),
-      toolName: readOptional(formData, "toolName"),
-      requestedAction: readRequired(formData, "requestedAction"),
-      reason: buildApprovalReason(formData)
+      requestedTools: readCsv(formData, "requestedTools"),
+      environment: readEnvironment(formData),
+      reason: readRequired(formData, "reason"),
+      ticketUrl: readOptional(formData, "ticketUrl"),
+      requestedExpiresAt: readOptional(formData, "requestedExpiresAt"),
+      requestedAction: readRequired(formData, "requestedAction")
     });
     revalidatePath("/access");
     revalidatePath("/approvals");
@@ -270,19 +283,6 @@ export async function revokeServerGrantsAction(_previousState: FormActionState, 
   }
 }
 
-
-function buildApprovalReason(formData: FormData) {
-  const reason = readRequired(formData, "reason");
-  const ticketUrl = readOptional(formData, "approvalTicketUrl");
-  const expiresAt = readOptional(formData, "approvalExpiresAt");
-  const pendingFields = [
-    ticketUrl ? `ticketUrl=${ticketUrl}` : undefined,
-    expiresAt ? `expiresAt=${expiresAt}` : undefined
-  ].filter((value): value is string => Boolean(value));
-
-  return pendingFields.length > 0 ? `${reason}\n\nControl Plane API pending fields: ${pendingFields.join("; ")}` : reason;
-}
-
 function readBoolean(formData: FormData, name: string) {
   return formData.get(name) === "on";
 }
@@ -311,6 +311,20 @@ function readCsv(formData: FormData, name: string) {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+}
+
+function readCsvOptional(formData: FormData, name: string) {
+  const value = readOptional(formData, name);
+  if (!value) {
+    return undefined;
+  }
+
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  return items.length > 0 ? items : undefined;
 }
 
 function readEnvironment(formData: FormData): Environment {
