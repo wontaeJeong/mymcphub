@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@mcp-hub/auth": "workspace:*",
     "@mcp-hub/db": "workspace:*",
     "fastify": "^5.4.0"
   }

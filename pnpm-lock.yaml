@@ -44,6 +44,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@mcp-hub/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mcp-hub/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -53,6 +56,9 @@ importers:
 
   apps/gateway:
     dependencies:
+      '@mcp-hub/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mcp-hub/mcp-protocol':
         specifier: workspace:*
         version: link:../../packages/mcp-protocol
@@ -83,7 +89,11 @@ importers:
 
   apps/worker: {}
 
-  packages/auth: {}
+  packages/auth:
+    dependencies:
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
 
   packages/config: {}
 
@@ -1280,6 +1290,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
@@ -2707,6 +2720,8 @@ snapshots:
       is-extglob: 2.1.1
 
   isexe@2.0.0: {}
+
+  jose@6.2.3: {}
 
   js-tokens@9.0.1: {}
 

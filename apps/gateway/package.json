@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@mcp-hub/auth": "workspace:*",
     "@mcp-hub/mcp-protocol": "workspace:*",
     "@mcp-hub/policy": "workspace:*"
   }
