@@ -26,8 +26,9 @@ const defaultMockPrincipal = createMockAdminPrincipal({
 const defaultMockAuth = authContextFromPrincipal(defaultMockPrincipal);
 
 export function registerAuthContext(app: FastifyInstance) {
-  app.addHook("preHandler", async (request) => {
+  app.addHook("preHandler", async (request, reply) => {
     request.traceId = firstHeader(request, "x-trace-id") ?? randomUUID();
+    reply.header("x-trace-id", request.traceId);
     request.auth = buildAuthContext(request);
   });
 }
