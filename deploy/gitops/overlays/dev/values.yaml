@@ -1,0 +1,2 @@
+# Kustomize requires valuesFile to stay inside the overlay load root.
+{}
