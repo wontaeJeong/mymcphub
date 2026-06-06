@@ -12,6 +12,8 @@ export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled" |
 
 export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
+export type ServerVersionStatus = "draft" | "pending" | "active" | "deprecated" | "rolled_back";
+
 export type User = {
   id: string;
   email: string;
@@ -69,6 +71,14 @@ export type McpServerVersion = {
   serverId: string;
   version: string;
   imageRef: string | null;
+  imageRepository: string | null;
+  imageTag: string | null;
+  imageDigest: string | null;
+  configHash: string | null;
+  toolSchemaHash: string | null;
+  status: ServerVersionStatus;
+  createdBy: string | null;
+  activatedAt: Date | null;
   manifestJson: Record<string, unknown>;
   createdAt: Date;
 };

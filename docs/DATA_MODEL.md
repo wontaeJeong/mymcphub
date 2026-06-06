@@ -13,7 +13,7 @@ MCP Hub separates identity, catalog, authorization, runtime session, audit, and 
 ## MCP Catalog
 
 - `mcp_servers` is the server catalog source of truth with slug, owner team, environment, transport, upstream URL, enabled flag, and risk level.
-- `mcp_server_versions` stores versioned manifests or image references.
+- `mcp_server_versions` stores versioned release metadata, including image repository/tag/digest, config and tool-schema hashes, lifecycle status, creator, activation timestamp, and compatibility manifest/image reference fields.
 - `mcp_tools` stores discovered tool names and risk metadata per server.
 - `mcp_tool_schemas` snapshots input/output schemas by hash and version.
 
