@@ -26,6 +26,32 @@ export class CircuitBreaker {
   }
 }
 
+export function createHttpJsonRpcTransport(): UpstreamTransport {
+  return {
+    async call(server, request) {
+      if (!server.upstreamUrl) {
+        throw new Error("UPSTREAM_URL_MISSING");
+      }
+
+      if (server.upstreamUrl.startsWith("local://")) {
+        return createLocalEchoTransport().call(server, request, 0);
+      }
+
+      const response = await fetch(server.upstreamUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request)
+      });
+
+      if (!response.ok) {
+        throw new Error(`UPSTREAM_HTTP_${response.status}`);
+      }
+
+      return parseJsonRpcResponse(await response.json());
+    }
+  };
+}
+
 export function createLocalEchoTransport(): UpstreamTransport {
   return {
     async call(server, request) {
@@ -92,6 +118,45 @@ function result(request: McpJsonRpcRequest, payload: Record<string, unknown>): M
     id: request.id ?? null,
     result: payload
   };
+}
+
+function parseJsonRpcResponse(value: unknown): McpJsonRpcResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("UPSTREAM_INVALID_JSON_RPC_RESPONSE");
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.jsonrpc !== "2.0") {
+    throw new Error("UPSTREAM_INVALID_JSON_RPC_RESPONSE");
+  }
+
+  return {
+    jsonrpc: "2.0",
+    id: isJsonRpcId(record.id) ? record.id : null,
+    result: readOptionalRecord(record.result),
+    error: readJsonRpcError(record.error)
+  };
+}
+
+function isJsonRpcId(value: unknown): value is McpJsonRpcResponse["id"] {
+  return value === null || typeof value === "string" || typeof value === "number";
+}
+
+function readOptionalRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function readJsonRpcError(value: unknown): McpJsonRpcResponse["error"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.code !== "number" || typeof record.message !== "string") {
+    return undefined;
+  }
+
+  return { code: record.code, message: record.message, data: readOptionalRecord(record.data) };
 }
 
 function toMcpToolDescriptor(tool: GatewayServer["tools"][number]): McpToolDescriptor {
