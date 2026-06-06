@@ -45,7 +45,13 @@ app.kubernetes.io/component: {{ .component }}
 {{- define "mcp-hub.image" -}}
 {{- $root := .root -}}
 {{- $componentValues := .componentValues -}}
-{{- printf "%s/%s/%s:%s" $root.Values.image.registry $root.Values.image.repositoryPrefix $componentValues.image.repository $root.Values.image.tag -}}
+{{- $repository := printf "%s/%s/%s" $root.Values.image.registry $root.Values.image.repositoryPrefix $componentValues.image.repository -}}
+{{- $digest := default "" $componentValues.image.digest -}}
+{{- if $digest -}}
+{{- printf "%s@%s" $repository $digest -}}
+{{- else -}}
+{{- printf "%s:%s" $repository $root.Values.image.tag -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "mcp-hub.serviceAccountName" -}}
