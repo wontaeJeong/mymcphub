@@ -1,0 +1,64 @@
+{
+  "realm": "mcp-hub",
+  "enabled": true,
+  "displayName": "MCP Hub Local",
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Local MCP Hub administrator"
+      },
+      {
+        "name": "reader",
+        "description": "Local MCP Hub read-only user"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "mcp-hub-web",
+      "name": "MCP Hub Web Local",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-secret",
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.com",
+      "firstName": "Local",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "readonly",
+      "enabled": true,
+      "email": "readonly@example.com",
+      "firstName": "Local",
+      "lastName": "Readonly",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "readonly",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["reader"]
+    }
+  ]
+}
