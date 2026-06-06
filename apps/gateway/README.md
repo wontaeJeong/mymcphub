@@ -7,7 +7,7 @@ GET  /mcp/:serverSlug
 POST /mcp/:serverSlug
 ```
 
-Local development uses mock bearer tokens. `Bearer dev-admin-token` maps to the platform team and can call the seeded `echo` tool. Requests without a bearer token are rejected.
+Local development uses mock bearer tokens. `Bearer dev-admin-token` maps to the platform team and can call the seeded first-party tools. Requests without a bearer token are rejected.
 
 ## Curl Examples
 
@@ -25,7 +25,17 @@ curl http://localhost:5000/mcp/echo \
 curl http://localhost:5000/mcp/echo \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"echo","arguments":{"message":"hello"}}}'
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"echo_message","arguments":{"message":"hello"}}}'
+
+curl http://localhost:5000/mcp/internal-docs \
+  -H 'authorization: Bearer dev-admin-token' \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_docs","arguments":{"query":"gateway"}}}'
+
+curl http://localhost:5000/mcp/k8s-readonly \
+  -H 'authorization: Bearer dev-admin-token' \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_pods","arguments":{"namespace":"platform"}}}'
 ```
 
-The initial stdio adapter transport is represented by interfaces only; concrete stdio adapter execution is implemented later.
+Run the first-party upstream servers on ports `5100`, `5101`, and `5102` before using the default HTTP proxy registry.
