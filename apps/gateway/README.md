@@ -36,6 +36,11 @@ curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_pods","arguments":{"namespace":"platform"}}}'
+
+curl http://localhost:5000/mcp/stdio-sample \
+  -H 'authorization: Bearer dev-admin-token' \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"stdio_echo","arguments":{"message":"via stdio adapter"}}}'
 ```
 
-Run the first-party upstream servers on ports `5100`, `5101`, and `5102` before using the default HTTP proxy registry.
+Run the first-party HTTP upstream servers on ports `5100`, `5101`, and `5102`, and run the stdio adapter for `stdio-sample` on port `5103`, before using the default HTTP proxy registry. The gateway only proxies HTTP JSON-RPC upstreams; stdio subprocess management belongs to `apps/stdio-adapter`.
