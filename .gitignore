@@ -5,3 +5,7 @@ dist/
 coverage/
 .env
 *.log
+.sisyphus/
+mcp_hub_prompt_pack/
+mcp_hub_parallel_prompt_pack/
+*.zip:Zone.Identifier
