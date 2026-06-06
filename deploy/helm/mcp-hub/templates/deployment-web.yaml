@@ -1,0 +1,50 @@
+{{- if .Values.web.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp-hub.componentName" (dict "root" . "component" "web") }}
+  labels:
+{{ include "mcp-hub.componentLabels" (dict "root" . "component" "web") | indent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+{{ include "mcp-hub.componentSelectorLabels" (dict "root" . "component" "web") | indent 6 }}
+  template:
+    metadata:
+      labels:
+{{ include "mcp-hub.componentSelectorLabels" (dict "root" . "component" "web") | indent 8 }}
+    spec:
+      serviceAccountName: {{ include "mcp-hub.serviceAccountName" (dict "root" . "component" "web" "componentValues" .Values.web) }}
+      securityContext:
+{{ include "mcp-hub.podSecurityContext" . | indent 8 }}
+      containers:
+        - name: web
+          image: {{ include "mcp-hub.image" (dict "root" . "componentValues" .Values.web) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.web.port | quote }}
+{{ include "mcp-hub.secretEnv" . | indent 12 }}
+          envFrom:
+{{ include "mcp-hub.commonEnvFrom" . | indent 12 }}
+          {{- if .Values.web.probes.enabled }}
+          readinessProbe:
+{{ include "mcp-hub.httpProbe" .Values.web.probes.readiness | indent 12 }}
+          livenessProbe:
+{{ include "mcp-hub.httpProbe" .Values.web.probes.liveness | indent 12 }}
+          {{- end }}
+          resources:
+{{ toYaml .Values.web.resources | indent 12 }}
+          securityContext:
+{{ include "mcp-hub.containerSecurityContext" . | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}
