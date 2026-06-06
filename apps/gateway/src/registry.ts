@@ -92,6 +92,33 @@ export function createDefaultRegistry(): GatewayServer[] {
         })
       ],
       grants: [platformGrant(["list_namespaces", "list_pods", "get_pod"])]
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000103",
+      slug: "stdio-sample",
+      environment: "dev",
+      transport: "stdio_adapter",
+      upstreamUrl: "http://localhost:5103/mcp",
+      enabled: true,
+      tools: [
+        tool(
+          "stdio_echo",
+          "Return the provided message and metadata from the stdio sample server.",
+          "low",
+          {
+            type: "object",
+            properties: { message: { type: "string", description: "Message to echo back." } },
+            required: ["message"],
+            additionalProperties: false
+          }
+        ),
+        tool("get_stdio_status", "Return process and uptime status for the stdio sample server.", "low", {
+          type: "object",
+          properties: {},
+          additionalProperties: false
+        })
+      ],
+      grants: [platformGrant(["stdio_echo", "get_stdio_status"])]
     }
   ];
 }
