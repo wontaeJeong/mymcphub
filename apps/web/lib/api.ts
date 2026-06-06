@@ -1,6 +1,7 @@
 export type Environment = "dev" | "stg" | "prod" | "shared";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type ServerTransport = "streamable_http" | "sse_legacy" | "stdio_adapter" | "external";
+export type ServerVersionStatus = "draft" | "pending" | "active" | "deprecated" | "rolled_back";
 export type PolicyEffect = "allow" | "deny" | "needs_approval";
 export type GrantSubjectType = "user" | "team" | "service_account";
 
@@ -72,6 +73,25 @@ export type ApiMcpTool = {
   schemaVersion?: string;
   discoveredAt: string;
   lastSeenAt?: string;
+};
+
+export type ApiMcpServerVersion = {
+  id: string;
+  serverId: string;
+  version: string;
+  imageRef?: string;
+  imageRepository?: string;
+  imageTag?: string;
+  imageDigest?: string;
+  configHash?: string;
+  toolSchemaHash?: string;
+  status: ServerVersionStatus;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  activatedAt?: string;
+  rolledBackAt?: string;
+  manifestJson?: Record<string, unknown>;
 };
 
 export type ApiGrant = {
@@ -292,6 +312,10 @@ export async function disableServer(serverId: string) {
 
 export async function listTools(serverId: string) {
   return apiRequest<ListResponse<ApiMcpTool>>(`/api/servers/${encodeURIComponent(serverId)}/tools`);
+}
+
+export async function listServerVersions(serverId: string) {
+  return apiRequest<ListResponse<ApiMcpServerVersion>>(`/api/servers/${encodeURIComponent(serverId)}/versions`);
 }
 
 export async function enableTool(serverId: string, toolId: string) {
