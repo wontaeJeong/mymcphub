@@ -22,6 +22,19 @@ export const openApiDocument = {
       get: { summary: "Get MCP server", responses: { "200": { description: "Server" }, "404": { description: "Not found" } } },
       patch: { summary: "Update MCP server", responses: { "200": { description: "Updated server" } } }
     },
+    "/api/servers/{serverId}/versions": {
+      get: { summary: "List MCP server versions", responses: { "200": { description: "Server version list" }, "404": { description: "Not found" } } },
+      post: { summary: "Create MCP server version", responses: { "201": { description: "Created server version" }, "400": { description: "Validation error" }, "403": { description: "Forbidden" } } }
+    },
+    "/api/servers/{serverId}/versions/{versionId}/activate": {
+      post: { summary: "Activate MCP server version", responses: { "200": { description: "Activated server version" }, "403": { description: "Forbidden" }, "404": { description: "Not found" } } }
+    },
+    "/api/servers/{serverId}/versions/{versionId}/rollback": {
+      post: { summary: "Roll back to MCP server version", responses: { "200": { description: "Rolled back server version" }, "403": { description: "Forbidden" }, "404": { description: "Not found" } } }
+    },
+    "/api/servers/{serverId}/schema-diff": {
+      get: { summary: "Get MCP server schema diff", responses: { "200": { description: "Schema diff response" }, "404": { description: "Not found" } } }
+    },
     "/api/servers/{serverId}/disable": { post: { summary: "Disable MCP server", responses: { "200": { description: "Disabled server" } } } },
     "/api/servers/{serverId}/enable": { post: { summary: "Enable MCP server", responses: { "200": { description: "Enabled server" } } } },
     "/api/servers/{serverId}/tools": { get: { summary: "List server tools", responses: { "200": { description: "Tool list" } } } },

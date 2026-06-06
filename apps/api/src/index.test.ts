@@ -94,6 +94,135 @@ describe("createApiServer", () => {
     await app.close();
   });
 
+  it("lists seed server versions and creates a server version", async () => {
+    const app = createApiServer();
+    const serverId = "00000000-0000-4000-8000-000000000100";
+
+    const seedVersions = await app.inject({ method: "GET", url: `/api/servers/${serverId}/versions` });
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/servers/${serverId}/versions`,
+      payload: {
+        version: "1.1.0",
+        imageRepository: "ghcr.io/mcp-hub/echo",
+        imageTag: "1.1.0",
+        imageDigest: "sha256:testdigest",
+        configHash: "config-hash-1",
+        toolSchemaHash: "tool-schema-hash-1",
+        createdBy: "release-bot",
+        manifestJson: { name: "echo", version: "1.1.0" },
+        status: "pending"
+      }
+    });
+    const versions = await app.inject({ method: "GET", url: `/api/servers/${serverId}/versions` });
+
+    expect(seedVersions.statusCode).toBe(200);
+    expect(seedVersions.json()).toMatchObject({ items: [expect.objectContaining({ serverId, version: "1.0.0", status: "active" })] });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      serverId,
+      version: "1.1.0",
+      status: "pending",
+      configHash: "config-hash-1",
+      toolSchemaHash: "tool-schema-hash-1",
+      createdBy: "release-bot",
+      manifestJson: { name: "echo", version: "1.1.0" }
+    });
+    expect(versions.json<{ items: Array<{ version: string }> }>().items).toEqual(expect.arrayContaining([expect.objectContaining({ version: "1.1.0" })]));
+
+    await app.close();
+  });
+
+  it("rejects duplicate and invalid server version creates", async () => {
+    const app = createApiServer();
+    const serverId = "00000000-0000-4000-8000-000000000100";
+
+    const duplicate = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions`, payload: { version: "1.0.0" } });
+    const missingVersion = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions`, payload: { status: "draft" } });
+    const invalidStatus = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions`, payload: { version: "2.0.0", status: "shipping" } });
+
+    expect(duplicate.statusCode).toBe(400);
+    expect(duplicate.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+    expect(missingVersion.statusCode).toBe(400);
+    expect(invalidStatus.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it("restricts server version mutations to platform admins", async () => {
+    const previousAuthMode = process.env.MCP_AUTH_MODE;
+    process.env.MCP_AUTH_MODE = "oidc";
+    const app = createApiServer();
+    const readerHeaders = {
+      "x-user-id": "reader-user",
+      "x-user-email": "reader@example.com",
+      "x-team-ids": "00000000-0000-4000-8000-000000000010",
+      "x-groups": "readers",
+      "x-roles": "reader"
+    };
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/servers/00000000-0000-4000-8000-000000000100/versions",
+        headers: readerHeaders,
+        payload: { version: "reader-create" }
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ error: { code: "AUTHORIZATION_DENIED" } });
+    } finally {
+      await app.close();
+      if (previousAuthMode === undefined) {
+        delete process.env.MCP_AUTH_MODE;
+      } else {
+        process.env.MCP_AUTH_MODE = previousAuthMode;
+      }
+    }
+  });
+
+  it("activates and rolls back server versions with lifecycle transitions", async () => {
+    const app = createApiServer();
+    const serverId = "00000000-0000-4000-8000-000000000100";
+
+    const created = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions`, payload: { version: "2.0.0" } });
+    const createdVersion = created.json<{ id: string }>();
+    const activated = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions/${createdVersion.id}/activate` });
+    const afterActivate = await app.inject({ method: "GET", url: `/api/servers/${serverId}/versions` });
+    const seedVersion = afterActivate.json<{ items: Array<{ id: string; version: string; status: string }> }>().items.find((version) => version.version === "1.0.0");
+    const rolledBack = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions/${seedVersion?.id}/rollback` });
+    const afterRollback = await app.inject({ method: "GET", url: `/api/servers/${serverId}/versions` });
+
+    expect(created.statusCode).toBe(201);
+    expect(activated.json()).toMatchObject({ id: createdVersion.id, status: "active", activatedAt: expect.any(String) });
+    expect(seedVersion).toMatchObject({ status: "deprecated" });
+    expect(rolledBack.json()).toMatchObject({ id: seedVersion?.id, status: "active" });
+    expect(afterRollback.json<{ items: Array<{ id: string; status: string }> }>().items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdVersion.id, status: "rolled_back" })])
+    );
+
+    await app.close();
+  });
+
+  it("serves schema-diff placeholders and not-found responses for missing server/version", async () => {
+    const app = createApiServer();
+    const serverId = "00000000-0000-4000-8000-000000000100";
+    const missingServerId = "00000000-0000-4000-8000-000000009999";
+
+    const schemaDiff = await app.inject({ method: "GET", url: `/api/servers/${serverId}/schema-diff` });
+    const missingServer = await app.inject({ method: "GET", url: `/api/servers/${missingServerId}/versions` });
+    const missingVersion = await app.inject({ method: "POST", url: `/api/servers/${serverId}/versions/missing-version/activate` });
+
+    expect(schemaDiff.statusCode).toBe(200);
+    expect(schemaDiff.json()).toMatchObject({ serverId, status: "placeholder", changes: [], generatedAt: expect.any(String) });
+    expect(missingServer.statusCode).toBe(404);
+    expect(missingServer.json()).toMatchObject({ error: { code: "MCP_SERVER_NOT_FOUND" } });
+    expect(missingVersion.statusCode).toBe(404);
+    expect(missingVersion.json()).toMatchObject({ error: { code: "MCP_SERVER_VERSION_NOT_FOUND" } });
+
+    await app.close();
+  });
+
   it("propagates x-trace-id into audit records and response headers", async () => {
     const app = createApiServer();
     const traceId = "trace-from-test";
