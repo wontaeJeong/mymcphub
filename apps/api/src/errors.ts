@@ -28,6 +28,10 @@ export function validationError(message: string, details: Record<string, unknown
   return new ApiError("VALIDATION_ERROR", message, 400, details);
 }
 
+export function authorizationError(message: string, details: Record<string, unknown> = {}) {
+  return new ApiError("AUTHORIZATION_DENIED", message, 403, details);
+}
+
 export function toErrorResponse(error: ApiError, traceId: string) {
   return {
     error: {

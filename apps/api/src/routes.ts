@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 
 import { generateClientConfig } from "./client-config";
-import { validationError } from "./errors";
+import { authorizationError, validationError } from "./errors";
 import type { ControlPlaneStore } from "./store";
+import type { AuthContext } from "./types";
 
 type ServerParams = { serverId: string };
 type ToolParams = ServerParams & { toolId: string };
@@ -14,56 +15,68 @@ export function registerControlPlaneRoutes(app: FastifyInstance, store: ControlP
 
   app.get("/api/servers", async () => store.listServers());
   app.post("/api/servers", async (request, reply) => {
+    requirePlatformAdmin(request.auth);
     const server = store.createServer(request.body, request.auth);
     return reply.code(201).send(server);
   });
   app.get<{ Params: ServerParams }>("/api/servers/:serverId", async (request) => store.getServer(request.params.serverId));
-  app.patch<{ Params: ServerParams }>("/api/servers/:serverId", async (request) =>
-    store.patchServer(request.params.serverId, request.body, request.auth)
-  );
-  app.post<{ Params: ServerParams }>("/api/servers/:serverId/disable", async (request) =>
-    store.setServerEnabled(request.params.serverId, false, request.auth)
-  );
-  app.post<{ Params: ServerParams }>("/api/servers/:serverId/enable", async (request) =>
-    store.setServerEnabled(request.params.serverId, true, request.auth)
-  );
+  app.patch<{ Params: ServerParams }>("/api/servers/:serverId", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.patchServer(request.params.serverId, request.body, request.auth);
+  });
+  app.post<{ Params: ServerParams }>("/api/servers/:serverId/disable", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.setServerEnabled(request.params.serverId, false, request.auth);
+  });
+  app.post<{ Params: ServerParams }>("/api/servers/:serverId/enable", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.setServerEnabled(request.params.serverId, true, request.auth);
+  });
 
   app.get<{ Params: ServerParams }>("/api/servers/:serverId/tools", async (request) =>
     store.listTools(request.params.serverId)
   );
-  app.patch<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId", async (request) =>
-    store.patchTool(request.params.serverId, request.params.toolId, request.body, request.auth)
-  );
-  app.post<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId/disable", async (request) =>
-    store.setToolEnabled(request.params.serverId, request.params.toolId, false, request.auth)
-  );
-  app.post<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId/enable", async (request) =>
-    store.setToolEnabled(request.params.serverId, request.params.toolId, true, request.auth)
-  );
+  app.patch<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.patchTool(request.params.serverId, request.params.toolId, request.body, request.auth);
+  });
+  app.post<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId/disable", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.setToolEnabled(request.params.serverId, request.params.toolId, false, request.auth);
+  });
+  app.post<{ Params: ToolParams }>("/api/servers/:serverId/tools/:toolId/enable", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.setToolEnabled(request.params.serverId, request.params.toolId, true, request.auth);
+  });
 
   app.get("/api/grants", async () => store.listGrants());
   app.post("/api/grants", async (request, reply) => {
+    requirePlatformAdmin(request.auth);
     const grant = store.createGrant(request.body, request.auth);
     return reply.code(201).send(grant);
   });
-  app.patch<{ Params: GrantParams }>("/api/grants/:grantId", async (request) =>
-    store.patchGrant(request.params.grantId, request.body, request.auth)
-  );
-  app.post<{ Params: GrantParams }>("/api/grants/:grantId/revoke", async (request) =>
-    store.revokeGrant(request.params.grantId, request.auth)
-  );
+  app.patch<{ Params: GrantParams }>("/api/grants/:grantId", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.patchGrant(request.params.grantId, request.body, request.auth);
+  });
+  app.post<{ Params: GrantParams }>("/api/grants/:grantId/revoke", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.revokeGrant(request.params.grantId, request.auth);
+  });
 
   app.get("/api/approvals", async () => store.listApprovals());
   app.post("/api/approvals", async (request, reply) => {
     const approval = store.createApproval(request.body, request.auth);
     return reply.code(201).send(approval);
   });
-  app.post<{ Params: ApprovalParams }>("/api/approvals/:approvalId/approve", async (request) =>
-    store.decideApproval(request.params.approvalId, "approved", request.auth)
-  );
-  app.post<{ Params: ApprovalParams }>("/api/approvals/:approvalId/reject", async (request) =>
-    store.decideApproval(request.params.approvalId, "rejected", request.auth)
-  );
+  app.post<{ Params: ApprovalParams }>("/api/approvals/:approvalId/approve", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.decideApproval(request.params.approvalId, "approved", request.auth, request.body);
+  });
+  app.post<{ Params: ApprovalParams }>("/api/approvals/:approvalId/reject", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.decideApproval(request.params.approvalId, "rejected", request.auth, request.body);
+  });
 
   app.get("/api/audit-events", async (request) => {
     const query = queryRecord(request.query);
@@ -80,12 +93,21 @@ export function registerControlPlaneRoutes(app: FastifyInstance, store: ControlP
   });
 
   app.post("/api/admin/emergency-deny", async (request) => {
+    requirePlatformAdmin(request.auth);
     const body = bodyRecord(request.body);
-    return store.enableEmergencyDeny(requiredBodyString(body.reason, "reason"), request.auth);
+    requiredBodyString(body.reason, "reason");
+    return store.enableEmergencyDeny(body, request.auth);
   });
-  app.post<{ Params: ServerParams }>("/api/admin/revoke-server-grants/:serverId", async (request) =>
-    store.revokeServerGrants(request.params.serverId, request.auth)
-  );
+  app.post<{ Params: ServerParams }>("/api/admin/revoke-server-grants/:serverId", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.revokeServerGrants(request.params.serverId, request.auth);
+  });
+}
+
+function requirePlatformAdmin(auth: AuthContext) {
+  if (!auth.isPlatformAdmin) {
+    throw authorizationError("Platform admin role is required for this action.");
+  }
 }
 
 function bodyRecord(body: unknown): Record<string, unknown> {
