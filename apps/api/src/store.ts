@@ -220,7 +220,8 @@ function createSeedState(): StoreState {
     servers: [
       createSeedServer(seedIds.echoServer, "echo", "Echo MCP Server", "First-party echo MCP server.", "streamable_http", "low", now),
       createSeedServer(seedIds.internalDocsServer, "internal-docs", "Internal Docs MCP Server", "First-party internal docs MCP server.", "streamable_http", "medium", now),
-      createSeedServer(seedIds.k8sReadonlyServer, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", "streamable_http", "medium", now)
+      createSeedServer(seedIds.k8sReadonlyServer, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", "streamable_http", "medium", now),
+      createSeedServer(seedIds.stdioSampleServer, "stdio-sample", "stdio Sample MCP Server", "First-party stdio MCP server exposed through the stdio adapter runtime.", "stdio_adapter", "low", now)
     ],
     tools: [
       createSeedTool(seedIds.echoServer, "echo_message", "Return the provided message unchanged.", "low", now),
@@ -229,7 +230,9 @@ function createSeedState(): StoreState {
       createSeedTool(seedIds.internalDocsServer, "read_doc", "Read one synthetic internal document by id.", "low", now),
       createSeedTool(seedIds.k8sReadonlyServer, "list_namespaces", "List namespace names from the local read-only mock Kubernetes dataset.", "medium", now),
       createSeedTool(seedIds.k8sReadonlyServer, "list_pods", "List pods in one namespace from the local read-only mock Kubernetes dataset.", "medium", now),
-      createSeedTool(seedIds.k8sReadonlyServer, "get_pod", "Read one pod by namespace and name from the local read-only mock Kubernetes dataset.", "medium", now)
+      createSeedTool(seedIds.k8sReadonlyServer, "get_pod", "Read one pod by namespace and name from the local read-only mock Kubernetes dataset.", "medium", now),
+      createSeedTool(seedIds.stdioSampleServer, "stdio_echo", "Return the provided message and metadata from the stdio sample server.", "low", now),
+      createSeedTool(seedIds.stdioSampleServer, "get_stdio_status", "Return process and uptime status for the stdio sample server.", "low", now)
     ],
     grants: [
       {
@@ -242,6 +245,19 @@ function createSeedState(): StoreState {
         environment: "dev",
         approvedBy: seedIds.adminUser,
         reason: "Initial sample grant for local development.",
+        enabled: true,
+        createdAt: now
+      },
+      {
+        id: seedIds.stdioSampleGrant,
+        subjectType: "team",
+        subjectId: seedIds.platformTeam,
+        projectId: seedIds.sampleProject,
+        serverId: seedIds.stdioSampleServer,
+        allowedTools: ["stdio_echo", "get_stdio_status"],
+        environment: "dev",
+        approvedBy: seedIds.adminUser,
+        reason: "Initial stdio adapter sample grant for local development.",
         enabled: true,
         createdAt: now
       }
@@ -321,6 +337,9 @@ function upstreamUrlForSlug(slug: string) {
   }
   if (slug === "k8s-readonly") {
     return "http://localhost:5102/mcp";
+  }
+  if (slug === "stdio-sample") {
+    return "http://localhost:5103/mcp";
   }
 
   return undefined;
