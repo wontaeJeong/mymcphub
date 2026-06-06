@@ -2,10 +2,19 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { JsonRpcId, McpJsonRpcRequest, McpJsonRpcResponse } from "@mcp-hub/mcp-protocol";
+import type { PolicyDecision } from "@mcp-hub/policy";
 
 import { createAuditBase, createAuditRecorder, hashArguments, redactArguments } from "./audit";
 import { validateBearerToken } from "./auth";
-import { allowedToolsForPrincipal, authorizeToolCall } from "./policy";
+import {
+  allowedToolsForPrincipal,
+  authorizeAdminAction,
+  authorizeConnect,
+  authorizePromptGet,
+  authorizeResourceRead,
+  authorizeToolCall,
+  authorizeToolDiscovery
+} from "./policy";
 import { createDefaultRegistry, findServerBySlug } from "./registry";
 import { CircuitBreaker, createHttpJsonRpcTransport, withTimeout, type UpstreamTransport } from "./upstream";
 import type { GatewayAuditEvent, GatewayPrincipal, GatewayServer } from "./types";
@@ -34,7 +43,7 @@ export function createGatewayRuntime(options: GatewayRuntimeOptions = {}) {
       return;
     }
 
-    const principal = validateBearerToken(request);
+    const principal = await validateBearerToken(request);
     if (!principal) {
       sendJson(response, 401, { error: "missing_or_invalid_bearer_token" });
       return;
@@ -49,6 +58,13 @@ export function createGatewayRuntime(options: GatewayRuntimeOptions = {}) {
     if (!server.enabled) {
       recordHttpAudit(audit.events, principal, server, "http", "deny", startedAt, "MCP_SERVER_DISABLED");
       sendJson(response, 403, { error: "mcp_server_disabled" });
+      return;
+    }
+
+    const connectDecision = authorizeConnect(server, principal);
+    if (connectDecision.effect !== "allow") {
+      recordHttpAudit(audit.events, principal, server, "connect", connectDecision.effect, startedAt, connectDecision.reasonCode);
+      sendJson(response, 403, { error: "mcp_server_denied", reason: connectDecision.reason });
       return;
     }
 
@@ -109,8 +125,13 @@ async function handleMcpMessage(
   }
 
   if (method === "tools/list") {
+    const decision = authorizeToolDiscovery(server, principal);
+    if (decision.effect !== "allow") {
+      recordAudit({ ...auditBase, errorCode: decision.reasonCode, latencyMs: Date.now() - startedAt, policyDecision: decision.effect });
+      return { statusCode: 200, body: error(request.id, -32001, decision.reason) };
+    }
     const allowedTools = allowedToolsForPrincipal(server, principal);
-    recordAudit({ ...auditBase, latencyMs: Date.now() - startedAt, policyDecision: "allow" });
+    recordAudit({ ...auditBase, latencyMs: Date.now() - startedAt, policyDecision: decision.effect });
     return {
       statusCode: 200,
       body: result(request.id, {
@@ -141,6 +162,23 @@ async function handleMcpMessage(
     }
   }
 
+  const methodDecision = authorizeAdditionalMethod(method, server, principal);
+  if (methodDecision?.effect !== "allow") {
+    recordAudit({
+      ...auditBase,
+      argumentHash: hashArguments(redacted),
+      argumentRedactedJson: redacted,
+      errorCode: methodDecision?.reasonCode ?? "MCP_METHOD_UNSUPPORTED",
+      latencyMs: Date.now() - startedAt,
+      policyDecision: methodDecision?.effect ?? "deny",
+      toolName
+    });
+    return {
+      statusCode: 200,
+      body: error(request.id, methodDecision ? -32001 : -32601, methodDecision?.reason ?? `Unsupported MCP method ${method}`)
+    };
+  }
+
   if (circuitBreaker.state(server.slug) === "degraded") {
     recordAudit({ ...auditBase, errorCode: "UPSTREAM_DEGRADED", latencyMs: Date.now() - startedAt, policyDecision: "deny", toolName });
     return { statusCode: 503, body: error(request.id, -32002, "Upstream is degraded") };
@@ -166,6 +204,40 @@ async function handleMcpMessage(
     return { statusCode: 502, body: error(request.id, -32003, message) };
   }
 }
+
+function authorizeAdditionalMethod(
+  method: string,
+  server: GatewayServer,
+  principal: GatewayPrincipal
+): PolicyDecision | undefined {
+  if (method === "tools/list" || method === "tools/call" || method === "notifications/initialized") {
+    return { ...allowConnectDecision, matchedGrantIds: [] };
+  }
+  if (method === "initialize" || method === "ping") {
+    return { ...allowConnectDecision, matchedGrantIds: [] };
+  }
+  if (method === "resources/read") {
+    return authorizeResourceRead(server, principal);
+  }
+  if (method === "prompts/get") {
+    return authorizePromptGet(server, principal);
+  }
+  if (method.startsWith("admin/")) {
+    return authorizeAdminAction(server, principal);
+  }
+
+  return undefined;
+}
+
+const allowConnectDecision: PolicyDecision = {
+  effect: "allow",
+  allowed: true,
+  reason: "MCP method is covered by the server connect authorization.",
+  reasonCode: "ALLOW",
+  matchedGrantIds: [],
+  requiresApproval: false,
+  requiresStepUp: false
+};
 
 function parseJsonRpcRequest(body: unknown): McpJsonRpcRequest {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
