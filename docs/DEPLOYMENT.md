@@ -27,11 +27,11 @@ The chart in `deploy/helm/mcp-hub` renders these Kubernetes resources:
 
 Key values follow this structure:
 
-- `image.registry`, `image.repositoryPrefix`, `image.tag`, and `image.pullPolicy` select images such as `registry.example.com/mcp-hub/api:dev`.
+- `image.registry`, `image.repositoryPrefix`, `image.tag`, and `image.pullPolicy` select images such as `registry.example.com/mcp-hub/api:dev`. Set each component image digest, such as `api.image.digest` or `web.image.digest`, in shared and production environments to render digest-pinned image references such as `registry.example.com/mcp-hub/api@sha256:...`.
 - `web`, `api`, `gateway`, and `worker` each expose `enabled`, `replicas`, `port`, `serviceAccountName`, resources, and probe settings.
-- `auth.mode`, `auth.oidcIssuerUrl`, and `auth.audience` populate non-secret auth runtime config. Use `mock` only for local/dev skeletons and `oidc` for shared environments.
+- `auth.mode`, `auth.oidcIssuerUrl`, and `auth.audience` populate non-secret auth runtime config. Use `mock` only for local/dev skeletons. Current `oidc` mode consumes OIDC-compatible identity headers, so shared environments must place the API behind a trusted auth proxy or ingress that verifies identity and strips client-supplied identity headers before injecting trusted values.
 - `postgres.external` and `redis.external` point to existing Secrets for connection URLs.
-- `ingress`, `networkPolicy`, `runtime`, and `serviceMonitor` control cluster integration and hardening.
+- `ingress`, `networkPolicy`, `runtime`, `serviceAccount`, and `serviceMonitor` control cluster integration and hardening. Keep pod `automountServiceAccountToken` disabled unless a component explicitly needs Kubernetes API access.
 
 ## Secret Expectations
 
@@ -65,7 +65,17 @@ helm upgrade --install mcp-hub deploy/helm/mcp-hub \
   -f deploy/helm/mcp-hub/values-dev.yaml
 ```
 
-Use `values-stg.yaml` or `values-prod.yaml` for staging or production. Override image tags from CI with `--set image.tag=<tag>` rather than editing committed values for one-off releases.
+Use `values-stg.yaml` or `values-prod.yaml` for staging or production. Override image tags from CI with `--set image.tag=<tag>` rather than editing committed values for one-off releases. Prefer component digests such as `--set api.image.digest=sha256:<digest>` for production after images are scanned and signed.
+
+## Runtime Hardening Notes
+
+The default chart enables non-root pods, read-only root filesystems, dropped Linux capabilities, `RuntimeDefault` seccomp, resource requests and limits, NetworkPolicy resources, separate ServiceAccounts, and pod-level `automountServiceAccountToken: false`. Staging and production values set `networkPolicy.allowExternalEgress=false`; keep broad egress disabled unless approved destinations are modeled elsewhere, grant ServiceAccounts only the minimum RBAC required outside this chart, and pin images by digest.
+
+## Auth Trust Boundary
+
+The current API skeleton does not verify JWTs directly at runtime. In `oidc` mode it accepts OIDC-compatible identity headers such as `x-user-id`, `x-team-ids`, `x-groups`, `x-roles`, `x-principal-type`, and `x-client-id`. Do not expose the API directly in shared environments unless a trusted ingress or auth proxy verifies the upstream identity, strips any client-supplied identity headers, and injects trusted headers for the API to consume.
+
+See [SECURITY.md](SECURITY.md) for scanner commands, Dockerfile and Kubernetes hardening review, MCP manifest review, secret handling, and kill-switch operation endpoints.
 
 ## Rollback
 
