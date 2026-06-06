@@ -230,8 +230,10 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
             <th>Policy</th>
             <th>Risk</th>
             <th>Actor</th>
+            <th>Execution</th>
+            <th>Argument hash</th>
             <th>Trace</th>
-            <th>Redacted metadata</th>
+            <th>Redacted payload</th>
             <th>Time</th>
           </tr>
         </thead>
@@ -242,13 +244,28 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
               <td><StatusPill tone={policyTone(event.policyDecision)}>{event.policyDecision}</StatusPill></td>
               <td><StatusPill tone={riskTone(event.riskLevel)}>{event.riskLevel}</StatusPill></td>
               <td>{event.userId ?? event.clientId ?? "unknown"}</td>
+              <td><AuditExecution event={event} /></td>
+              <td>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">Not recorded</span>}</td>
               <td><CopyButton value={event.traceId} label="Copy trace" /></td>
-              <td><RedactedMetadata metadata={event.metadataJson} /></td>
+              <td>
+                <RedactedJsonDetails summary="View redacted arguments" value={event.argumentRedactedJson} emptyText="No redacted arguments returned" />
+                <RedactedJsonDetails summary="View redacted metadata" value={event.metadataJson} emptyText="No metadata returned" />
+              </td>
               <td>{formatDate(event.timestamp)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AuditExecution({ event }: Readonly<{ event: ApiAuditEvent }>) {
+  return (
+    <div>
+      <p>{event.latencyMs === undefined ? <span className="muted">Latency n/a</span> : `${event.latencyMs} ms`}</p>
+      {event.upstreamStatus === undefined ? <p className="muted">Upstream n/a</p> : <StatusPill tone={event.upstreamStatus < 400 ? "success" : "warning"}>{event.upstreamStatus}</StatusPill>}
+      {event.errorCode ? <p className="muted">Error {event.errorCode}</p> : null}
     </div>
   );
 }
@@ -325,18 +342,22 @@ function SchemaViewer({ tool }: Readonly<{ tool: ApiMcpTool }>) {
   );
 }
 
-function RedactedMetadata({ metadata }: Readonly<{ metadata: Record<string, unknown> }>) {
+function RedactedJsonDetails({ summary, value, emptyText }: Readonly<{ summary: string; value: unknown; emptyText: string }>) {
+  if (value === undefined || value === null) {
+    return <p className="muted">{emptyText}</p>;
+  }
+
   return (
     <details className="schema-viewer">
-      <summary>View redacted metadata</summary>
-      <pre className="code-block">{JSON.stringify(redactMetadata(metadata), null, 2)}</pre>
+      <summary>{summary}</summary>
+      <pre className="code-block">{JSON.stringify(redactAuditJson(value), null, 2)}</pre>
     </details>
   );
 }
 
-function redactMetadata(value: unknown): unknown {
+function redactAuditJson(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => redactMetadata(item));
+    return value.map((item) => redactAuditJson(item));
   }
 
   if (!value || typeof value !== "object") {
@@ -346,7 +367,7 @@ function redactMetadata(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
       key,
-      isSensitiveMetadataKey(key) ? "[redacted]" : redactMetadata(nestedValue)
+      isSensitiveMetadataKey(key) ? "[REDACTED]" : redactAuditJson(nestedValue)
     ])
   );
 }
