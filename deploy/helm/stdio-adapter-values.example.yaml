@@ -1,0 +1,32 @@
+stdioAdapters:
+  stdioSample:
+    enabled: true
+    name: stdio-sample-adapter
+    image: mcp-hub/stdio-adapter:prompt-07
+    replicas: 1
+    port: 5103
+    command: node
+    args:
+      - servers/stdio-sample/dist/index.js
+    workdir: /app
+    startupTimeoutMs: 10000
+    requestTimeoutMs: 30000
+    maxBodyBytes: 1048576
+    maxQueueDepth: 16
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 10001
+    networkPolicy:
+      enabled: true
+      allowedIngressLabels:
+        app.kubernetes.io/name: mcp-gateway
+      allowedEgressLabels: {}
