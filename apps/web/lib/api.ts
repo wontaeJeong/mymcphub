@@ -128,7 +128,28 @@ export type ApiAuditEvent = {
   policyDecision: PolicyEffect;
   traceId: string;
   metadataJson: Record<string, unknown>;
+  argumentHash?: string;
+  argumentRedactedJson?: unknown;
+  latencyMs?: number;
+  upstreamStatus?: number;
+  errorCode?: string;
 };
+
+export type ListAuditEventsOptions = Readonly<{
+  limit?: number;
+  cursor?: string;
+  from?: string;
+  to?: string;
+  user?: string;
+  team?: string;
+  project?: string;
+  server?: string;
+  tool?: string;
+  event_type?: string;
+  policy_decision?: string;
+  risk_level?: string;
+  trace_id?: string;
+}>;
 
 export type ApiToolCallEvent = {
   id: string;
@@ -293,8 +314,36 @@ export async function listApprovals() {
   return apiRequest<ListResponse<ApiApproval>>("/api/approvals");
 }
 
-export async function listAuditEvents(limit = 50) {
-  return apiRequest<ListResponse<ApiAuditEvent>>(`/api/audit-events?limit=${limit}`);
+export function buildAuditEventsPath(options: ListAuditEventsOptions = {}) {
+  const params = new URLSearchParams();
+  appendSearchParam(params, "limit", options.limit);
+  appendSearchParam(params, "cursor", options.cursor);
+  appendSearchParam(params, "from", options.from);
+  appendSearchParam(params, "to", options.to);
+  appendSearchParam(params, "user", options.user);
+  appendSearchParam(params, "team", options.team);
+  appendSearchParam(params, "project", options.project);
+  appendSearchParam(params, "server", options.server);
+  appendSearchParam(params, "tool", options.tool);
+  appendSearchParam(params, "event_type", options.event_type);
+  appendSearchParam(params, "policy_decision", options.policy_decision);
+  appendSearchParam(params, "risk_level", options.risk_level);
+  appendSearchParam(params, "trace_id", options.trace_id);
+
+  const query = params.toString();
+  return query ? `/api/audit-events?${query}` : "/api/audit-events";
+}
+
+export async function listAuditEvents(options: ListAuditEventsOptions = {}) {
+  return apiRequest<ListResponse<ApiAuditEvent>>(buildAuditEventsPath(options));
+}
+
+function appendSearchParam(params: URLSearchParams, key: string, value: number | string | undefined) {
+  if (value === undefined || value === "") {
+    return;
+  }
+
+  params.set(key, String(value));
 }
 
 export async function listToolCallEvents() {
