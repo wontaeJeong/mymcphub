@@ -16,7 +16,13 @@
     "security:secrets": "scripts/security/scan-secrets.sh",
     "security:k8s": "scripts/security/scan-k8s-manifests.sh",
     "security:mcp-manifests": "tsx scripts/security/check-mcp-manifest.ts",
-    "security:check": "scripts/security/check-all.sh"
+    "security:check": "scripts/security/check-all.sh",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm security:smoke && pnpm helm:template",
+    "test:unit": "turbo test:unit",
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
+    "helm:template": "bash tests/helm-template.sh",
+    "security:smoke": "pnpm security:mcp-manifests"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
