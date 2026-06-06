@@ -1,12 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { splitApprovalQueue } from "../app/approvals/page-helpers";
 import { buildAuditPageHref, filterToolCallEvents, readAuditOptions } from "../app/audit/page-helpers";
 import { matchesCatalogFilters } from "../app/catalog/page-helpers";
-import { selectRecentServerAuditEvents, selectServerHealth } from "../app/servers/[serverId]/page-helpers";
-import { ApprovalTable, AuditTable, ServerTable, ToolCallTable, ToolTable } from "../components/tables";
-import type { ApiApproval, ApiAuditEvent, ApiMcpServer, ApiMcpTool, ApiServerHealth, ApiToolCallEvent } from "../lib/api";
+import ServerDetailPage from "../app/servers/[serverId]/page";
+import { selectActiveServerVersion, selectRecentServerAuditEvents, selectServerHealth } from "../app/servers/[serverId]/page-helpers";
+import { ApprovalTable, AuditTable, ServerTable, ServerVersionTable, ToolCallTable, ToolTable } from "../components/tables";
+import type { ApiApproval, ApiAuditEvent, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth, ApiToolCallEvent } from "../lib/api";
 
 const createdAt = "2026-06-07T09:00:00.000Z";
 const updatedAt = "2026-06-07T10:00:00.000Z";
@@ -40,6 +41,64 @@ function buildHealth(overrides: Partial<ApiServerHealth> = {}): ApiServerHealth 
     checkedAt: "2026-06-07T10:05:00.000Z",
     ...overrides
   };
+}
+
+function buildServerVersion(overrides: Partial<ApiMcpServerVersion> = {}): ApiMcpServerVersion {
+  return {
+    id: "version-1",
+    serverId: "server-prod-docs",
+    version: "2026.06.1",
+    imageRef: "ghcr.io/example/prod-docs:2026.06.1",
+    configHash: "sha256:config",
+    toolSchemaHash: "sha256:schema",
+    status: "active",
+    createdBy: "user-release",
+    createdAt,
+    activatedAt: updatedAt,
+    manifestJson: { name: "prod-docs" },
+    ...overrides
+  };
+}
+
+function jsonResponse(value: unknown, init: ResponseInit = {}) {
+  return new Response(JSON.stringify(value), {
+    ...init,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
+function stubServerDetailFetch(versionResult: { type: "items"; items: ApiMcpServerVersion[] } | { type: "error" }) {
+  vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+    const url = input instanceof Request ? new URL(input.url) : input instanceof URL ? input : new URL(input);
+
+    if (url.pathname === "/api/servers/server-prod-docs") {
+      return jsonResponse(buildServer());
+    }
+
+    if (url.pathname === "/api/servers/server-prod-docs/tools") {
+      return jsonResponse({ items: [] });
+    }
+
+    if (url.pathname === "/api/server-health") {
+      return jsonResponse({ items: [buildHealth()] });
+    }
+
+    if (url.pathname === "/api/audit-events") {
+      return jsonResponse({ items: [] });
+    }
+
+    if (url.pathname === "/api/servers/server-prod-docs/versions") {
+      if (versionResult.type === "error") {
+        return jsonResponse({ error: { message: "Versions endpoint unavailable" } }, { status: 503, statusText: "Service Unavailable" });
+      }
+
+      return jsonResponse({ items: versionResult.items });
+    }
+
+    return jsonResponse({ error: { message: `Unhandled test endpoint ${url.pathname}` } }, { status: 404, statusText: "Not Found" });
+  });
 }
 
 function buildTool(overrides: Partial<ApiMcpTool> = {}): ApiMcpTool {
@@ -119,6 +178,10 @@ function buildToolCallEvent(overrides: Partial<ApiToolCallEvent> = {}): ApiToolC
   };
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("prompt-12 required web pages", () => {
   it("covers server catalog filtering and rendered catalog row state", () => {
     const matchingServer = buildServer();
@@ -163,6 +226,54 @@ describe("prompt-12 required web pages", () => {
     expect(toolsHtml).toContain("disabled");
     expect(auditHtml).toContain("trace-latest");
     expect(auditHtml).not.toContain("trace-older");
+  });
+
+
+  it("covers server version active selection and table rendering", () => {
+    const activeVersion = buildServerVersion({ id: "version-active", version: "2026.06.1", status: "active", createdAt: "2026-06-07T09:00:00.000Z" });
+    const newerPendingVersion = buildServerVersion({ id: "version-pending", version: "2026.06.2", status: "pending", createdAt: "2026-06-07T11:00:00.000Z" });
+    const newestFallbackVersion = buildServerVersion({ id: "version-draft", version: "2026.06.3", status: "draft", createdAt: "2026-06-07T12:00:00.000Z", imageRef: undefined, imageRepository: "ghcr.io/example/prod-docs", imageTag: "2026.06.3" });
+
+    expect(selectActiveServerVersion([newerPendingVersion, activeVersion])).toEqual(activeVersion);
+    expect(selectActiveServerVersion([newerPendingVersion, newestFallbackVersion])).toEqual(newestFallbackVersion);
+
+    const html = renderToStaticMarkup(<ServerVersionTable versions={[activeVersion, newestFallbackVersion]} />);
+
+    expect(html).toContain("2026.06.1");
+    expect(html).toContain("active");
+    expect(html).toContain("ghcr.io/example/prod-docs:2026.06.1");
+    expect(html).toContain("sha256:config");
+    expect(html).toContain("sha256:schema");
+    expect(html).toContain("2026.06.3");
+    expect(html).toContain("ghcr.io/example/prod-docs");
+  });
+
+  it("renders server detail versions plus empty and error fallbacks without blocking the page", async () => {
+    stubServerDetailFetch({ type: "items", items: [buildServerVersion(), buildServerVersion({ id: "version-pending", version: "2026.06.2", status: "pending", createdAt: "2026-06-07T11:00:00.000Z" })] });
+    const versionPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
+    const versionHtml = renderToStaticMarkup(versionPage);
+
+    expect(versionHtml).toContain("Active version");
+    expect(versionHtml).toContain("2026.06.1");
+    expect(versionHtml).toContain("2026.06.2");
+    expect(versionHtml).toContain("Server tools");
+
+    stubServerDetailFetch({ type: "items", items: [] });
+    const emptyPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
+    const emptyHtml = renderToStaticMarkup(emptyPage);
+
+    expect(emptyHtml).toContain("Production Docs");
+    expect(emptyHtml).toContain("No server versions");
+    expect(emptyHtml).toContain("No tools discovered");
+
+    stubServerDetailFetch({ type: "error" });
+    const errorPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
+    const errorHtml = renderToStaticMarkup(errorPage);
+
+    expect(errorHtml).toContain("Production Docs");
+    expect(errorHtml).toContain("Server versions unavailable");
+    expect(errorHtml).toContain("Versions endpoint unavailable (503)");
+    expect(errorHtml).toContain("No tools discovered");
   });
 
   it("covers approval queue partitioning and decision rendering", () => {

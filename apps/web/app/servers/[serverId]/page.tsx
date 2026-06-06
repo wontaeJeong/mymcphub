@@ -5,11 +5,11 @@ import { disableServerAction, disableToolAction, enableServerAction, enableToolA
 import { PageHero, SectionHeader } from "../../../components/chrome";
 import { enabledTone, formatDate, healthTone, riskTone } from "../../../components/format";
 import { ErrorState } from "../../../components/states";
-import { AuditTable, ToolTable } from "../../../components/tables";
-import type { ApiMcpTool } from "../../../lib/api";
-import { getServer, listAuditEvents, listServerHealth, listTools } from "../../../lib/api";
+import { AuditTable, ServerVersionTable, ToolTable } from "../../../components/tables";
+import type { ApiMcpServerVersion, ApiMcpTool } from "../../../lib/api";
+import { getServer, listAuditEvents, listServerHealth, listServerVersions, listTools } from "../../../lib/api";
 import { loadResult } from "../../../lib/result";
-import { selectRecentServerAuditEvents, selectServerHealth } from "./page-helpers";
+import { selectActiveServerVersion, selectRecentServerAuditEvents, selectServerHealth } from "./page-helpers";
 
 type ServerDetailPageProps = Readonly<{
   params: Promise<{ serverId: string }>;
@@ -21,7 +21,8 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   const toolsPromise = loadResult(listTools(serverId));
   const healthPromise = loadResult(listServerHealth());
   const auditPromise = loadResult(listAuditEvents({ limit: 50, server: serverId }));
-  const [server, tools, health, audit] = await Promise.all([serverPromise, toolsPromise, healthPromise, auditPromise]);
+  const versionsPromise = loadResult(listServerVersions(serverId));
+  const [server, tools, health, audit, versions] = await Promise.all([serverPromise, toolsPromise, healthPromise, auditPromise, versionsPromise]);
 
   if (!server.ok) {
     return (
@@ -35,6 +36,8 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
 
   const latestHealth = health.ok ? selectServerHealth(health.data.items, serverId) : undefined;
   const recentAudit = audit.ok ? selectRecentServerAuditEvents(audit.data.items) : [];
+  const versionItems = versions.ok ? versions.data.items : [];
+  const activeVersion = versions.ok ? selectActiveServerVersion(versionItems) : undefined;
 
   return (
     <div className="page-stack">
@@ -76,6 +79,15 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
         </Surface>
       </div>
       <section>
+        <SectionHeader title="Server versions" description="Read-only release state from /api/servers/:serverId/versions." />
+        {versions.ok && activeVersion ? (
+          <div className="grid">
+            <ActiveVersionSummary version={activeVersion} />
+            <ServerVersionTable versions={versionItems} />
+          </div>
+        ) : versions.ok ? <EmptyState title="No server versions" description="The Control Plane returned no versions for this server." /> : <ErrorState title="Server versions unavailable" message={versions.error} />}
+      </section>
+      <section>
         <SectionHeader title="Recent audit event" description="Most recent event for this server from /api/audit-events." />
         {audit.ok && recentAudit.length > 0 ? <AuditTable events={recentAudit} /> : audit.ok ? <EmptyState title="No server audit event" description="No audit event in the fetched window references this server." /> : <ErrorState message={audit.error} />}
       </section>
@@ -85,6 +97,37 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
       </section>
     </div>
   );
+}
+
+function ActiveVersionSummary({ version }: Readonly<{ version: ApiMcpServerVersion }>) {
+  return (
+    <Surface>
+      <SectionHeader title="Active version" description="Current server version selected from active status or newest available fallback." />
+      <div className="grid">
+        <div className="actions">
+          <StatusPill tone={version.status === "active" ? "success" : "warning"}>{version.status}</StatusPill>
+          <StatusPill>{version.version}</StatusPill>
+        </div>
+        <p><strong>Image:</strong> {formatVersionImage(version)}</p>
+        <p><strong>Config hash:</strong> {version.configHash ?? "Not recorded"}</p>
+        <p><strong>Tool schema hash:</strong> {version.toolSchemaHash ?? "Not recorded"}</p>
+        <p><strong>Created:</strong> {formatDate(version.createdAt)}</p>
+        <p><strong>Activated:</strong> {formatDate(version.activatedAt)}</p>
+      </div>
+    </Surface>
+  );
+}
+
+function formatVersionImage(version: ApiMcpServerVersion) {
+  if (version.imageRef) {
+    return version.imageRef;
+  }
+
+  if (version.imageRepository && version.imageTag) {
+    return `${version.imageRepository}:${version.imageTag}`;
+  }
+
+  return version.imageRepository ?? version.imageDigest ?? "Image not recorded";
 }
 
 function ToolControls(tool: ApiMcpTool) {
