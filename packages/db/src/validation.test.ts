@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import { dbTableNames } from "./schema";
 import { seedStatements } from "./seed-data";
 import {
+  ApprovalRequestSchema,
+  EmergencyPolicyStateSchema,
   HealthCheckResultSchema,
   McpGrantSchema,
-  McpServerManifestSchema
+  McpServerManifestSchema,
+  PolicyDecisionInputSchema,
+  PolicyDecisionResultSchema
 } from "./validation";
 
 describe("db shared schemas", () => {
@@ -49,6 +53,138 @@ describe("db shared schemas", () => {
         checkedAt: new Date("2026-01-01T00:00:00.000Z").toISOString()
       }).metadataJson
     ).toEqual({});
+  });
+
+  it("validates prompt-08 approval, policy result, and emergency policy inputs", () => {
+    expect(
+      PolicyDecisionInputSchema.parse({
+        subject: {
+          type: "user",
+          userId: "00000000-0000-4000-8000-000000000001",
+          teamIds: ["00000000-0000-4000-8000-000000000010"]
+        },
+        client: {
+          clientId: "local-dev-client",
+          clientType: "opencode"
+        },
+        project: {
+          projectId: "00000000-0000-4000-8000-000000000020"
+        },
+        server: {
+          serverId: "00000000-0000-4000-8000-000000000100",
+          serverSlug: "echo",
+          environment: "dev",
+          enabled: true
+        },
+        tool: {
+          name: "echo_message",
+          riskLevel: "low",
+          enabled: true
+        },
+        action: "call_tool",
+        requestTime: new Date("2026-01-01T00:00:00.000Z").toISOString()
+      })
+    ).toMatchObject({ action: "call_tool", server: { serverSlug: "echo" } });
+
+    expect(
+      ApprovalRequestSchema.parse({
+        requesterId: "00000000-0000-4000-8000-000000000001",
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        requestedTools: ["echo_message"],
+        environment: "dev",
+        ticketUrl: "https://tickets.example.com/MCP-8",
+        reason: "Need access"
+      })
+    ).toMatchObject({ status: "pending", requestedAction: "call_tool" });
+
+    expect(() =>
+      ApprovalRequestSchema.parse({
+        requesterId: "00000000-0000-4000-8000-000000000001",
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        requestedTools: [],
+        environment: "dev",
+        reason: "Need access"
+      })
+    ).toThrow();
+
+    expect(() =>
+      ApprovalRequestSchema.parse({
+        requesterId: "00000000-0000-4000-8000-000000000001",
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        requestedTools: ["*"],
+        environment: "dev",
+        reason: "Need access"
+      })
+    ).toThrow();
+
+    expect(() =>
+      ApprovalRequestSchema.parse({
+        requesterId: "00000000-0000-4000-8000-000000000001",
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        requestedTools: ["echo_message"],
+        environment: "dev",
+        ticketUrl: "javascript:alert(1)",
+        reason: "Need access"
+      })
+    ).toThrow();
+
+    expect(
+      ApprovalRequestSchema.safeParse({
+        requesterId: "00000000-0000-4000-8000-000000000001",
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        requestedTools: ["echo_message"],
+        environment: "dev",
+        ticketUrl: "not a url",
+        reason: "Need access"
+      }).success
+    ).toBe(false);
+
+    expect(
+      McpGrantSchema.safeParse({
+        subjectType: "team",
+        subjectId: "00000000-0000-4000-8000-000000000010",
+        projectId: "00000000-0000-4000-8000-000000000020",
+        serverId: "00000000-0000-4000-8000-000000000100",
+        allowedTools: ["echo_message"],
+        environment: "dev",
+        ticketUrl: "javascript:alert(1)",
+        reason: "Need access"
+      }).success
+    ).toBe(false);
+
+    expect(
+      PolicyDecisionResultSchema.parse({
+        allowed: true,
+        reason: "Allowed",
+        reasonCode: "ALLOW",
+        matchedGrantIds: ["grant-1"]
+      })
+    ).toEqual({ allowed: true, reason: "Allowed", reasonCode: "ALLOW", matchedGrantIds: ["grant-1"] });
+
+    expect(
+      EmergencyPolicyStateSchema.parse({
+        reason: "Incident",
+        global: false,
+        highCritical: true,
+        serverIds: ["00000000-0000-4000-8000-000000000100"],
+        clientIds: ["local-dev-client"]
+      })
+    ).toMatchObject({ enabled: true, global: false, highCritical: true });
   });
 
   it("lists required tables and seed statements", () => {

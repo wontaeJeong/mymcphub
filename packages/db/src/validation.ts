@@ -13,6 +13,16 @@ export const ServerTransportSchema = z.enum([
 
 export const PolicyEffectSchema = z.enum(["allow", "deny", "needs_approval"]);
 
+export const GrantSubjectTypeSchema = z.enum(["user", "team", "service_account"]);
+
+export const ApprovalStatusSchema = z.enum(["pending", "approved", "rejected", "cancelled", "expired"]);
+
+const HttpUrlSchema = z.string().url().refine(isHttpUrl, "URL must use http or https");
+
+const ExplicitToolListSchema = z.array(z.string().min(1))
+  .min(1)
+  .refine((tools) => !tools.includes("*"), "Tool list must not contain wildcard entries");
+
 export const McpToolSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -36,7 +46,7 @@ export const McpServerManifestSchema = z.object({
 });
 
 export const McpGrantSchema = z.object({
-  subjectType: z.enum(["user", "team", "service_account"]),
+  subjectType: GrantSubjectTypeSchema,
   subjectId: z.string().min(1),
   projectId: z.string().uuid(),
   serverId: z.string().uuid(),
@@ -45,26 +55,77 @@ export const McpGrantSchema = z.object({
   expiresAt: z.string().datetime().optional(),
   approvedBy: z.string().uuid().optional(),
   reason: z.string().min(1),
-  ticketUrl: z.string().url().optional(),
+  ticketUrl: HttpUrlSchema.optional(),
   enabled: z.boolean().default(true)
 });
 
 export const PolicyDecisionInputSchema = z.object({
-  principal: z.object({
-    subject: z.string().min(1),
-    teams: z.array(z.string().min(1)).default([])
+  subject: z.object({
+    type: GrantSubjectTypeSchema,
+    userId: z.string().min(1).optional(),
+    teamIds: z.array(z.string().min(1)).optional(),
+    serviceAccountId: z.string().min(1).optional()
   }),
-  projectId: z.string().uuid(),
-  serverId: z.string().uuid(),
-  toolName: z.string().min(1),
-  environment: EnvironmentSchema,
-  argumentHash: z.string().optional()
+  client: z.object({
+    clientId: z.string().min(1).optional(),
+    clientType: z.string().min(1).optional()
+  }),
+  project: z.object({
+    projectId: z.string().uuid().optional()
+  }).optional(),
+  server: z.object({
+    serverId: z.string().uuid(),
+    serverSlug: z.string().min(1),
+    environment: EnvironmentSchema,
+    enabled: z.boolean()
+  }),
+  tool: z.object({
+    name: z.string().min(1),
+    riskLevel: RiskLevelSchema,
+    enabled: z.boolean()
+  }).optional(),
+  action: z.enum(["connect", "discover_tool", "call_tool", "read_resource", "get_prompt", "admin"]),
+  requestTime: z.string().datetime()
 });
 
 export const PolicyDecisionResultSchema = z.object({
-  effect: PolicyEffectSchema,
+  allowed: z.boolean(),
   reason: z.string().min(1),
+  reasonCode: z.string().min(1),
+  matchedGrantIds: z.array(z.string().min(1)).default([]),
+  requiresApproval: z.boolean().optional(),
+  requiresStepUp: z.boolean().optional(),
   matchedPolicyVersion: z.string().optional()
+});
+
+export const ApprovalRequestSchema = z.object({
+  requesterId: z.string().min(1),
+  subjectType: GrantSubjectTypeSchema,
+  subjectId: z.string().min(1),
+  projectId: z.string().uuid(),
+  serverId: z.string().uuid(),
+  requestedTools: ExplicitToolListSchema,
+  environment: EnvironmentSchema,
+  reason: z.string().min(1),
+  ticketUrl: HttpUrlSchema.optional(),
+  requestedExpiresAt: z.string().datetime().optional(),
+  status: ApprovalStatusSchema.default("pending"),
+  reviewerId: z.string().min(1).optional(),
+  reviewComment: z.string().min(1).optional(),
+  toolName: z.string().min(1).optional(),
+  requestedAction: z.string().min(1).default("call_tool")
+});
+
+export const EmergencyPolicyStateSchema = z.object({
+  enabled: z.boolean().default(true),
+  reason: z.string().min(1),
+  global: z.boolean().default(true),
+  highCritical: z.boolean().default(false),
+  serverIds: z.array(z.string().min(1)).default([]),
+  serverSlugs: z.array(z.string().min(1)).default([]),
+  toolNames: z.array(z.string().min(1)).default([]),
+  subjectIds: z.array(z.string().min(1)).default([]),
+  clientIds: z.array(z.string().min(1)).default([])
 });
 
 export const AuditEventSchema = z.object({
@@ -101,5 +162,19 @@ export type McpToolInput = z.infer<typeof McpToolSchema>;
 export type McpGrantInput = z.infer<typeof McpGrantSchema>;
 export type PolicyDecisionInput = z.infer<typeof PolicyDecisionInputSchema>;
 export type PolicyDecisionResult = z.infer<typeof PolicyDecisionResultSchema>;
+export type ApprovalRequestInput = z.infer<typeof ApprovalRequestSchema>;
+export type EmergencyPolicyStateInput = z.infer<typeof EmergencyPolicyStateSchema>;
 export type AuditEventInput = z.infer<typeof AuditEventSchema>;
 export type HealthCheckResultInput = z.infer<typeof HealthCheckResultSchema>;
+
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (caught: unknown) {
+    if (caught instanceof TypeError) {
+      return false;
+    }
+    throw caught;
+  }
+}

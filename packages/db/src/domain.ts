@@ -8,6 +8,8 @@ export type GrantSubjectType = "user" | "team" | "service_account";
 
 export type PolicyEffect = "allow" | "deny" | "needs_approval";
 
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled" | "expired";
+
 export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
 export type User = {
@@ -112,16 +114,38 @@ export type McpGrant = {
 export type ApprovalRequest = {
   id: string;
   requesterId: string;
+  subjectType: GrantSubjectType;
+  subjectId: string;
   projectId: string;
   serverId: string;
+  requestedTools: string[];
+  environment: Environment;
   toolName: string | null;
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: ApprovalStatus;
   requestedAction: string;
   reason: string;
+  ticketUrl: string | null;
+  requestedExpiresAt: Date | null;
+  reviewerId: string | null;
+  reviewComment: string | null;
   decidedBy: string | null;
   decidedAt: Date | null;
   createdAt: Date;
+  updatedAt: Date;
   metadataJson: Record<string, unknown>;
+};
+
+export type EmergencyPolicyState = {
+  enabled: boolean;
+  reason: string;
+  global: boolean;
+  highCritical: boolean;
+  serverIds: string[];
+  serverSlugs: string[];
+  toolNames: string[];
+  subjectIds: string[];
+  clientIds: string[];
+  createdAt: Date;
 };
 
 export type OAuthClient = {
