@@ -2,14 +2,25 @@ import type { Environment, PolicyEffect, RiskLevel, ServerTransport } from "@mcp
 
 export type AuthContext = {
   userId: string;
+  principalType: "user" | "team" | "service_account";
   email: string;
   displayName: string;
   teamIds: string[];
+  teams: string[];
+  groups: string[];
   roles: string[];
   clientId: string;
   issuer: string;
   audience: string;
+  isAdmin: boolean;
+  isPlatformAdmin: boolean;
+  authSource: "mock" | "oidc" | "service_account";
+  tokenIssuer: string;
 };
+
+export type GrantSubjectType = "user" | "team" | "service_account";
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled" | "expired";
 
 export type ApiMcpServer = {
   id: string;
@@ -39,7 +50,7 @@ export type ApiMcpTool = {
 
 export type ApiGrant = {
   id: string;
-  subjectType: "user" | "team" | "service_account";
+  subjectType: GrantSubjectType;
   subjectId: string;
   projectId: string;
   serverId: string;
@@ -56,14 +67,36 @@ export type ApiGrant = {
 export type ApiApproval = {
   id: string;
   requesterId: string;
+  subjectType: GrantSubjectType;
+  subjectId: string;
   projectId: string;
   serverId: string;
+  requestedTools: string[];
+  environment: Environment;
   toolName?: string;
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: ApprovalStatus;
   requestedAction: string;
   reason: string;
+  ticketUrl?: string;
+  requestedExpiresAt?: string;
+  reviewerId?: string;
+  reviewComment?: string;
   decidedBy?: string;
   decidedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiEmergencyPolicyState = {
+  enabled: boolean;
+  reason: string;
+  global: boolean;
+  highCritical: boolean;
+  serverIds: string[];
+  serverSlugs: string[];
+  toolNames: string[];
+  subjectIds: string[];
+  clientIds: string[];
   createdAt: string;
 };
 
