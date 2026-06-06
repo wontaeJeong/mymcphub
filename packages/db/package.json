@@ -13,7 +13,9 @@
     "seed": "tsx src/seed.ts",
     "seed:dry-run": "tsx src/seed.ts --dry-run",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run src/validation.test.ts",
+    "test:integration": "vitest run src/repositories.test.ts"
   },
   "dependencies": {
     "postgres": "^3.4.7",
