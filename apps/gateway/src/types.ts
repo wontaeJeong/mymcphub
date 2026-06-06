@@ -3,10 +3,15 @@ import type { PolicyEffect } from "@mcp-hub/policy";
 
 export type GatewayPrincipal = {
   userId: string;
+  principalType: "user" | "team" | "service_account";
   teamIds: string[];
   clientId: string;
   issuer: string;
   audience: string;
+  projectId: string;
+  groups: string[];
+  roles: string[];
+  isPlatformAdmin: boolean;
 };
 
 export type GatewayServer = {
@@ -18,6 +23,7 @@ export type GatewayServer = {
   enabled: boolean;
   tools: GatewayTool[];
   grants: GatewayGrant[];
+  emergencyDeny?: GatewayEmergencyPolicy;
 };
 
 export type GatewayTool = McpToolDescriptor & {
@@ -26,10 +32,27 @@ export type GatewayTool = McpToolDescriptor & {
 };
 
 export type GatewayGrant = {
+  id?: string;
   subjectType: "user" | "team" | "service_account";
   subjectId: string;
   projectId?: string;
   allowedTools: string[];
+  environment?: GatewayServer["environment"];
+  expiresAt?: string;
+  approvedBy?: string;
+  enabled?: boolean;
+};
+
+export type GatewayEmergencyPolicy = {
+  enabled: boolean;
+  reason?: string;
+  global?: boolean;
+  highCritical?: boolean;
+  serverIds?: string[];
+  serverSlugs?: string[];
+  toolNames?: string[];
+  subjectIds?: string[];
+  clientIds?: string[];
 };
 
 export type GatewayAuditEvent = {

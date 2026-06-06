@@ -1,8 +1,13 @@
 import type { IncomingMessage } from "node:http";
 
+import { createMockTokenVerifier } from "@mcp-hub/auth";
+
 import type { GatewayPrincipal } from "./types";
 
-export function validateBearerToken(request: IncomingMessage): GatewayPrincipal | undefined {
+const mockVerifier = createMockTokenVerifier();
+const defaultProjectId = "00000000-0000-4000-8000-000000000020";
+
+export async function validateBearerToken(request: IncomingMessage): Promise<GatewayPrincipal | undefined> {
   const authorization = firstHeader(request.headers.authorization);
 
   if (!authorization?.startsWith("Bearer ")) {
@@ -11,17 +16,31 @@ export function validateBearerToken(request: IncomingMessage): GatewayPrincipal 
 
   const token = authorization.slice("Bearer ".length).trim();
 
-  if (token.length === 0 || token === "invalid") {
+  if (token.length === 0) {
     return undefined;
   }
 
-  return {
-    userId: token === "dev-readonly-token" ? "readonly-user" : "admin-user",
-    teamIds: token === "dev-readonly-token" ? ["readonly-team"] : ["platform-team"],
-    clientId: "mcp-client",
-    issuer: process.env.OIDC_ISSUER_URL ?? "mock-gateway-issuer",
-    audience: process.env.OIDC_AUDIENCE ?? "mcp-hub"
-  };
+  try {
+    const principal = await mockVerifier.verify(token);
+
+    return {
+      userId: principal.subject,
+      principalType: principal.principalType,
+      teamIds: principal.teamIds,
+      clientId: "mcp-client",
+      issuer: principal.issuer,
+      audience: principal.audience,
+      projectId: process.env.MCP_PROJECT_ID ?? defaultProjectId,
+      groups: principal.groups,
+      roles: principal.roles,
+      isPlatformAdmin: principal.isPlatformAdmin
+    };
+  } catch (caught: unknown) {
+    if (caught instanceof Error) {
+      return undefined;
+    }
+    return undefined;
+  }
 }
 
 function firstHeader(value: string | string[] | undefined) {
