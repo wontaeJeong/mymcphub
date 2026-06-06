@@ -1,6 +1,6 @@
 # Deployment
 
-MCP Hub can be deployed with Helm directly or through the Kustomize GitOps overlays in `deploy/gitops`. The chart is intentionally application-only: PostgreSQL and Redis are external by default, with optional placeholder Services for clusters that want to wire their own backing services later.
+MCP Hub can be deployed with Helm directly or through the Kustomize GitOps overlays in `deploy/gitops`. The chart is intentionally application only: PostgreSQL and Redis are external by default, with optional placeholder Services for clusters that want to wire their own backing services later. See [RELEASE.md](RELEASE.md) for dev to stg to prod promotion, digest usage, API version metadata checks, canary placeholder behavior, and rollback.
 
 ## Chart Contents
 
@@ -27,11 +27,12 @@ The chart in `deploy/helm/mcp-hub` renders these Kubernetes resources:
 
 Key values follow this structure:
 
-- `image.registry`, `image.repositoryPrefix`, `image.tag`, and `image.pullPolicy` select images such as `registry.example.com/mcp-hub/api:dev`. Set each component image digest, such as `api.image.digest` or `web.image.digest`, in shared and production environments to render digest-pinned image references such as `registry.example.com/mcp-hub/api@sha256:...`.
+- `image.registry`, `image.repositoryPrefix`, `image.tag`, and `image.pullPolicy` select images such as `registry.example.com/mcp-hub/api:dev`. Set each component image digest, such as `api.image.digest` or `web.image.digest`, in shared and production environments to render digest pinned image references such as `registry.example.com/mcp-hub/api@sha256:...`. A component digest overrides tag rendering for that component.
 - `web`, `api`, `gateway`, and `worker` each expose `enabled`, `replicas`, `port`, `serviceAccountName`, resources, and probe settings.
 - `auth.mode`, `auth.oidcIssuerUrl`, and `auth.audience` populate non-secret auth runtime config. Use `mock` only for local/dev skeletons. Current `oidc` mode consumes OIDC-compatible identity headers, so shared environments must place the API behind a trusted auth proxy or ingress that verifies identity and strips client-supplied identity headers before injecting trusted values.
 - `postgres.external` and `redis.external` point to existing Secrets for connection URLs.
 - `ingress`, `networkPolicy`, `runtime`, `serviceAccount`, and `serviceMonitor` control cluster integration and hardening. Keep pod `automountServiceAccountToken` disabled unless a component explicitly needs Kubernetes API access.
+- `rollout.canary` is a disabled placeholder. The chart does not render traffic splitting resources yet.
 
 ## Secret Expectations
 
@@ -65,7 +66,7 @@ helm upgrade --install mcp-hub deploy/helm/mcp-hub \
   -f deploy/helm/mcp-hub/values-dev.yaml
 ```
 
-Use `values-stg.yaml` or `values-prod.yaml` for staging or production. Override image tags from CI with `--set image.tag=<tag>` rather than editing committed values for one-off releases. Prefer component digests such as `--set api.image.digest=sha256:<digest>` for production after images are scanned and signed.
+Use `values-stg.yaml` or `values-prod.yaml` for staging or production. Override image tags from CI with `--set image.tag=<tag>` rather than editing committed values for temporary releases. Prefer component digests such as `--set api.image.digest=sha256:<digest>` for production after images are scanned and signed. The full promotion path is documented in [RELEASE.md](RELEASE.md).
 
 ## Runtime Hardening Notes
 
@@ -86,7 +87,7 @@ helm history mcp-hub --namespace mcp-hub
 helm rollback mcp-hub <revision> --namespace mcp-hub
 ```
 
-After rollback, confirm the generated configuration still points at the expected external Secrets and image tag.
+After rollback, confirm the generated configuration still points at the expected external Secrets and image tag or digest. Also compare API version metadata with the intended rollback target as described in [RELEASE.md](RELEASE.md).
 
 ## GitOps Usage
 

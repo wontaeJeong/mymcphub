@@ -52,7 +52,7 @@ See [docs/POLICY.md](docs/POLICY.md) for the implemented auth, policy, approval,
 
 The full MCP Hub Helm chart lives in `deploy/helm/mcp-hub` with default, dev, stg, and prod values files. Install or upgrade with `helm upgrade --install mcp-hub deploy/helm/mcp-hub --namespace mcp-hub --create-namespace -f deploy/helm/mcp-hub/values-dev.yaml`, and roll back with `helm rollback mcp-hub <revision> --namespace mcp-hub`.
 
-GitOps examples for Argo CD or Flux live under `deploy/gitops` and require Kustomize with Helm support, for example `kustomize build --enable-helm deploy/gitops/overlays/dev`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for secret expectations, environment values, validation, install, upgrade, rollback, and GitOps usage. See [docs/SECURITY.md](docs/SECURITY.md) for security scans, MCP manifest review, image digest pinning, egress and service account hardening, and kill-switch operation endpoints.
+GitOps examples for Argo CD or Flux live under `deploy/gitops` and require Kustomize with Helm support, for example `kustomize build --enable-helm deploy/gitops/overlays/dev`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for secret expectations, environment values, validation, install, upgrade, rollback, and GitOps usage. See [docs/RELEASE.md](docs/RELEASE.md) for dev to stg to prod promotion, Helm digest use, API version metadata checks, the canary placeholder, and rollback. See [docs/SECURITY.md](docs/SECURITY.md) for security scans, MCP manifest review, image digest pinning, egress and service account hardening, and kill-switch operation endpoints.
 
 ## Development Order
 
