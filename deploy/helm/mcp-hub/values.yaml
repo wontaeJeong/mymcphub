@@ -66,6 +66,7 @@ web:
   serviceAccountName: ""
   image:
     repository: web
+    digest: ""
   service:
     type: ClusterIP
     port: 3000
@@ -94,6 +95,7 @@ api:
   serviceAccountName: ""
   image:
     repository: api
+    digest: ""
   service:
     type: ClusterIP
     port: 4000
@@ -122,6 +124,7 @@ gateway:
   serviceAccountName: ""
   image:
     repository: gateway
+    digest: ""
   service:
     type: ClusterIP
     port: 5000
@@ -151,6 +154,7 @@ worker:
   serviceAccountName: ""
   image:
     repository: worker
+    digest: ""
   resources:
     requests:
       cpu: 100m
