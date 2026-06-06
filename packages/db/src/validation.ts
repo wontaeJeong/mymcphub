@@ -17,6 +17,8 @@ export const GrantSubjectTypeSchema = z.enum(["user", "team", "service_account"]
 
 export const ApprovalStatusSchema = z.enum(["pending", "approved", "rejected", "cancelled", "expired"]);
 
+export const ServerVersionStatusSchema = z.enum(["draft", "pending", "active", "deprecated", "rolled_back"]);
+
 const HttpUrlSchema = z.string().url().refine(isHttpUrl, "URL must use http or https");
 
 const ExplicitToolListSchema = z.array(z.string().min(1))
@@ -43,6 +45,21 @@ export const McpServerManifestSchema = z.object({
   enabled: z.boolean().default(true),
   riskLevel: RiskLevelSchema.default("low"),
   tools: z.array(McpToolSchema).default([])
+});
+
+export const CreateMcpServerVersionSchema = z.object({
+  serverId: z.string().uuid(),
+  version: z.string().min(1),
+  imageRef: z.string().min(1).nullable().optional(),
+  imageRepository: z.string().min(1).nullable().optional(),
+  imageTag: z.string().min(1).nullable().optional(),
+  imageDigest: z.string().min(1).nullable().optional(),
+  configHash: z.string().min(1).nullable().optional(),
+  toolSchemaHash: z.string().min(1).nullable().optional(),
+  status: ServerVersionStatusSchema.default("draft"),
+  createdBy: z.string().uuid().nullable().optional(),
+  activatedAt: z.string().datetime().nullable().optional(),
+  manifestJson: z.record(z.unknown()).default({})
 });
 
 export const McpGrantSchema = z.object({
@@ -159,6 +176,7 @@ export const HealthCheckResultSchema = z.object({
 
 export type McpServerManifestInput = z.infer<typeof McpServerManifestSchema>;
 export type McpToolInput = z.infer<typeof McpToolSchema>;
+export type CreateMcpServerVersionInput = z.infer<typeof CreateMcpServerVersionSchema>;
 export type McpGrantInput = z.infer<typeof McpGrantSchema>;
 export type PolicyDecisionInput = z.infer<typeof PolicyDecisionInputSchema>;
 export type PolicyDecisionResult = z.infer<typeof PolicyDecisionResultSchema>;
