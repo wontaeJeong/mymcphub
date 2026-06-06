@@ -1,0 +1,17 @@
+{{- if and (not .Values.redis.external.enabled) .Values.redis.placeholder.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mcp-hub.fullname" . }}-redis
+  labels:
+{{ include "mcp-hub.labels" . | indent 4 }}
+    app.kubernetes.io/component: redis-placeholder
+  annotations:
+    mcp-hub.example.com/description: "Placeholder only; provide an actual Redis backend and REDIS_URL Secret."
+spec:
+  clusterIP: None
+  ports:
+    - name: redis
+      port: {{ .Values.redis.placeholder.port }}
+      targetPort: redis
+{{- end }}
