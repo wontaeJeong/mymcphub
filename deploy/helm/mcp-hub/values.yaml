@@ -1,6 +1,8 @@
 image:
   registry: registry.example.com
   repositoryPrefix: mcp-hub
+  # image.tag is used for components that do not set image.digest.
+  # A component digest renders an immutable @sha256:... image reference instead.
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -66,6 +68,8 @@ web:
   serviceAccountName: ""
   image:
     repository: web
+    # Set to sha256:<digest> to render registry.example.com/mcp-hub/web@sha256:...
+    # When set, digest rendering overrides image.tag for this component.
     digest: ""
   service:
     type: ClusterIP
@@ -95,6 +99,8 @@ api:
   serviceAccountName: ""
   image:
     repository: api
+    # Set to sha256:<digest> to render registry.example.com/mcp-hub/api@sha256:...
+    # When set, digest rendering overrides image.tag for this component.
     digest: ""
   service:
     type: ClusterIP
@@ -124,6 +130,8 @@ gateway:
   serviceAccountName: ""
   image:
     repository: gateway
+    # Set to sha256:<digest> to render registry.example.com/mcp-hub/gateway@sha256:...
+    # When set, digest rendering overrides image.tag for this component.
     digest: ""
   service:
     type: ClusterIP
@@ -154,6 +162,8 @@ worker:
   serviceAccountName: ""
   image:
     repository: worker
+    # Set to sha256:<digest> to render registry.example.com/mcp-hub/worker@sha256:...
+    # When set, digest rendering overrides image.tag for this component.
     digest: ""
   resources:
     requests:
@@ -190,6 +200,12 @@ ingress:
           pathType: Prefix
           service: gateway
   tls: []
+
+rollout:
+  canary:
+    # Placeholder only. The chart does not render traffic splitting resources yet.
+    enabled: false
+    weight: 0
 
 networkPolicy:
   enabled: true
