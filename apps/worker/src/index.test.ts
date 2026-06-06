@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getWorkerMetricsText, resetWorkerMetricsForTests } from "./metrics.js";
 import { createWorkerServer, getWorkerAuditEvents, resetWorkerAuditEventsForTests, runWorkerOnce, type WorkerJob } from "./index.js";
+import { diffToolSnapshots, hashCanonicalJson, type ToolSnapshot } from "./schema-diff.js";
 
 const { withSpanMock } = vi.hoisted(() => ({
   withSpanMock: vi.fn(async <T>(_service: string, _spanName: string, _attributes: Record<string, string>, fn: () => T | Promise<T>) => fn())
@@ -59,7 +60,12 @@ describe("runWorkerOnce", () => {
 
     await runWorkerOnce([
       { kind: "tool-scan", targetServerId: "server-1" },
-      { kind: "schema-diff", targetServerId: "server-1" }
+      {
+        kind: "schema-diff",
+        targetServerId: "server-1",
+        previousSnapshot: [makeToolSnapshot({ name: "search" })],
+        currentSnapshot: [makeToolSnapshot({ name: "search", description: "updated search" })]
+      }
     ], { traceId: "trace-metrics" });
 
     const metrics = await getWorkerMetricsText();
@@ -78,6 +84,49 @@ describe("runWorkerOnce", () => {
     expect(getWorkerAuditEvents()).toEqual([
       expect.objectContaining({ eventType: "health.changed", traceId: "trace-audit", serverId: "server-health", outcome: "success" }),
       expect.objectContaining({ eventType: "schema.changed", traceId: "trace-audit", serverId: "server-schema", outcome: "success" })
+    ]);
+  });
+
+  it("records supplied snapshot schema diff metadata", async () => {
+    await runWorkerOnce([
+      {
+        kind: "schema-diff",
+        targetServerId: "server-schema",
+        previousSnapshot: [makeToolSnapshot({ name: "search", risk: "medium" })],
+        currentSnapshot: [makeToolSnapshot({ name: "search", risk: "high" })]
+      }
+    ], { traceId: "trace-schema-diff" });
+
+    expect(getWorkerAuditEvents()).toEqual([
+      expect.objectContaining({
+        eventType: "schema.changed",
+        traceId: "trace-schema-diff",
+        serverId: "server-schema",
+        metadata: expect.objectContaining({
+          approvalRequired: true,
+          changed: true,
+          diffCount: 1,
+          diffTypes: "tool_risk_changed",
+          jobKind: "schema-diff"
+        })
+      })
+    ]);
+  });
+
+  it("records placeholder schema diff metadata when snapshots are absent", async () => {
+    await runWorkerOnce([{ kind: "schema-diff", targetServerId: "server-schema" }], { traceId: "trace-placeholder" });
+
+    expect(getWorkerAuditEvents()).toEqual([
+      expect.objectContaining({
+        eventType: "schema.changed",
+        traceId: "trace-placeholder",
+        serverId: "server-schema",
+        metadata: expect.objectContaining({
+          jobKind: "schema-diff",
+          placeholder: true,
+          reason: "runtime MCP tools/list scanning is not implemented"
+        })
+      })
     ]);
   });
 
@@ -101,3 +150,74 @@ describe("runWorkerOnce", () => {
     await once(server, "close");
   });
 });
+
+describe("schema diff helper", () => {
+  it("detects added, removed, description, input schema, and risk changes", () => {
+    const diffs = diffToolSnapshots([
+      makeToolSnapshot({ name: "description-tool", description: "old description" }),
+      makeToolSnapshot({ name: "input-tool", inputSchema: { type: "object", properties: { query: { type: "string" } } } }),
+      makeToolSnapshot({ name: "removed-tool" }),
+      makeToolSnapshot({ name: "risk-tool", risk: "medium" })
+    ], [
+      makeToolSnapshot({ name: "added-tool" }),
+      makeToolSnapshot({ name: "description-tool", description: "new description" }),
+      makeToolSnapshot({ name: "input-tool", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } } } }),
+      makeToolSnapshot({ name: "risk-tool", risk: "high" })
+    ]);
+
+    expect(diffs.map((diff) => diff.type)).toEqual([
+      "tool_added",
+      "tool_description_changed",
+      "tool_input_schema_changed",
+      "tool_removed",
+      "tool_risk_changed"
+    ]);
+    expect(diffs.find((diff) => diff.type === "tool_removed")?.metadata).toMatchObject({ approvalRequired: true, highRisk: true });
+    expect(diffs.find((diff) => diff.type === "tool_input_schema_changed")?.metadata).toMatchObject({ approvalRequired: true, highRisk: true });
+    expect(diffs.find((diff) => diff.type === "tool_risk_changed")?.metadata).toMatchObject({ approvalRequired: true, highRisk: true });
+    expect(diffs.find((diff) => diff.type === "tool_description_changed")?.metadata).toMatchObject({ approvalRequired: false, highRisk: false });
+  });
+
+  it("uses canonical JSON hashing for reordered input schema object keys", () => {
+    const leftHash = hashCanonicalJson({
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        limit: { default: 10, type: "number" }
+      },
+      required: ["query"]
+    });
+    const rightHash = hashCanonicalJson({
+      required: ["query"],
+      properties: {
+        limit: { type: "number", default: 10 },
+        query: { description: "Search query", type: "string" }
+      },
+      type: "object"
+    });
+
+    expect(leftHash).toBe(rightHash);
+  });
+
+  it("requires approval for added high or critical risk tools", () => {
+    expect(diffToolSnapshots([], [makeToolSnapshot({ name: "low-tool", risk: "low" })])[0]?.metadata.approvalRequired).toBe(false);
+    expect(diffToolSnapshots([], [makeToolSnapshot({ name: "high-tool", risk: "high" })])[0]?.metadata).toMatchObject({
+      approvalRequired: true,
+      highRisk: true
+    });
+    expect(diffToolSnapshots([], [makeToolSnapshot({ name: "critical-tool", risk: "critical" })])[0]?.metadata).toMatchObject({
+      approvalRequired: true,
+      highRisk: true
+    });
+  });
+});
+
+function makeToolSnapshot(overrides: Partial<ToolSnapshot>): ToolSnapshot {
+  return {
+    name: "search",
+    description: "Search documents",
+    inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+    risk: "low",
+    ...overrides
+  };
+}

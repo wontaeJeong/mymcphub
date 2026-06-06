@@ -2,13 +2,22 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { createLogger, withSpan } from "@mcp-hub/logger";
 import { getWorkerMetricsText, recordWorkerScan, recordWorkerSchemaChange } from "./metrics.js";
+import { diffToolSnapshots, type ToolSnapshot, type ToolSchemaDiffType } from "./schema-diff.js";
 
 export type WorkerJobKind = "tool-scan" | "schema-diff" | "health-check";
 
-export type WorkerJob = {
+type BaseWorkerJob = {
   kind: WorkerJobKind;
   targetServerId: string;
 };
+
+export type SchemaDiffWorkerJob = BaseWorkerJob & {
+  kind: "schema-diff";
+  previousSnapshot?: ToolSnapshot[];
+  currentSnapshot?: ToolSnapshot[];
+};
+
+export type WorkerJob = SchemaDiffWorkerJob | (BaseWorkerJob & { kind: "tool-scan" | "health-check" });
 
 export const defaultWorkerJobs: WorkerJobKind[] = [
   "tool-scan",
@@ -50,8 +59,7 @@ async function processWorkerJob(job: WorkerJob, traceId: string) {
     recordWorkerScan(job.kind);
 
     if (job.kind === "schema-diff") {
-      recordWorkerSchemaChange(job.kind);
-      recordWorkerAuditEvent("schema.changed", job, traceId, { changed: true });
+      processSchemaDiffJob(job, traceId);
     }
 
     if (job.kind === "health-check") {
@@ -63,6 +71,35 @@ async function processWorkerJob(job: WorkerJob, traceId: string) {
       traceId
     });
   });
+}
+
+function processSchemaDiffJob(job: SchemaDiffWorkerJob, traceId: string) {
+  if (!job.previousSnapshot || !job.currentSnapshot) {
+    recordWorkerAuditEvent("schema.changed", job, traceId, {
+      placeholder: true,
+      reason: "runtime MCP tools/list scanning is not implemented"
+    });
+    return;
+  }
+
+  const diffs = diffToolSnapshots(job.previousSnapshot, job.currentSnapshot);
+  const diffTypes = summarizeDiffTypes(diffs.map((diff) => diff.type));
+  const approvalRequired = diffs.some((diff) => diff.metadata.approvalRequired);
+
+  if (diffs.length > 0) {
+    recordWorkerSchemaChange(job.kind);
+  }
+
+  recordWorkerAuditEvent("schema.changed", job, traceId, {
+    changed: diffs.length > 0,
+    diffCount: diffs.length,
+    diffTypes,
+    approvalRequired
+  });
+}
+
+function summarizeDiffTypes(diffTypes: ToolSchemaDiffType[]) {
+  return [...new Set(diffTypes)].join(",");
 }
 
 export function getWorkerAuditEvents() {
