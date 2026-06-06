@@ -21,6 +21,20 @@ describe("gateway runtime", () => {
     await close(gateway.server);
   });
 
+  it("rejects requests with an invalid bearer token", async () => {
+    const gateway = createGatewayServer({ upstream: createServerShapedUpstream() });
+    await listen(gateway.server);
+
+    const response = await fetch(url(gateway.server, "/mcp/echo"), {
+      method: "GET",
+      headers: { authorization: "Bearer invalid" }
+    });
+
+    expect(response.status).toBe(401);
+
+    await close(gateway.server);
+  });
+
   it.each([
     ["echo", ["echo_message", "get_server_time"]],
     ["internal-docs", ["search_docs", "read_doc"]],
@@ -75,6 +89,62 @@ describe("gateway runtime", () => {
 
     await close(gateway.server);
     await close(upstream);
+  });
+
+  it("denies connect when no active server-level grant matches", async () => {
+    const [baseServer] = createDefaultRegistry();
+    if (!baseServer) {
+      throw new Error("Default registry is empty.");
+    }
+
+    const gateway = createGatewayServer({ registry: [{ ...baseServer, grants: [] }], upstream: createServerShapedUpstream() });
+    await listen(gateway.server);
+
+    const response = await postMcp(gateway.server, "echo", { jsonrpc: "2.0", id: 20, method: "tools/list" });
+
+    expect(response.status).toBe(403);
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ policyDecision: "deny", errorCode: "CONNECT_GRANT_REQUIRED" });
+
+    await close(gateway.server);
+  });
+
+  it("blocks needs_approval decisions before calling upstream", async () => {
+    let calls = 0;
+    const upstream: UpstreamTransport = {
+      async call() {
+        calls += 1;
+        return { jsonrpc: "2.0", id: null, result: {} };
+      }
+    };
+    const [baseServer] = createDefaultRegistry();
+    if (!baseServer) {
+      throw new Error("Default registry is empty.");
+    }
+    const [baseTool] = baseServer.tools;
+    const [baseGrant] = baseServer.grants;
+    if (!baseTool || !baseGrant) {
+      throw new Error("Default registry missing echo tool or grant.");
+    }
+    const riskyServer: GatewayServer = {
+      ...baseServer,
+      tools: [{ ...baseTool, name: "restart_cluster", riskLevel: "high" }, ...baseServer.tools.slice(1)],
+      grants: [{ ...baseGrant, allowedTools: ["restart_cluster"] }]
+    };
+    const gateway = createGatewayServer({ registry: [riskyServer], upstream });
+    await listen(gateway.server);
+
+    const response = await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 21,
+      method: "tools/call",
+      params: { name: "restart_cluster", arguments: {} }
+    });
+
+    expect(await response.json()).toMatchObject({ error: { code: -32001 } });
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ policyDecision: "needs_approval", errorCode: "MCP_TOOL_DENIED" });
+    expect(calls).toBe(0);
+
+    await close(gateway.server);
   });
 
   it.each([
@@ -156,6 +226,73 @@ describe("gateway runtime", () => {
     await close(gateway.server);
   });
 
+  it("denies unsupported MCP methods before calling upstream", async () => {
+    let calls = 0;
+    const upstream: UpstreamTransport = {
+      async call() {
+        calls += 1;
+        return { jsonrpc: "2.0", id: null, result: {} };
+      }
+    };
+    const gateway = createGatewayServer({ upstream });
+    await listen(gateway.server);
+
+    const denied = await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 22,
+      method: "sampling/createMessage",
+      params: { messages: [] }
+    });
+
+    expect(await denied.json()).toMatchObject({ error: { code: -32601, message: "Unsupported MCP method sampling/createMessage" } });
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ errorCode: "MCP_METHOD_UNSUPPORTED", policyDecision: "deny" });
+    expect(calls).toBe(0);
+
+    await close(gateway.server);
+  });
+
+  it("requires platform admin authorization for Gateway admin methods", async () => {
+    let calls = 0;
+    const upstream: UpstreamTransport = {
+      async call() {
+        calls += 1;
+        return { jsonrpc: "2.0", id: null, result: {} };
+      }
+    };
+    const [baseServer] = createDefaultRegistry();
+    if (!baseServer) {
+      throw new Error("Default registry is empty.");
+    }
+    const readerServer: GatewayServer = {
+      ...baseServer,
+      grants: [
+        ...baseServer.grants,
+        {
+          subjectType: "team",
+          subjectId: "readonly-team",
+          projectId: "00000000-0000-4000-8000-000000000020",
+          allowedTools: ["echo_message"],
+          environment: "dev"
+        }
+      ]
+    };
+    const gateway = createGatewayServer({ registry: [readerServer], upstream });
+    await listen(gateway.server);
+
+    const denied = await postMcpWithToken(gateway.server, "echo", "dev-readonly-token", {
+      jsonrpc: "2.0",
+      id: 23,
+      method: "admin/reload",
+      params: {}
+    });
+
+    expect(await denied.json()).toMatchObject({ error: { code: -32001 } });
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ errorCode: "ADMIN_REQUIRES_PLATFORM_ADMIN", policyDecision: "deny" });
+    expect(calls).toBe(0);
+
+    await close(gateway.server);
+  });
+
   it("returns JSON-RPC errors for malformed requests before calling upstream", async () => {
     let calls = 0;
     const upstream: UpstreamTransport = {
@@ -209,9 +346,19 @@ describe("gateway runtime", () => {
     await listen(gateway.server);
 
     for (const id of [6, 7, 8]) {
-      await postMcp(gateway.server, "echo", { jsonrpc: "2.0", id, method: "ping" });
+      await postMcp(gateway.server, "echo", {
+        jsonrpc: "2.0",
+        id,
+        method: "tools/call",
+        params: { name: "echo_message", arguments: { message: "hello" } }
+      });
     }
-    const degraded = await postMcp(gateway.server, "echo", { jsonrpc: "2.0", id: 9, method: "ping" });
+    const degraded = await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 9,
+      method: "tools/call",
+      params: { name: "echo_message", arguments: { message: "hello" } }
+    });
 
     expect(degraded.status).toBe(503);
     expect(gateway.runtime.metrics.upstreamFailureCount).toBeGreaterThan(0);
@@ -237,10 +384,19 @@ function createRegistryWithUpstream(slug: string, upstreamUrl: string) {
 }
 
 async function postMcp(server: ReturnType<typeof createGatewayServer>["server"], slug: string, body: Record<string, unknown>) {
+  return postMcpWithToken(server, slug, "dev-admin-token", body);
+}
+
+async function postMcpWithToken(
+  server: ReturnType<typeof createGatewayServer>["server"],
+  slug: string,
+  token: string,
+  body: Record<string, unknown>
+) {
   return fetch(url(server, `/mcp/${slug}`), {
     method: "POST",
     headers: {
-      authorization: "Bearer dev-admin-token",
+      authorization: `Bearer ${token}`,
       "content-type": "application/json"
     },
     body: JSON.stringify(body)
