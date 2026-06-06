@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { createLogger, withSpan } from "@mcp-hub/logger";
 import type { JsonRpcId, McpJsonRpcRequest, McpJsonRpcResponse } from "@mcp-hub/mcp-protocol";
-import type { PolicyDecision } from "@mcp-hub/policy";
+import type { PolicyDecision, PolicyEffect } from "@mcp-hub/policy";
 
-import { createAuditBase, createAuditRecorder, hashArguments, redactArguments } from "./audit";
+import { createAuditBase, createAuditRecorder, hashArguments, redactArguments, riskLevelForGatewayEvent } from "./audit";
 import { validateBearerToken } from "./auth";
+import { createGatewayPrometheusMetrics, type GatewayPrometheusMetrics } from "./metrics";
 import {
   allowedToolsForPrincipal,
   authorizeAdminAction,
@@ -26,82 +28,246 @@ export type GatewayRuntimeOptions = {
   circuitBreaker?: CircuitBreaker;
 };
 
+type RequestContext = {
+  traceId: string;
+  startedAt: number;
+  route: "mcp" | "metrics" | "unknown";
+  policyDecision: PolicyEffect | "none";
+  statusCode: number;
+};
+
+type RecordAudit = (input: Omit<GatewayAuditEvent, "createdAt">) => void;
+
+const logger = createLogger("gateway");
+
 export function createGatewayRuntime(options: GatewayRuntimeOptions = {}) {
   const registry = options.registry ?? createDefaultRegistry();
   const upstream = options.upstream ?? createHttpJsonRpcTransport();
   const timeoutMs = options.timeoutMs ?? 2_000;
   const circuitBreaker = options.circuitBreaker ?? new CircuitBreaker();
   const audit = createAuditRecorder();
+  const prometheus = createGatewayPrometheusMetrics();
 
   async function handle(request: IncomingMessage, response: ServerResponse) {
-    const startedAt = Date.now();
-    const url = new URL(request.url ?? "/", "http://localhost");
-    const match = /^\/mcp\/([^/]+)$/.exec(url.pathname);
+    const context: RequestContext = {
+      traceId: readTraceId(request),
+      startedAt: Date.now(),
+      route: "unknown",
+      policyDecision: "none",
+      statusCode: 500
+    };
+    response.setHeader("x-trace-id", context.traceId);
+    prometheus.incrementActiveSessions();
 
-    if (!match) {
-      sendJson(response, 404, { error: "not_found" });
-      return;
-    }
-
-    const principal = await validateBearerToken(request);
-    if (!principal) {
-      sendJson(response, 401, { error: "missing_or_invalid_bearer_token" });
-      return;
-    }
-
-    const server = findServerBySlug(registry, match[1] ?? "");
-    if (!server) {
-      sendJson(response, 404, { error: "mcp_server_not_found" });
-      return;
-    }
-
-    if (!server.enabled) {
-      recordHttpAudit(audit.events, principal, server, "http", "deny", startedAt, "MCP_SERVER_DISABLED");
-      sendJson(response, 403, { error: "mcp_server_disabled" });
-      return;
-    }
-
-    const connectDecision = authorizeConnect(server, principal);
-    if (connectDecision.effect !== "allow") {
-      recordHttpAudit(audit.events, principal, server, "connect", connectDecision.effect, startedAt, connectDecision.reasonCode);
-      sendJson(response, 403, { error: "mcp_server_denied", reason: connectDecision.reason });
-      return;
-    }
-
-    if (request.method === "GET") {
-      sendJson(response, 200, {
-        server: { id: server.id, slug: server.slug, transport: server.transport },
-        circuitState: circuitBreaker.state(server.slug)
+    const recordAudit: RecordAudit = (input) => {
+      context.policyDecision = input.policyDecision;
+      void withSpan("gateway", "mcp.gateway.audit_write", { event_type: input.eventType, policy_decision: input.policyDecision }, () => {
+        audit.record(input);
       });
-      return;
-    }
-
-    if (request.method !== "POST") {
-      sendJson(response, 405, { error: "method_not_allowed" });
-      return;
-    }
-
-    let parsed: McpJsonRpcRequest;
-    try {
-      parsed = parseJsonRpcRequest(await readJsonBody(request));
-    } catch (caught: unknown) {
-      if (caught instanceof JsonRpcRequestError) {
-        sendJson(response, 400, error(caught.id, caught.code, caught.message));
-        return;
+      if (input.policyDecision !== "allow") {
+        prometheus.recordPolicyDeny(input.policyDecision);
       }
-      throw caught;
-    }
+      if (input.errorCode?.startsWith("UPSTREAM")) {
+        prometheus.recordUpstreamError("error");
+      }
+    };
 
-    const reply = await handleMcpMessage(parsed, principal, server, upstream, audit.record, circuitBreaker, timeoutMs, startedAt);
-    sendJson(response, reply.statusCode, reply.body);
+    try {
+      await withSpan("gateway", "mcp.gateway.request", { method: normalizeHttpMethod(request.method) }, () =>
+        routeRequest(request, response, context, registry, upstream, recordAudit, circuitBreaker, timeoutMs, prometheus)
+      );
+    } catch (caught: unknown) {
+      const message = caught instanceof Error ? caught.message : "GATEWAY_INTERNAL_ERROR";
+      sendJson(response, context, 500, { error: "gateway_internal_error" });
+      logger.error("gateway request failed", { traceId: context.traceId, errorCode: message });
+    } finally {
+      const latencyMs = Date.now() - context.startedAt;
+      const outcome = context.statusCode >= 200 && context.statusCode < 400 ? "success" : "error";
+      prometheus.recordHttpRequest({
+        method: normalizeHttpMethod(request.method),
+        route: context.route,
+        statusCode: context.statusCode,
+        latencyMs,
+        outcome,
+        policyDecision: context.policyDecision
+      });
+      prometheus.decrementActiveSessions();
+      logger.info("gateway request completed", {
+        traceId: context.traceId,
+        method: normalizeHttpMethod(request.method),
+        route: context.route,
+        statusCode: context.statusCode,
+        latencyMs,
+        outcome,
+        policyDecision: context.policyDecision
+      });
+    }
   }
 
   return {
     auditEvents: audit.events,
     handle,
     metrics: audit.metrics,
+    prometheus,
     registry
   };
+}
+
+async function routeRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  registry: GatewayServer[],
+  upstream: UpstreamTransport,
+  recordAudit: RecordAudit,
+  circuitBreaker: CircuitBreaker,
+  timeoutMs: number,
+  prometheus: GatewayPrometheusMetrics
+) {
+  const url = new URL(request.url ?? "/", "http://localhost");
+
+  if (url.pathname === "/metrics") {
+    context.route = "metrics";
+    sendText(response, context, 200, prometheus.contentType, await prometheus.render());
+    return;
+  }
+
+  const match = /^\/mcp\/([^/]+)$/.exec(url.pathname);
+  if (!match) {
+    recordAudit({
+      eventType: "server.connect.denied",
+      traceId: context.traceId,
+      method: normalizeHttpMethod(request.method),
+      riskLevel: "low",
+      policyDecision: "deny",
+      latencyMs: elapsed(context),
+      errorCode: "GATEWAY_ROUTE_NOT_FOUND"
+    });
+    sendJson(response, context, 404, { error: "not_found" });
+    return;
+  }
+
+  context.route = "mcp";
+  const principal = await withSpan("gateway", "mcp.gateway.auth", { route: context.route }, () => validateBearerToken(request));
+  if (!principal) {
+    recordAudit({
+      eventType: "auth.failure",
+      traceId: context.traceId,
+      method: normalizeHttpMethod(request.method),
+      riskLevel: "low",
+      policyDecision: "deny",
+      latencyMs: elapsed(context),
+      errorCode: "AUTH_MISSING_OR_INVALID_BEARER_TOKEN"
+    });
+    sendJson(response, context, 401, { error: "missing_or_invalid_bearer_token" });
+    return;
+  }
+
+  recordAudit({
+    eventType: "auth.success",
+    traceId: context.traceId,
+    method: normalizeHttpMethod(request.method),
+    riskLevel: "low",
+    policyDecision: "allow",
+    latencyMs: elapsed(context),
+    userId: principal.userId,
+    clientId: principal.clientId
+  });
+
+  const serverSlug = match[1] ?? "";
+  const server = findServerBySlug(registry, serverSlug);
+  if (!server) {
+    recordAudit({
+      eventType: "server.connect.denied",
+      traceId: context.traceId,
+      method: normalizeHttpMethod(request.method),
+      riskLevel: "low",
+      policyDecision: "deny",
+      latencyMs: elapsed(context),
+      errorCode: "MCP_SERVER_NOT_FOUND",
+      userId: principal.userId,
+      clientId: principal.clientId
+    });
+    sendJson(response, context, 404, { error: "mcp_server_not_found" });
+    return;
+  }
+
+  const connectMethod = request.method === "POST" ? "connect" : normalizeHttpMethod(request.method);
+  const auditBase = createAuditBase(principal, server, connectMethod, context.traceId);
+
+  if (!server.enabled) {
+    recordAudit({
+      ...auditBase,
+      eventType: "server.disabled",
+      policyDecision: "deny",
+      latencyMs: elapsed(context),
+      errorCode: "MCP_SERVER_DISABLED"
+    });
+    sendJson(response, context, 403, { error: "mcp_server_disabled" });
+    return;
+  }
+
+  const connectDecision = withSpan("gateway", "mcp.gateway.policy_decision", { policy_action: "connect" }, () => authorizeConnect(server, principal));
+  const resolvedConnectDecision = await connectDecision;
+  if (resolvedConnectDecision.effect !== "allow") {
+    recordAudit({
+      ...auditBase,
+      eventType: "server.connect.denied",
+      policyDecision: resolvedConnectDecision.effect,
+      latencyMs: elapsed(context),
+      errorCode: resolvedConnectDecision.reasonCode
+    });
+    sendJson(response, context, 403, { error: "mcp_server_denied", reason: resolvedConnectDecision.reason });
+    return;
+  }
+
+  recordAudit({
+    ...auditBase,
+    eventType: "server.connect.allowed",
+    policyDecision: "allow",
+    latencyMs: elapsed(context)
+  });
+
+  if (request.method === "GET") {
+    sendJson(response, context, 200, {
+      server: { id: server.id, slug: server.slug, transport: server.transport },
+      circuitState: circuitBreaker.state(server.slug)
+    });
+    return;
+  }
+
+  if (request.method !== "POST") {
+    recordAudit({
+      ...createAuditBase(principal, server, normalizeHttpMethod(request.method), context.traceId),
+      eventType: "server.connect.denied",
+      policyDecision: "deny",
+      latencyMs: elapsed(context),
+      errorCode: "METHOD_NOT_ALLOWED"
+    });
+    sendJson(response, context, 405, { error: "method_not_allowed" });
+    return;
+  }
+
+  let parsed: McpJsonRpcRequest;
+  try {
+    parsed = parseJsonRpcRequest(await readJsonBody(request));
+  } catch (caught: unknown) {
+    if (caught instanceof JsonRpcRequestError) {
+      recordAudit({
+        ...createAuditBase(principal, server, "jsonrpc", context.traceId),
+        eventType: "tool.call.failed",
+        policyDecision: "deny",
+        latencyMs: elapsed(context),
+        errorCode: caught.code === -32700 ? "JSON_RPC_PARSE_ERROR" : "JSON_RPC_INVALID_REQUEST"
+      });
+      sendJson(response, context, 400, error(caught.id, caught.code, caught.message));
+      return;
+    }
+    throw caught;
+  }
+
+  const reply = await handleMcpMessage(parsed, principal, server, upstream, recordAudit, circuitBreaker, timeoutMs, context, prometheus);
+  sendJson(response, context, reply.statusCode, reply.body);
 }
 
 async function handleMcpMessage(
@@ -109,29 +275,41 @@ async function handleMcpMessage(
   principal: GatewayPrincipal,
   server: GatewayServer,
   upstream: UpstreamTransport,
-  recordAudit: (input: Omit<GatewayAuditEvent, "createdAt" | "traceId"> & { traceId?: string }) => void,
+  recordAudit: RecordAudit,
   circuitBreaker: CircuitBreaker,
   timeoutMs: number,
-  startedAt: number
+  context: RequestContext,
+  prometheus: GatewayPrometheusMetrics
 ): Promise<{ statusCode: number; body: McpJsonRpcResponse | Record<string, unknown> }> {
   const method = request.method;
   const toolName = readToolName(request);
   const redacted = redactArguments(request.params?.arguments);
-  const auditBase = createAuditBase(principal, server, method);
+  const auditBase = createAuditBase(principal, server, method, context.traceId);
 
   if (method === "notifications/initialized") {
-    recordAudit({ ...auditBase, latencyMs: Date.now() - startedAt, policyDecision: "allow" });
+    recordAudit({ ...auditBase, eventType: "server.connect.allowed", latencyMs: elapsed(context), policyDecision: "allow" });
     return { statusCode: 202, body: { accepted: true } };
   }
 
   if (method === "tools/list") {
-    const decision = authorizeToolDiscovery(server, principal);
+    const decision = await withSpan("gateway", "mcp.gateway.policy_decision", { policy_action: "tools/list" }, () => authorizeToolDiscovery(server, principal));
     if (decision.effect !== "allow") {
-      recordAudit({ ...auditBase, errorCode: decision.reasonCode, latencyMs: Date.now() - startedAt, policyDecision: decision.effect });
+      recordAudit({
+        ...auditBase,
+        eventType: "tool.discovery.filtered",
+        errorCode: decision.reasonCode,
+        latencyMs: elapsed(context),
+        policyDecision: decision.effect
+      });
       return { statusCode: 200, body: error(request.id, -32001, decision.reason) };
     }
     const allowedTools = allowedToolsForPrincipal(server, principal);
-    recordAudit({ ...auditBase, latencyMs: Date.now() - startedAt, policyDecision: decision.effect });
+    recordAudit({
+      ...auditBase,
+      eventType: allowedTools.length === server.tools.length ? "tool.discovery.allowed" : "tool.discovery.filtered",
+      latencyMs: elapsed(context),
+      policyDecision: decision.effect
+    });
     return {
       statusCode: 200,
       body: result(request.id, {
@@ -146,33 +324,53 @@ async function handleMcpMessage(
 
   if (method === "tools/call") {
     const tool = server.tools.find((candidate) => candidate.name === toolName);
-    const decision = authorizeToolCall(server, principal, tool);
+    const decision = await withSpan("gateway", "mcp.gateway.policy_decision", { policy_action: "tools/call" }, () => authorizeToolCall(server, principal, tool));
 
     if (decision.effect !== "allow") {
       recordAudit({
         ...auditBase,
         argumentHash: hashArguments(redacted),
         argumentRedactedJson: redacted,
+        eventType: "tool.call.denied",
         errorCode: "MCP_TOOL_DENIED",
-        latencyMs: Date.now() - startedAt,
+        latencyMs: elapsed(context),
         policyDecision: decision.effect,
+        riskLevel: riskLevelForGatewayEvent(server, toolName),
         toolName
       });
+      prometheus.recordToolCall({ latencyMs: elapsed(context), outcome: "error", policyDecision: decision.effect });
       return { statusCode: 200, body: error(request.id, -32001, decision.reason) };
     }
-  }
 
-  const methodDecision = authorizeAdditionalMethod(method, server, principal);
-  if (methodDecision?.effect !== "allow") {
     recordAudit({
       ...auditBase,
       argumentHash: hashArguments(redacted),
       argumentRedactedJson: redacted,
-      errorCode: methodDecision?.reasonCode ?? "MCP_METHOD_UNSUPPORTED",
-      latencyMs: Date.now() - startedAt,
-      policyDecision: methodDecision?.effect ?? "deny",
+      eventType: "tool.call.allowed",
+      latencyMs: elapsed(context),
+      policyDecision: "allow",
+      riskLevel: riskLevelForGatewayEvent(server, toolName),
       toolName
     });
+  }
+
+  const methodDecision = await withSpan("gateway", "mcp.gateway.policy_decision", { policy_action: method }, () => authorizeAdditionalMethod(method, server, principal));
+  if (methodDecision?.effect !== "allow") {
+    const policyDecision = methodDecision?.effect ?? "deny";
+    recordAudit({
+      ...auditBase,
+      argumentHash: hashArguments(redacted),
+      argumentRedactedJson: redacted,
+      eventType: method === "tools/call" ? "tool.call.denied" : "server.connect.denied",
+      errorCode: methodDecision?.reasonCode ?? "MCP_METHOD_UNSUPPORTED",
+      latencyMs: elapsed(context),
+      policyDecision,
+      riskLevel: riskLevelForGatewayEvent(server, toolName),
+      toolName
+    });
+    if (method === "tools/call") {
+      prometheus.recordToolCall({ latencyMs: elapsed(context), outcome: "error", policyDecision });
+    }
     return {
       statusCode: 200,
       body: error(request.id, methodDecision ? -32001 : -32601, methodDecision?.reason ?? `Unsupported MCP method ${method}`)
@@ -180,27 +378,56 @@ async function handleMcpMessage(
   }
 
   if (circuitBreaker.state(server.slug) === "degraded") {
-    recordAudit({ ...auditBase, errorCode: "UPSTREAM_DEGRADED", latencyMs: Date.now() - startedAt, policyDecision: "deny", toolName });
+    recordAudit({
+      ...auditBase,
+      eventType: method === "tools/call" ? "tool.call.failed" : "server.connect.denied",
+      errorCode: "UPSTREAM_DEGRADED",
+      latencyMs: elapsed(context),
+      policyDecision: "deny",
+      riskLevel: riskLevelForGatewayEvent(server, toolName),
+      toolName
+    });
+    if (method === "tools/call") {
+      prometheus.recordToolCall({ latencyMs: elapsed(context), outcome: "error", policyDecision: "deny" });
+    }
     return { statusCode: 503, body: error(request.id, -32002, "Upstream is degraded") };
   }
 
   try {
-    const upstreamResponse = await withTimeout(upstream.call(server, request, timeoutMs), timeoutMs);
+    const upstreamResponse = await withSpan("gateway", "mcp.gateway.upstream_call", { mcp_method: method }, () =>
+      withTimeout(upstream.call(server, request, timeoutMs, context.traceId), timeoutMs)
+    );
     circuitBreaker.recordSuccess(server.slug);
     recordAudit({
       ...auditBase,
       argumentHash: hashArguments(redacted),
       argumentRedactedJson: redacted,
-      latencyMs: Date.now() - startedAt,
+      eventType: method === "tools/call" ? "tool.call.succeeded" : "server.connect.allowed",
+      latencyMs: elapsed(context),
       policyDecision: "allow",
+      riskLevel: riskLevelForGatewayEvent(server, toolName),
       toolName,
       upstreamStatus: 200
     });
+    if (method === "tools/call") {
+      prometheus.recordToolCall({ latencyMs: elapsed(context), outcome: "success", policyDecision: "allow" });
+    }
     return { statusCode: 200, body: upstreamResponse };
   } catch (caught: unknown) {
     circuitBreaker.recordFailure(server.slug);
     const message = caught instanceof Error ? caught.message : "UPSTREAM_ERROR";
-    recordAudit({ ...auditBase, errorCode: message, latencyMs: Date.now() - startedAt, policyDecision: "deny", toolName });
+    recordAudit({
+      ...auditBase,
+      eventType: method === "tools/call" ? "tool.call.failed" : "server.connect.denied",
+      errorCode: message,
+      latencyMs: elapsed(context),
+      policyDecision: "deny",
+      riskLevel: riskLevelForGatewayEvent(server, toolName),
+      toolName
+    });
+    if (method === "tools/call") {
+      prometheus.recordToolCall({ latencyMs: elapsed(context), outcome: "error", policyDecision: "deny" });
+    }
     return { statusCode: 502, body: error(request.id, -32003, message) };
   }
 }
@@ -328,10 +555,37 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   }
 }
 
-function sendJson(response: ServerResponse, statusCode: number, payload: Record<string, unknown> | McpJsonRpcResponse) {
+function sendJson(
+  response: ServerResponse,
+  context: RequestContext,
+  statusCode: number,
+  payload: Record<string, unknown> | McpJsonRpcResponse
+) {
+  sendText(response, context, statusCode, "application/json", JSON.stringify(payload));
+}
+
+function sendText(response: ServerResponse, context: RequestContext, statusCode: number, contentType: string, payload: string) {
+  context.statusCode = statusCode;
   response.statusCode = statusCode;
-  response.setHeader("content-type", "application/json");
-  response.end(JSON.stringify(payload));
+  response.setHeader("content-type", contentType);
+  response.end(payload);
+}
+
+function readTraceId(request: IncomingMessage) {
+  const header = firstHeader(request.headers["x-trace-id"]);
+  return header && header.trim().length > 0 ? header.trim() : randomUUID();
+}
+
+function firstHeader(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeHttpMethod(method: string | undefined) {
+  return method ?? "UNKNOWN";
+}
+
+function elapsed(context: RequestContext) {
+  return Date.now() - context.startedAt;
 }
 
 class JsonRpcRequestError extends Error {
@@ -342,27 +596,4 @@ class JsonRpcRequestError extends Error {
   ) {
     super(message);
   }
-}
-
-function recordHttpAudit(
-  events: GatewayAuditEvent[],
-  principal: GatewayPrincipal,
-  server: GatewayServer,
-  method: string,
-  policyDecision: GatewayAuditEvent["policyDecision"],
-  startedAt: number,
-  errorCode?: string
-) {
-  events.unshift({
-    traceId: randomUUID(),
-    sessionId: `${principal.clientId}:${server.slug}`,
-    userId: principal.userId,
-    clientId: principal.clientId,
-    serverId: server.id,
-    method,
-    policyDecision,
-    latencyMs: Date.now() - startedAt,
-    errorCode,
-    createdAt: new Date().toISOString()
-  });
 }

@@ -2,12 +2,30 @@ import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import type { McpJsonRpcRequest } from "@mcp-hub/mcp-protocol";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createGatewayServer } from "./index";
 import { createDefaultRegistry } from "./registry";
 import type { GatewayServer } from "./types";
 import type { UpstreamTransport } from "./upstream";
+
+const { withSpanMock } = vi.hoisted(() => ({
+  withSpanMock: vi.fn(async <T>(_service: string, _spanName: string, _attributes: Record<string, string | number | boolean> | undefined, fn: () => T | Promise<T>) => fn())
+}));
+
+vi.mock("@mcp-hub/logger", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn()
+  }),
+  withSpan: withSpanMock
+}));
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("gateway runtime", () => {
   it("rejects requests without a bearer token", async () => {
@@ -17,6 +35,12 @@ describe("gateway runtime", () => {
     const response = await fetch(url(gateway.server, "/mcp/echo"), { method: "GET" });
 
     expect(response.status).toBe(401);
+    expect(response.headers.get("x-trace-id")).toBeTruthy();
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({
+      eventType: "auth.failure",
+      policyDecision: "deny",
+      errorCode: "AUTH_MISSING_OR_INVALID_BEARER_TOKEN"
+    });
 
     await close(gateway.server);
   });
@@ -31,6 +55,7 @@ describe("gateway runtime", () => {
     });
 
     expect(response.status).toBe(401);
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ eventType: "auth.failure", policyDecision: "deny" });
 
     await close(gateway.server);
   });
@@ -59,9 +84,11 @@ describe("gateway runtime", () => {
 
   it("proxies tools/call to an HTTP upstream and returns server-shaped output", async () => {
     const upstreamRequests: McpJsonRpcRequest[] = [];
+    const upstreamTraceIds: string[] = [];
     const upstream = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       upstreamRequests.push(body);
+      upstreamTraceIds.push(firstHeader(request.headers["x-trace-id"]) ?? "");
       sendJson(response, 200, {
         jsonrpc: "2.0",
         id: body.id ?? null,
@@ -74,18 +101,107 @@ describe("gateway runtime", () => {
     const gateway = createGatewayServer({ registry });
     await listen(gateway.server);
 
+    const traceId = "trace-from-test";
     const response = await postMcp(gateway.server, "echo", {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "echo_message", arguments: { message: "hello", token: "secret" } }
-    });
+      params: { name: "echo_message", arguments: { message: "hello", token: "raw-token-value", nested: { apiKey: "raw-key-value" } } }
+    }, { "x-trace-id": traceId });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ result: { content: [{ type: "text" }] } });
+    expect(response.headers.get("x-trace-id")).toBe(traceId);
     expect(upstreamRequests).toHaveLength(1);
+    expect(upstreamTraceIds).toEqual([traceId]);
     expect(upstreamRequests[0]).toMatchObject({ method: "tools/call", params: { name: "echo_message" } });
-    expect(gateway.runtime.auditEvents[0]?.argumentRedactedJson).toMatchObject({ token: "[REDACTED]" });
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ eventType: "tool.call.succeeded", traceId });
+    expect(gateway.runtime.auditEvents[0]?.argumentRedactedJson).toMatchObject({ token: "[REDACTED]", nested: { apiKey: "[REDACTED]" } });
+    const serializedAudit = JSON.stringify(gateway.runtime.auditEvents[0]);
+    expect(serializedAudit).not.toContain("raw-token-value");
+    expect(serializedAudit).not.toContain("raw-key-value");
+    expect(withSpanMock).toHaveBeenCalledWith("gateway", "mcp.gateway.request", expect.any(Object), expect.any(Function));
+    expect(withSpanMock).toHaveBeenCalledWith("gateway", "mcp.gateway.auth", expect.any(Object), expect.any(Function));
+    expect(withSpanMock).toHaveBeenCalledWith("gateway", "mcp.gateway.policy_decision", expect.any(Object), expect.any(Function));
+    expect(withSpanMock).toHaveBeenCalledWith("gateway", "mcp.gateway.upstream_call", expect.any(Object), expect.any(Function));
+    expect(withSpanMock).toHaveBeenCalledWith("gateway", "mcp.gateway.audit_write", expect.any(Object), expect.any(Function));
+
+    await close(gateway.server);
+    await close(upstream);
+  });
+
+  it("redacts the required sensitive keys recursively and hashes canonical redacted JSON", async () => {
+    const upstreamRequests: McpJsonRpcRequest[] = [];
+    const upstream = createServer(async (request, response) => {
+      const body = await readJsonBody(request);
+      upstreamRequests.push(body);
+      sendJson(response, 200, { jsonrpc: "2.0", id: body.id ?? null, result: {} });
+    });
+    await listen(upstream);
+    const registry = createRegistryWithUpstream("echo", `${url(upstream, "")}/mcp`);
+    const gateway = createGatewayServer({ registry });
+    await listen(gateway.server);
+
+    await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 30,
+      method: "tools/call",
+      params: {
+        name: "echo_message",
+        arguments: {
+          z: 1,
+          password: "raw-password",
+          Passwd: "raw-passwd",
+          token: "raw-token",
+          secret: "raw-secret",
+          apiKey: "raw-api-key",
+          apikey: "raw-apikey",
+          authorization: "raw-auth",
+          cookie: "raw-cookie",
+          kubeconfig: "raw-kubeconfig",
+          privateKey: "raw-private-key",
+          privatekey: "raw-privatekey",
+          nested: [{ ok: true, token: "array-token" }, Number.NaN]
+        }
+      }
+    });
+    const first = gateway.runtime.auditEvents[0];
+
+    await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 31,
+      method: "tools/call",
+      params: {
+        name: "echo_message",
+        arguments: {
+          nested: [{ token: "different-array-token", ok: true }, Number.POSITIVE_INFINITY],
+          privatekey: "different-privatekey",
+          privateKey: "different-private-key",
+          kubeconfig: "different-kubeconfig",
+          cookie: "different-cookie",
+          authorization: "different-auth",
+          apikey: "different-apikey",
+          apiKey: "different-api-key",
+          secret: "different-secret",
+          token: "different-token",
+          Passwd: "different-passwd",
+          password: "different-password",
+          z: 1
+        }
+      }
+    });
+    const second = gateway.runtime.auditEvents[0];
+
+    expect(first?.argumentRedactedJson).toEqual(second?.argumentRedactedJson);
+    expect(first?.argumentHash).toBe(second?.argumentHash);
+    expect(first?.argumentRedactedJson).toMatchObject({
+      password: "[REDACTED]",
+      Passwd: "[REDACTED]",
+      apiKey: "[REDACTED]",
+      privatekey: "[REDACTED]",
+      nested: [{ ok: true, token: "[REDACTED]" }, null]
+    });
+    expect(JSON.stringify(gateway.runtime.auditEvents)).not.toContain("raw-");
 
     await close(gateway.server);
     await close(upstream);
@@ -141,7 +257,7 @@ describe("gateway runtime", () => {
     });
 
     expect(await response.json()).toMatchObject({ error: { code: -32001 } });
-    expect(gateway.runtime.auditEvents[0]).toMatchObject({ policyDecision: "needs_approval", errorCode: "MCP_TOOL_DENIED" });
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({ policyDecision: "needs_approval", errorCode: "MCP_TOOL_DENIED", riskLevel: "high" });
     expect(calls).toBe(0);
 
     await close(gateway.server);
@@ -311,7 +427,59 @@ describe("gateway runtime", () => {
     expect(await parseError.json()).toMatchObject({ error: { code: -32700, message: "Parse error" } });
     expect(invalidEnvelope.status).toBe(400);
     expect(await invalidEnvelope.json()).toMatchObject({ error: { code: -32600, message: "Invalid Request" } });
+    expect(gateway.runtime.auditEvents.map((event) => event.errorCode)).toContain("JSON_RPC_PARSE_ERROR");
+    expect(gateway.runtime.auditEvents.map((event) => event.errorCode)).toContain("JSON_RPC_INVALID_REQUEST");
+    expect(gateway.runtime.auditEvents.filter((event) => event.eventType === "tool.call.failed")).toHaveLength(2);
     expect(calls).toBe(0);
+
+    await close(gateway.server);
+  });
+
+  it("audits method-not-allowed HTTP requests", async () => {
+    const gateway = createGatewayServer({ upstream: createServerShapedUpstream() });
+    await listen(gateway.server);
+
+    const response = await fetch(url(gateway.server, "/mcp/echo"), {
+      method: "PUT",
+      headers: { authorization: "Bearer dev-admin-token" }
+    });
+
+    expect(response.status).toBe(405);
+    expect(gateway.runtime.auditEvents[0]).toMatchObject({
+      eventType: "server.connect.denied",
+      method: "PUT",
+      policyDecision: "deny",
+      errorCode: "METHOD_NOT_ALLOWED"
+    });
+
+    await close(gateway.server);
+  });
+
+  it("exposes Prometheus metrics text", async () => {
+    const gateway = createGatewayServer({ upstream: createServerShapedUpstream() });
+    await listen(gateway.server);
+
+    await postMcp(gateway.server, "echo", {
+      jsonrpc: "2.0",
+      id: 24,
+      method: "tools/call",
+      params: { name: "echo_message", arguments: { message: "metrics" } }
+    });
+    const response = await fetch(url(gateway.server, "/metrics"));
+    const metricsText = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-trace-id")).toBeTruthy();
+    expect(metricsText).toContain("mcp_gateway_requests_total");
+    expect(metricsText).toContain("mcp_gateway_request_duration_ms");
+    expect(metricsText).toContain("mcp_gateway_tool_calls_total");
+    expect(metricsText).toContain("mcp_gateway_tool_call_duration_ms");
+    expect(metricsText).toContain("mcp_gateway_policy_denies_total");
+    expect(metricsText).toContain("mcp_gateway_upstream_errors_total");
+    expect(metricsText).toContain("mcp_gateway_active_sessions");
+    expect(metricsText).not.toContain("trace_id");
+    expect(metricsText).not.toContain("server_id");
+    expect(metricsText).not.toContain("tool_name");
 
     await close(gateway.server);
   });
@@ -383,21 +551,28 @@ function createRegistryWithUpstream(slug: string, upstreamUrl: string) {
   return createDefaultRegistry().map((server) => (server.slug === slug ? { ...server, upstreamUrl } : server));
 }
 
-async function postMcp(server: ReturnType<typeof createGatewayServer>["server"], slug: string, body: Record<string, unknown>) {
-  return postMcpWithToken(server, slug, "dev-admin-token", body);
+async function postMcp(
+  server: ReturnType<typeof createGatewayServer>["server"],
+  slug: string,
+  body: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {}
+) {
+  return postMcpWithToken(server, slug, "dev-admin-token", body, extraHeaders);
 }
 
 async function postMcpWithToken(
   server: ReturnType<typeof createGatewayServer>["server"],
   slug: string,
   token: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {}
 ) {
   return fetch(url(server, `/mcp/${slug}`), {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...extraHeaders
     },
     body: JSON.stringify(body)
   });
@@ -463,4 +638,8 @@ function readToolNames(body: unknown) {
   }
 
   return tools.map((tool) => (tool && typeof tool === "object" && !Array.isArray(tool) ? (tool as Record<string, unknown>).name : undefined));
+}
+
+function firstHeader(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
