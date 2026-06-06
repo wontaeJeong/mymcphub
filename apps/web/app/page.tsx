@@ -14,7 +14,7 @@ export default async function Page() {
   const serversPromise = loadResult(listServers());
   const approvalsPromise = loadResult(listApprovals());
   const healthPromise = loadResult(listServerHealth());
-  const auditPromise = loadResult(listAuditEvents(25));
+  const auditPromise = loadResult(listAuditEvents({ limit: 25 }));
   const toolCallsPromise = loadResult(listToolCallEvents());
   const [me, servers, approvals, health, audit, toolCalls] = await Promise.all([
     mePromise,
