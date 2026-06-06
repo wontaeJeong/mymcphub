@@ -12,7 +12,10 @@ import type {
   AuditEventSearchFilters,
   ApiGrant,
   ApiMcpServer,
+  ApiMcpServerVersion,
+  ApiMcpServerVersionStatus,
   ApiMcpTool,
+  ApiSchemaDiffResponse,
   ApiServerHealth,
   ApiToolCallEvent,
   GrantSubjectType,
@@ -21,6 +24,8 @@ import type {
 
 type StoreState = {
   servers: ApiMcpServer[];
+  serverVersions: ApiMcpServerVersion[];
+  schemaDiffs: ApiSchemaDiffResponse[];
   tools: ApiMcpTool[];
   grants: ApiGrant[];
   approvals: ApiApproval[];
@@ -71,6 +76,70 @@ export function createControlPlaneStore(initialState = createSeedState()) {
       return server;
     },
     getServer: (serverId: string) => findServer(state, serverId),
+    listServerVersions: (serverId: string) => {
+      findServer(state, serverId);
+      return { items: state.serverVersions.filter((version) => version.serverId === serverId) };
+    },
+    createServerVersion: (serverId: string, body: unknown, context: AuditContext) => {
+      findServer(state, serverId);
+      const input = recordBody(body);
+      const versionName = requiredString(input.version, "version");
+      if (state.serverVersions.some((version) => version.serverId === serverId && version.version === versionName)) {
+        throw validationError("Server version already exists", { serverId, version: versionName });
+      }
+      const now = currentTimestamp();
+      const status = readServerVersionStatus(input.status) ?? "draft";
+      if (status === "active") {
+        updateActiveServerVersions(state, serverId, "deprecated", now);
+      }
+      const serverVersion: ApiMcpServerVersion = {
+        id: randomUUID(),
+        serverId,
+        version: versionName,
+        status,
+        imageRef: optionalNonEmptyString(input.imageRef, "imageRef"),
+        imageRepository: optionalNonEmptyString(input.imageRepository, "imageRepository"),
+        imageTag: optionalNonEmptyString(input.imageTag, "imageTag"),
+        imageDigest: optionalNonEmptyString(input.imageDigest, "imageDigest"),
+        configHash: optionalNonEmptyString(input.configHash, "configHash"),
+        toolSchemaHash: optionalNonEmptyString(input.toolSchemaHash, "toolSchemaHash"),
+        createdBy: optionalNonEmptyString(input.createdBy, "createdBy"),
+        createdAt: now,
+        updatedAt: now,
+        activatedAt: status === "active" ? now : undefined,
+        rolledBackAt: status === "rolled_back" ? now : undefined,
+        manifestJson: optionalRecord(input.manifestJson, "manifestJson")
+      };
+      state.serverVersions.push(serverVersion);
+      recordAudit(state, context, "mcp_server_version.created", serverId, undefined, "allow", undefined, body);
+      return serverVersion;
+    },
+    activateServerVersion: (serverId: string, versionId: string, context: AuditContext) => {
+      findServer(state, serverId);
+      const serverVersion = findServerVersion(state, serverId, versionId);
+      const now = currentTimestamp();
+      updateActiveServerVersions(state, serverId, "deprecated", now, versionId);
+      serverVersion.status = "active";
+      serverVersion.updatedAt = now;
+      serverVersion.activatedAt = now;
+      recordAudit(state, context, "mcp_server_version.activated", serverId, undefined, "allow", undefined, { versionId, version: serverVersion.version });
+      return serverVersion;
+    },
+    rollbackServerVersion: (serverId: string, versionId: string, context: AuditContext) => {
+      findServer(state, serverId);
+      const serverVersion = findServerVersion(state, serverId, versionId);
+      const now = currentTimestamp();
+      updateActiveServerVersions(state, serverId, "rolled_back", now, versionId);
+      serverVersion.status = "active";
+      serverVersion.updatedAt = now;
+      serverVersion.activatedAt = now;
+      recordAudit(state, context, "mcp_server_version.rolled_back", serverId, undefined, "allow", undefined, { versionId, version: serverVersion.version });
+      return serverVersion;
+    },
+    getServerSchemaDiff: (serverId: string) => {
+      findServer(state, serverId);
+      return state.schemaDiffs.find((diff) => diff.serverId === serverId) ?? createSchemaDiffPlaceholder(serverId);
+    },
     patchServer: (serverId: string, body: unknown, context: AuditContext) => {
       const server = findServer(state, serverId);
       const patch = recordBody(body);
@@ -324,6 +393,13 @@ function createSeedState(): StoreState {
       createSeedServer(seedIds.k8sReadonlyServer, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", "streamable_http", "medium", now),
       createSeedServer(seedIds.stdioSampleServer, "stdio-sample", "stdio Sample MCP Server", "First-party stdio MCP server exposed through the stdio adapter runtime.", "stdio_adapter", "low", now)
     ],
+    serverVersions: [
+      createSeedServerVersion(seedIds.echoServer, "1.0.0", now),
+      createSeedServerVersion(seedIds.internalDocsServer, "1.0.0", now),
+      createSeedServerVersion(seedIds.k8sReadonlyServer, "1.0.0", now),
+      createSeedServerVersion(seedIds.stdioSampleServer, "1.0.0", now)
+    ],
+    schemaDiffs: [],
     tools: [
       createSeedTool(seedIds.echoServer, "echo_message", "Return the provided message unchanged.", "low", now),
       createSeedTool(seedIds.echoServer, "get_server_time", "Return the current server time as an ISO-8601 timestamp.", "low", now),
@@ -404,6 +480,20 @@ function createSeedState(): StoreState {
   };
 }
 
+function createSeedServerVersion(serverId: string, version: string, timestamp: string): ApiMcpServerVersion {
+  return {
+    id: randomUUID(),
+    serverId,
+    version,
+    status: "active",
+    configHash: `seed-config-${serverId}`,
+    toolSchemaHash: `seed-tool-schema-${serverId}`,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    activatedAt: timestamp
+  };
+}
+
 function createSeedServer(
   id: string,
   slug: string,
@@ -479,6 +569,41 @@ function findTool(state: StoreState, toolId: string) {
     throw notFound("MCP_TOOL_NOT_FOUND", "MCP tool not found");
   }
   return tool;
+}
+
+function findServerVersion(state: StoreState, serverId: string, versionId: string) {
+  const serverVersion = state.serverVersions.find((candidate) => candidate.serverId === serverId && candidate.id === versionId);
+  if (!serverVersion) {
+    throw notFound("MCP_SERVER_VERSION_NOT_FOUND", "MCP server version not found");
+  }
+  return serverVersion;
+}
+
+function updateActiveServerVersions(
+  state: StoreState,
+  serverId: string,
+  status: Extract<ApiMcpServerVersionStatus, "deprecated" | "rolled_back">,
+  timestamp: string,
+  exceptVersionId?: string
+) {
+  for (const version of state.serverVersions) {
+    if (version.serverId === serverId && version.id !== exceptVersionId && version.status === "active") {
+      version.status = status;
+      version.updatedAt = timestamp;
+      if (status === "rolled_back") {
+        version.rolledBackAt = timestamp;
+      }
+    }
+  }
+}
+
+function createSchemaDiffPlaceholder(serverId: string): ApiSchemaDiffResponse {
+  return {
+    serverId,
+    status: "placeholder",
+    generatedAt: currentTimestamp(),
+    changes: []
+  };
 }
 
 function findGrant(state: StoreState, grantId: string) {
@@ -646,6 +771,17 @@ function optionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function optionalNonEmptyString(value: unknown, fieldName: string) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    throw validationError(`${fieldName} must be a non-empty string`);
+  }
+
+  return value;
+}
+
 function optionalNumber(value: unknown, fieldName: string) {
   if (value === undefined) {
     return undefined;
@@ -674,6 +810,28 @@ function readRiskLevel(value: unknown): ApiAuditEvent["riskLevel"] | undefined {
   }
 
   throw validationError("riskLevel must be low, medium, high, or critical");
+}
+
+function readServerVersionStatus(value: unknown): ApiMcpServerVersionStatus | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "draft" || value === "pending" || value === "active" || value === "deprecated" || value === "rolled_back") {
+    return value;
+  }
+
+  throw validationError("status must be draft, pending, active, deprecated, or rolled_back");
+}
+
+function optionalRecord(value: unknown, fieldName: string): Record<string, unknown> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw validationError(`${fieldName} must be an object`);
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function readAuditJsonValue(value: unknown): ApiAuditEvent["argumentRedactedJson"] {

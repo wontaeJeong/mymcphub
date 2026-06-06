@@ -7,6 +7,7 @@ import type { AuditContext, AuditEventSearchFilters, AuthContext } from "./types
 
 type ServerParams = { serverId: string };
 type ToolParams = ServerParams & { toolId: string };
+type ServerVersionParams = ServerParams & { versionId: string };
 type GrantParams = { grantId: string };
 type ApprovalParams = { approvalId: string };
 
@@ -20,6 +21,21 @@ export function registerControlPlaneRoutes(app: FastifyInstance, store: ControlP
     return reply.code(201).send(server);
   });
   app.get<{ Params: ServerParams }>("/api/servers/:serverId", async (request) => store.getServer(request.params.serverId));
+  app.get<{ Params: ServerParams }>("/api/servers/:serverId/versions", async (request) => store.listServerVersions(request.params.serverId));
+  app.post<{ Params: ServerParams }>("/api/servers/:serverId/versions", async (request, reply) => {
+    requirePlatformAdmin(request.auth);
+    const version = store.createServerVersion(request.params.serverId, request.body, auditContext(request));
+    return reply.code(201).send(version);
+  });
+  app.post<{ Params: ServerVersionParams }>("/api/servers/:serverId/versions/:versionId/activate", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.activateServerVersion(request.params.serverId, request.params.versionId, auditContext(request));
+  });
+  app.post<{ Params: ServerVersionParams }>("/api/servers/:serverId/versions/:versionId/rollback", async (request) => {
+    requirePlatformAdmin(request.auth);
+    return store.rollbackServerVersion(request.params.serverId, request.params.versionId, auditContext(request));
+  });
+  app.get<{ Params: ServerParams }>("/api/servers/:serverId/schema-diff", async (request) => store.getServerSchemaDiff(request.params.serverId));
   app.patch<{ Params: ServerParams }>("/api/servers/:serverId", async (request) => {
     requirePlatformAdmin(request.auth);
     return store.patchServer(request.params.serverId, request.body, auditContext(request));

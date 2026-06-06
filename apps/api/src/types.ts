@@ -50,6 +50,49 @@ export type ApiMcpTool = {
   lastSeenAt?: string;
 };
 
+export type ApiMcpServerVersionStatus = "draft" | "pending" | "active" | "deprecated" | "rolled_back";
+
+export type ApiMcpServerVersion = {
+  id: string;
+  serverId: string;
+  version: string;
+  status: ApiMcpServerVersionStatus;
+  imageRef?: string;
+  imageRepository?: string;
+  imageTag?: string;
+  imageDigest?: string;
+  configHash?: string;
+  toolSchemaHash?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  activatedAt?: string;
+  rolledBackAt?: string;
+  manifestJson?: Record<string, unknown>;
+};
+
+export type ApiSchemaDiffChangeType =
+  | "tool_added"
+  | "tool_removed"
+  | "tool_description_changed"
+  | "tool_input_schema_changed"
+  | "tool_risk_changed";
+
+export type ApiSchemaDiffChange = {
+  type: ApiSchemaDiffChangeType;
+  path: string;
+  description: string;
+};
+
+export type ApiSchemaDiffResponse = {
+  serverId: string;
+  fromVersionId?: string;
+  toVersionId?: string;
+  status: "placeholder" | "ready";
+  generatedAt: string;
+  changes: ApiSchemaDiffChange[];
+};
+
 export type ApiGrant = {
   id: string;
   subjectType: GrantSubjectType;
