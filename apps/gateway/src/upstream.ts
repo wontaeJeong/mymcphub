@@ -3,7 +3,7 @@ import type { McpJsonRpcRequest, McpJsonRpcResponse, McpToolDescriptor } from "@
 import type { GatewayServer } from "./types";
 
 export interface UpstreamTransport {
-  call(server: GatewayServer, request: McpJsonRpcRequest, timeoutMs: number): Promise<McpJsonRpcResponse>;
+  call(server: GatewayServer, request: McpJsonRpcRequest, timeoutMs: number, traceId: string): Promise<McpJsonRpcResponse>;
 }
 
 export type CircuitState = "closed" | "degraded";
@@ -28,18 +28,18 @@ export class CircuitBreaker {
 
 export function createHttpJsonRpcTransport(): UpstreamTransport {
   return {
-    async call(server, request) {
+    async call(server, request, _timeoutMs, traceId) {
       if (!server.upstreamUrl) {
         throw new Error("UPSTREAM_URL_MISSING");
       }
 
       if (server.upstreamUrl.startsWith("local://")) {
-        return createLocalEchoTransport().call(server, request, 0);
+        return createLocalEchoTransport().call(server, request, 0, traceId);
       }
 
       const response = await fetch(server.upstreamUrl, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-trace-id": traceId },
         body: JSON.stringify(request)
       });
 
