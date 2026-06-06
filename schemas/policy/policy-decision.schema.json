@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Policy Decision",
+  "type": "object",
+  "required": ["effect", "reason"],
+  "properties": {
+    "effect": { "enum": ["allow", "deny", "needs_approval"] },
+    "reason": { "type": "string", "minLength": 1 },
+    "matchedPolicyVersion": { "type": "string" }
+  }
+}
