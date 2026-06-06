@@ -48,7 +48,7 @@ describe("createApiServer", () => {
         subjectId: "00000000-0000-4000-8000-000000000010",
         projectId: "00000000-0000-4000-8000-000000000020",
         serverId: echoServer?.id,
-        allowedTools: ["echo"],
+        allowedTools: ["echo_message"],
         environment: "dev",
         reason: "Integration test grant"
       }
