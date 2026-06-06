@@ -1,6 +1,8 @@
 import type { McpToolDescriptor } from "@mcp-hub/mcp-protocol";
 import type { PolicyEffect } from "@mcp-hub/policy";
 
+export type GatewayAuditJsonValue = string | number | boolean | null | GatewayAuditJsonValue[] | { [key: string]: GatewayAuditJsonValue };
+
 export type GatewayPrincipal = {
   userId: string;
   principalType: "user" | "team" | "service_account";
@@ -55,20 +57,35 @@ export type GatewayEmergencyPolicy = {
   clientIds?: string[];
 };
 
+export type GatewayAuditEventType =
+  | "auth.success"
+  | "auth.failure"
+  | "server.connect.allowed"
+  | "server.connect.denied"
+  | "tool.discovery.allowed"
+  | "tool.discovery.filtered"
+  | "tool.call.allowed"
+  | "tool.call.denied"
+  | "tool.call.succeeded"
+  | "tool.call.failed"
+  | "server.disabled";
+
 export type GatewayAuditEvent = {
+  eventType: GatewayAuditEventType;
   traceId: string;
-  sessionId: string;
-  userId: string;
-  clientId: string;
-  serverId: string;
+  sessionId?: string;
+  userId?: string;
+  clientId?: string;
+  serverId?: string;
   method: string;
   toolName?: string;
+  riskLevel: GatewayTool["riskLevel"];
   policyDecision: PolicyEffect;
   latencyMs: number;
   upstreamStatus?: number;
   errorCode?: string;
   argumentHash?: string;
-  argumentRedactedJson?: Record<string, unknown>;
+  argumentRedactedJson?: GatewayAuditJsonValue;
   createdAt: string;
 };
 
