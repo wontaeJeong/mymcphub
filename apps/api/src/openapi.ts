@@ -6,6 +6,12 @@ export const openApiDocument = {
   },
   paths: {
     "/healthz": { get: { summary: "Health check", responses: { "200": { description: "Healthy" } } } },
+    "/metrics": {
+      get: {
+        summary: "Prometheus metrics",
+        responses: { "200": { description: "Prometheus text metrics", content: { "text/plain": { schema: { type: "string" } } } } }
+      }
+    },
     "/readyz": { get: { summary: "Readiness check", responses: { "200": { description: "Ready" } } } },
     "/api/me": { get: { summary: "Current auth context", responses: { "200": { description: "Auth context" } } } },
     "/api/servers": {
@@ -34,11 +40,33 @@ export const openApiDocument = {
     },
     "/api/approvals/{approvalId}/approve": { post: { summary: "Approve request", responses: { "200": { description: "Approved request" } } } },
     "/api/approvals/{approvalId}/reject": { post: { summary: "Reject request", responses: { "200": { description: "Rejected request" } } } },
-    "/api/audit-events": { get: { summary: "Search audit events", responses: { "200": { description: "Paginated audit events" } } } },
+    "/api/audit-events": {
+      get: {
+        summary: "Search audit events",
+        parameters: [
+          { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
+          { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
+          { name: "user", in: "query", schema: { type: "string" } },
+          { name: "team", in: "query", schema: { type: "string" } },
+          { name: "project", in: "query", schema: { type: "string" } },
+          { name: "server", in: "query", schema: { type: "string" } },
+          { name: "tool", in: "query", schema: { type: "string" } },
+          { name: "event_type", in: "query", schema: { type: "string" } },
+          { name: "policy_decision", in: "query", schema: { type: "string", enum: ["allow", "deny", "needs_approval"] } },
+          { name: "risk_level", in: "query", schema: { type: "string", enum: ["low", "medium", "high", "critical"] } },
+          { name: "trace_id", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          { name: "cursor", in: "query", schema: { type: "string" } }
+        ],
+        responses: { "200": { description: "Paginated audit events" } }
+      }
+    },
+    "/api/audit-events/gateway": { post: { summary: "Ingest Gateway audit event", responses: { "201": { description: "Ingested audit event" } } } },
     "/api/tool-call-events": { get: { summary: "List tool call events", responses: { "200": { description: "Tool call events" } } } },
     "/api/server-health": { get: { summary: "List server health checks", responses: { "200": { description: "Server health checks" } } } },
     "/api/client-config/generate": { post: { summary: "Generate client config", responses: { "200": { description: "Client config snippet" } } } },
     "/api/admin/emergency-deny": { post: { summary: "Enable emergency deny", responses: { "200": { description: "Emergency deny state" } } } },
+    "/api/admin/emergency-deny/disable": { post: { summary: "Disable emergency deny", responses: { "200": { description: "Emergency deny disabled state" } } } },
     "/api/admin/revoke-server-grants/{serverId}": { post: { summary: "Revoke server grants", responses: { "200": { description: "Revocation summary" } } } }
   },
   components: {
