@@ -107,15 +107,24 @@ create table if not exists mcp_grants (
 create table if not exists approval_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references users(id),
+  subject_type text not null check (subject_type in ('user', 'team', 'service_account')),
+  subject_id text not null,
   project_id uuid not null references projects(id),
   server_id uuid not null references mcp_servers(id),
+  requested_tools_json jsonb not null default '[]'::jsonb,
+  environment text not null check (environment in ('dev', 'stg', 'prod', 'shared')),
   tool_name text,
-  status text not null check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  status text not null check (status in ('pending', 'approved', 'rejected', 'cancelled', 'expired')),
   requested_action text not null,
   reason text not null,
+  ticket_url text,
+  requested_expires_at timestamptz,
+  reviewer_id uuid references users(id),
+  review_comment text,
   decided_by uuid references users(id),
   decided_at timestamptz,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   metadata_json jsonb not null default '{}'::jsonb
 );
 
