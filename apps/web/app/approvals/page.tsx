@@ -7,11 +7,11 @@ import { ApprovalTable } from "../../components/tables";
 import type { ApiApproval } from "../../lib/api";
 import { listApprovals } from "../../lib/api";
 import { loadResult } from "../../lib/result";
+import { splitApprovalQueue } from "./page-helpers";
 
 export default async function ApprovalsPage() {
   const approvals = await loadResult(listApprovals());
-  const pending = approvals.ok ? approvals.data.items.filter((approval) => approval.status === "pending") : [];
-  const decided = approvals.ok ? approvals.data.items.filter((approval) => approval.status !== "pending") : [];
+  const { pending, decided } = approvals.ok ? splitApprovalQueue(approvals.data.items) : { pending: [], decided: [] };
 
   return (
     <div className="page-stack">
