@@ -35,8 +35,12 @@ tests/          Cross-workspace smoke tests
 
 1. Install dependencies with `pnpm install`.
 2. Copy `.env.example` to `.env` and adjust values for local services.
-3. Run all development tasks with `pnpm dev`.
-4. Run validation with `pnpm typecheck`, `pnpm lint`, and `pnpm test`.
+3. Start local support infrastructure with `pnpm dev:infra`.
+4. Run database setup with `pnpm db:migrate` and `pnpm db:seed`.
+5. Run the local app stack with `pnpm dev`.
+6. Run validation with `pnpm dev:smoke-test`, `pnpm typecheck`, `pnpm lint`, and `pnpm test`.
+
+See [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) for the complete local infra, database, mock token, smoke-test, and troubleshooting guide.
 
 ## Policy Model
 
