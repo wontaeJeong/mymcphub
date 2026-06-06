@@ -19,7 +19,7 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   const serverPromise = loadResult(getServer(serverId));
   const toolsPromise = loadResult(listTools(serverId));
   const healthPromise = loadResult(listServerHealth());
-  const auditPromise = loadResult(listAuditEvents(50));
+  const auditPromise = loadResult(listAuditEvents({ limit: 50, server: serverId }));
   const [server, tools, health, audit] = await Promise.all([serverPromise, toolsPromise, healthPromise, auditPromise]);
 
   if (!server.ok) {
@@ -33,7 +33,7 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   }
 
   const latestHealth = health.ok ? health.data.items.find((check) => check.serverId === serverId) : undefined;
-  const recentAudit = audit.ok ? audit.data.items.filter((event) => event.serverId === serverId).slice(0, 1) : [];
+  const recentAudit = audit.ok ? audit.data.items.slice(0, 1) : [];
 
   return (
     <div className="page-stack">
