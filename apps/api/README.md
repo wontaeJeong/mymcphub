@@ -17,7 +17,7 @@ curl http://localhost:4000/api/me
 curl http://localhost:4000/api/servers
 curl -X POST http://localhost:4000/api/grants \
   -H 'content-type: application/json' \
-  -d '{"subjectType":"team","subjectId":"00000000-0000-4000-8000-000000000010","projectId":"00000000-0000-4000-8000-000000000020","serverId":"00000000-0000-4000-8000-000000000100","allowedTools":["echo"],"environment":"dev","reason":"local access"}'
+  -d '{"subjectType":"team","subjectId":"00000000-0000-4000-8000-000000000010","projectId":"00000000-0000-4000-8000-000000000020","serverId":"00000000-0000-4000-8000-000000000100","allowedTools":["echo_message"],"environment":"dev","reason":"local access"}'
 curl 'http://localhost:4000/api/audit-events?limit=10'
 curl -X POST http://localhost:4000/api/client-config/generate \
   -H 'content-type: application/json' \

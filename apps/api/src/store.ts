@@ -220,12 +220,16 @@ function createSeedState(): StoreState {
     servers: [
       createSeedServer(seedIds.echoServer, "echo", "Echo MCP Server", "First-party echo MCP server.", "streamable_http", "low", now),
       createSeedServer(seedIds.internalDocsServer, "internal-docs", "Internal Docs MCP Server", "First-party internal docs MCP server.", "streamable_http", "medium", now),
-      createSeedServer(seedIds.k8sReadonlyServer, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server.", "stdio_adapter", "high", now)
+      createSeedServer(seedIds.k8sReadonlyServer, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", "streamable_http", "medium", now)
     ],
     tools: [
-      createSeedTool(seedIds.echoServer, "echo", "Echo an input payload.", "low", now),
-      createSeedTool(seedIds.internalDocsServer, "search_docs", "Search internal documentation.", "medium", now),
-      createSeedTool(seedIds.k8sReadonlyServer, "list_pods", "List Kubernetes pods.", "high", now)
+      createSeedTool(seedIds.echoServer, "echo_message", "Return the provided message unchanged.", "low", now),
+      createSeedTool(seedIds.echoServer, "get_server_time", "Return the current server time as an ISO-8601 timestamp.", "low", now),
+      createSeedTool(seedIds.internalDocsServer, "search_docs", "Search synthetic internal documentation by keyword.", "low", now),
+      createSeedTool(seedIds.internalDocsServer, "read_doc", "Read one synthetic internal document by id.", "low", now),
+      createSeedTool(seedIds.k8sReadonlyServer, "list_namespaces", "List namespace names from the local read-only mock Kubernetes dataset.", "medium", now),
+      createSeedTool(seedIds.k8sReadonlyServer, "list_pods", "List pods in one namespace from the local read-only mock Kubernetes dataset.", "medium", now),
+      createSeedTool(seedIds.k8sReadonlyServer, "get_pod", "Read one pod by namespace and name from the local read-only mock Kubernetes dataset.", "medium", now)
     ],
     grants: [
       {
@@ -234,7 +238,7 @@ function createSeedState(): StoreState {
         subjectId: seedIds.platformTeam,
         projectId: seedIds.sampleProject,
         serverId: seedIds.echoServer,
-        allowedTools: ["echo"],
+        allowedTools: ["echo_message", "get_server_time"],
         environment: "dev",
         approvedBy: seedIds.adminUser,
         reason: "Initial sample grant for local development.",
@@ -252,7 +256,7 @@ function createSeedState(): StoreState {
         projectId: seedIds.sampleProject,
         clientId: "local-dev-client",
         serverId: seedIds.echoServer,
-        toolName: "echo",
+        toolName: "echo_message",
         eventType: "seed.audit_event",
         riskLevel: "low",
         policyDecision: "allow",
@@ -265,7 +269,7 @@ function createSeedState(): StoreState {
         id: randomUUID(),
         auditEventId: "seed-audit-event",
         serverId: seedIds.echoServer,
-        toolName: "echo",
+        toolName: "echo_message",
         status: "ok",
         latencyMs: 12,
         createdAt: now
@@ -300,12 +304,26 @@ function createSeedServer(
     ownerTeamId: seedIds.platformTeam,
     environment: "dev",
     transport,
-    upstreamUrl: transport === "stdio_adapter" ? undefined : `http://localhost:5100/${slug}/mcp`,
+    upstreamUrl: upstreamUrlForSlug(slug),
     enabled: true,
     riskLevel,
     createdAt: timestamp,
     updatedAt: timestamp
   };
+}
+
+function upstreamUrlForSlug(slug: string) {
+  if (slug === "echo") {
+    return "http://localhost:5100/mcp";
+  }
+  if (slug === "internal-docs") {
+    return "http://localhost:5101/mcp";
+  }
+  if (slug === "k8s-readonly") {
+    return "http://localhost:5102/mcp";
+  }
+
+  return undefined;
 }
 
 function createSeedTool(
