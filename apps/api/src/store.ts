@@ -6,12 +6,14 @@ import { notFound, validationError } from "./errors";
 import type {
   ApiApproval,
   ApiAuditEvent,
+  ApiEmergencyPolicyState,
   ApiGrant,
   ApiMcpServer,
   ApiMcpTool,
   ApiServerHealth,
   ApiToolCallEvent,
   AuthContext,
+  GrantSubjectType,
   ListResponse
 } from "./types";
 
@@ -23,7 +25,7 @@ type StoreState = {
   auditEvents: ApiAuditEvent[];
   toolCallEvents: ApiToolCallEvent[];
   serverHealth: ApiServerHealth[];
-  emergencyDeny?: { enabled: boolean; reason: string; createdAt: string };
+  emergencyDeny?: ApiEmergencyPolicyState;
 };
 
 export type ControlPlaneStore = ReturnType<typeof createControlPlaneStore>;
@@ -166,35 +168,69 @@ export function createControlPlaneStore(initialState = createSeedState()) {
     createApproval: (body: unknown, auth: AuthContext) => {
       const input = recordBody(body);
       const serverId = requiredString(input.serverId, "serverId");
-      findServer(state, serverId);
+      const server = findServer(state, serverId);
+      const now = currentTimestamp();
+      const requestedTools = readRequestedTools(input);
       const approval: ApiApproval = {
         id: randomUUID(),
         requesterId: auth.userId,
+        subjectType: readSubjectType(input.subjectType) ?? "user",
+        subjectId: optionalString(input.subjectId) ?? auth.userId,
         projectId: requiredString(input.projectId, "projectId"),
         serverId,
-        toolName: optionalString(input.toolName),
+        requestedTools,
+        environment: readEnvironment(input.environment) ?? server.environment,
+        toolName: optionalString(input.toolName) ?? requestedTools[0],
         status: "pending",
-        requestedAction: requiredString(input.requestedAction, "requestedAction"),
+        requestedAction: optionalString(input.requestedAction) ?? "call_tool",
         reason: requiredString(input.reason, "reason"),
-        createdAt: currentTimestamp()
+        ticketUrl: optionalUrl(input.ticketUrl, "ticketUrl"),
+        requestedExpiresAt: optionalDateTime(input.requestedExpiresAt, "requestedExpiresAt"),
+        createdAt: now,
+        updatedAt: now
       };
       state.approvals.push(approval);
       recordAudit(state, auth, "approval.created", approval.serverId, approval.toolName, "needs_approval");
       return approval;
     },
-    decideApproval: (approvalId: string, decision: "approved" | "rejected", auth: AuthContext) => {
+    decideApproval: (approvalId: string, decision: "approved" | "rejected", auth: AuthContext, body: unknown = {}) => {
       const approval = findApproval(state, approvalId);
+      if (approval.status !== "pending") {
+        throw validationError("Approval has already been decided", { status: approval.status });
+      }
+      const input = recordBody(body);
+      const now = currentTimestamp();
+      const reviewerId = optionalString(input.reviewerId) ?? auth.userId;
       approval.status = decision;
-      approval.decidedBy = auth.userId;
-      approval.decidedAt = currentTimestamp();
+      approval.reviewerId = reviewerId;
+      approval.reviewComment = optionalString(input.reviewComment);
+      approval.decidedBy = reviewerId;
+      approval.decidedAt = now;
+      approval.updatedAt = now;
+      if (decision === "approved") {
+        const grant = createGrantFromApproval(approval, input, reviewerId, now);
+        state.grants.push(grant);
+      }
       recordAudit(state, auth, `approval.${decision}`, approval.serverId, approval.toolName, decision === "approved" ? "allow" : "deny");
       return approval;
     },
     listAuditEvents: (limit: number, cursor?: string): ListResponse<ApiAuditEvent> => paginate(state.auditEvents, limit, cursor),
     listToolCallEvents: () => ({ items: state.toolCallEvents }),
     listServerHealth: () => ({ items: state.serverHealth }),
-    enableEmergencyDeny: (reason: string, auth: AuthContext) => {
-      state.emergencyDeny = { enabled: true, reason, createdAt: currentTimestamp() };
+    enableEmergencyDeny: (body: unknown, auth: AuthContext) => {
+      const input = typeof body === "string" ? { reason: body } : recordBody(body);
+      state.emergencyDeny = {
+        enabled: true,
+        reason: requiredString(input.reason, "reason"),
+        global: readBoolean(input.global) ?? !hasEmergencyScope(input),
+        highCritical: readBoolean(input.highCritical) ?? false,
+        serverIds: readStringArray(input.serverIds),
+        serverSlugs: readStringArray(input.serverSlugs),
+        toolNames: readStringArray(input.toolNames),
+        subjectIds: readStringArray(input.subjectIds),
+        clientIds: readStringArray(input.clientIds),
+        createdAt: currentTimestamp()
+      };
       recordAudit(state, auth, "admin.emergency_deny.enabled", undefined, undefined, "deny");
       return state.emergencyDeny;
     },
@@ -396,6 +432,31 @@ function findApproval(state: StoreState, approvalId: string) {
   return approval;
 }
 
+function createGrantFromApproval(
+  approval: ApiApproval,
+  input: Record<string, unknown>,
+  reviewerId: string,
+  timestamp: string
+): ApiGrant {
+  const allowedTools = readApprovalGrantTools(input.allowedTools, approval.requestedTools);
+
+  return {
+    id: randomUUID(),
+    subjectType: approval.subjectType,
+    subjectId: approval.subjectId,
+    projectId: approval.projectId,
+    serverId: approval.serverId,
+    allowedTools,
+    environment: readEnvironment(input.environment) ?? approval.environment,
+    expiresAt: optionalDateTime(input.expiresAt, "expiresAt") ?? approval.requestedExpiresAt,
+    approvedBy: reviewerId,
+    reason: optionalString(input.reason) ?? approval.reason,
+    ticketUrl: optionalUrl(input.ticketUrl, "ticketUrl") ?? approval.ticketUrl,
+    enabled: true,
+    createdAt: timestamp
+  };
+}
+
 function recordAudit(
   state: StoreState,
   auth: AuthContext,
@@ -453,6 +514,131 @@ function requiredString(value: unknown, fieldName: string) {
 
 function optionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readRequestedTools(input: Record<string, unknown>) {
+  const requestedTools = readStringArray(input.requestedTools);
+  if (requestedTools.length > 0) {
+    requireExplicitApprovalTools(requestedTools, "requestedTools");
+    return requestedTools;
+  }
+  const allowedTools = readStringArray(input.allowedTools);
+  if (allowedTools.length > 0) {
+    requireExplicitApprovalTools(allowedTools, "allowedTools");
+    return allowedTools;
+  }
+  const toolName = optionalString(input.toolName);
+  if (toolName) {
+    requireExplicitApprovalTools([toolName], "toolName");
+    return [toolName];
+  }
+
+  throw validationError("Approval requests must include at least one explicit requested tool.");
+}
+
+function readStringArray(value: unknown, fallback: string[] = []) {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length === 0)) {
+    throw validationError("Expected an array of non-empty strings");
+  }
+
+  return value;
+}
+
+function readApprovalGrantTools(value: unknown, fallback: string[]) {
+  const allowedTools = readStringArray(value, fallback);
+  requireExplicitApprovalTools(allowedTools, "allowedTools");
+  return allowedTools;
+}
+
+function requireExplicitApprovalTools(tools: string[], fieldName: string) {
+  if (tools.length === 0) {
+    throw validationError(`${fieldName} must include at least one tool`);
+  }
+  if (tools.includes("*")) {
+    throw validationError(`${fieldName} must list explicit tools for approval-created grants`);
+  }
+}
+
+function optionalUrl(value: unknown, fieldName: string) {
+  const url = optionalString(value);
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw validationError(`${fieldName} must use http or https`);
+    }
+  } catch (caught: unknown) {
+    if (caught instanceof TypeError) {
+      throw validationError(`${fieldName} must be a valid URL`);
+    }
+    throw caught;
+  }
+
+  return url;
+}
+
+function optionalDateTime(value: unknown, fieldName: string) {
+  const timestamp = optionalString(value);
+  if (!timestamp) {
+    return undefined;
+  }
+
+  if (Number.isNaN(Date.parse(timestamp))) {
+    throw validationError(`${fieldName} must be a valid date-time`);
+  }
+
+  return timestamp;
+}
+
+function readSubjectType(value: unknown): GrantSubjectType | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "user" || value === "team" || value === "service_account") {
+    return value;
+  }
+
+  throw validationError("subjectType must be user, team, or service_account");
+}
+
+function readEnvironment(value: unknown): ApiGrant["environment"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "dev" || value === "stg" || value === "prod" || value === "shared") {
+    return value;
+  }
+
+  throw validationError("environment must be dev, stg, prod, or shared");
+}
+
+function readBoolean(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "boolean") {
+    throw validationError("Expected a boolean value");
+  }
+
+  return value;
+}
+
+function hasEmergencyScope(input: Record<string, unknown>) {
+  return (
+    input.global !== undefined ||
+    input.highCritical !== undefined ||
+    input.serverIds !== undefined ||
+    input.serverSlugs !== undefined ||
+    input.toolNames !== undefined ||
+    input.subjectIds !== undefined ||
+    input.clientIds !== undefined
+  );
 }
 
 function isRiskLevel(value: unknown): value is ApiMcpTool["riskLevel"] {
