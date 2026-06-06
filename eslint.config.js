@@ -5,9 +5,14 @@ export default [
   {
     ignores: [
       "node_modules/**",
+      "**/node_modules/**",
       "dist/**",
+      "**/dist/**",
       ".next/**",
+      "**/.next/**",
       "coverage/**",
+      "**/coverage/**",
+      "**/next-env.d.ts",
       "mcp_hub_prompt_pack/**"
     ]
   },
