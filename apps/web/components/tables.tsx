@@ -4,7 +4,7 @@ import { StatusPill } from "@mcp-hub/ui";
 
 import { CopyButton } from "./copy-button";
 import type { ApiApproval, ApiAuditEvent, ApiGrant, ApiMcpServer, ApiMcpTool, ApiServerHealth, ApiToolCallEvent } from "../lib/api";
-import { enabledTone, formatDate, healthTone, policyTone, riskTone } from "./format";
+import { approvalTone, enabledTone, formatDate, healthTone, policyTone, riskTone } from "./format";
 
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
@@ -142,30 +142,82 @@ export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: A
       <table>
         <thead>
           <tr>
+            <th>Subject</th>
+            <th>Scope</th>
             <th>Request</th>
-            <th>Action</th>
             <th>Status</th>
-            <th>Created</th>
+            <th>Timing</th>
             <th>Decision</th>
           </tr>
         </thead>
         <tbody>
-          {approvals.map((approval) => (
-            <tr key={approval.id}>
-              <td>
-                {approval.requesterId}
-                <p className="muted">{approval.reason}</p>
-              </td>
-              <td>{approval.requestedAction}{approval.toolName ? `: ${approval.toolName}` : ""}</td>
-              <td><StatusPill tone={approval.status === "pending" ? "warning" : approval.status === "approved" ? "success" : "danger"}>{approval.status}</StatusPill></td>
-              <td>{formatDate(approval.createdAt)}</td>
-              <td>{actionSlot ? actionSlot(approval) : approval.decidedAt ? formatDate(approval.decidedAt) : "Not decided"}</td>
-            </tr>
-          ))}
+          {approvals.map((approval) => {
+            const ticketUrl = safeExternalUrl(approval.ticketUrl);
+
+            return (
+              <tr key={approval.id}>
+                <td>
+                  {approval.subjectType}: {approval.subjectId}
+                  <p className="muted">Requester {approval.requesterId}</p>
+                </td>
+                <td>
+                  {approval.serverId}
+                  <p className="muted">Project {approval.projectId}</p>
+                </td>
+                <td>
+                  {approval.requestedAction}
+                  <p className="muted">{formatList(approval.requestedTools)} · {approval.environment}</p>
+                  {ticketUrl ? <p><a href={ticketUrl} target="_blank" rel="noreferrer">Ticket</a></p> : null}
+                  {approval.requestedExpiresAt ? <p className="muted">Requested expiry {formatDate(approval.requestedExpiresAt)}</p> : null}
+                  <p className="muted">{approval.reason}</p>
+                </td>
+                <td><StatusPill tone={approvalTone(approval.status)}>{approval.status}</StatusPill></td>
+                <td>
+                  {formatDate(approval.createdAt)}
+                  <p className="muted">Updated {formatDate(approval.updatedAt)}</p>
+                </td>
+                <td>{actionSlot ? actionSlot(approval) : <ApprovalDecision approval={approval} />}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
+}
+
+function ApprovalDecision({ approval }: Readonly<{ approval: ApiApproval }>) {
+  if (!approval.decidedAt && !approval.reviewerId && !approval.reviewComment) {
+    return <span className="muted">Not decided</span>;
+  }
+
+  return (
+    <div>
+      {approval.reviewerId ? <p>Reviewer {approval.reviewerId}</p> : null}
+      {approval.decidedAt ? <p className="muted">Decided {formatDate(approval.decidedAt)}</p> : null}
+      {approval.reviewComment ? <p className="muted">{approval.reviewComment}</p> : null}
+    </div>
+  );
+}
+
+function formatList(values: string[]) {
+  return values.length > 0 ? values.join(", ") : "All requested tools";
+}
+
+function safeExternalUrl(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : undefined;
+  } catch (caught: unknown) {
+    if (caught instanceof TypeError) {
+      return undefined;
+    }
+    throw caught;
+  }
 }
 
 export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
