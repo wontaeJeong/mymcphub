@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { StatusPill } from "@mcp-hub/ui";
 
 import { CopyButton } from "./copy-button";
-import type { ApiApproval, ApiAuditEvent, ApiGrant, ApiMcpServer, ApiMcpTool, ApiServerHealth, ApiToolCallEvent } from "../lib/api";
+import type { ApiApproval, ApiAuditEvent, ApiGrant, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth, ApiToolCallEvent, ServerVersionStatus } from "../lib/api";
 import { approvalTone, enabledTone, formatDate, healthTone, policyTone, riskTone } from "./format";
 
 export type ServerTableProps = Readonly<{
@@ -103,6 +103,43 @@ export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, sho
   );
 }
 
+export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServerVersion[] }>) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Image</th>
+            <th>Hashes</th>
+            <th>Created</th>
+            <th>Activated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {versions.map((version) => (
+            <tr key={version.id}>
+              <td>
+                {version.version}
+                <p className="muted">{version.createdBy ? `Created by ${version.createdBy}` : "Creator not recorded"}</p>
+              </td>
+              <td><StatusPill tone={serverVersionTone(version.status)}>{version.status}</StatusPill></td>
+              <td><VersionImage version={version} /></td>
+              <td>
+                <p>{version.configHash ?? "Config hash not recorded"}</p>
+                <p className="muted">Schema {version.toolSchemaHash ?? "not recorded"}</p>
+              </td>
+              <td>{formatDate(version.createdAt)}</td>
+              <td>{formatDate(version.activatedAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function GrantTable({ grants, serverNameById, actionSlot }: Readonly<{ grants: ApiGrant[]; serverNameById: Map<string, string>; actionSlot?: (grant: ApiGrant) => ReactNode }>) {
   return (
     <div className="table-wrap">
@@ -184,6 +221,39 @@ export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: A
       </table>
     </div>
   );
+}
+
+function VersionImage({ version }: Readonly<{ version: ApiMcpServerVersion }>) {
+  if (version.imageRef) {
+    return <span>{version.imageRef}</span>;
+  }
+
+  if (version.imageRepository || version.imageTag || version.imageDigest) {
+    return (
+      <div>
+        <p>{version.imageRepository ?? "Image repository not recorded"}</p>
+        <p className="muted">{version.imageTag ?? version.imageDigest ?? "Image tag not recorded"}</p>
+      </div>
+    );
+  }
+
+  return <span className="muted">Image not recorded</span>;
+}
+
+function serverVersionTone(status: ServerVersionStatus) {
+  if (status === "active") {
+    return "success";
+  }
+
+  if (status === "pending" || status === "draft") {
+    return "warning";
+  }
+
+  if (status === "deprecated") {
+    return "neutral";
+  }
+
+  return "danger";
 }
 
 function ApprovalDecision({ approval }: Readonly<{ approval: ApiApproval }>) {
