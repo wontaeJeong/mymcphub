@@ -16,6 +16,7 @@ spec:
 {{ include "mcp-hub.componentSelectorLabels" (dict "root" . "component" "api") | indent 8 }}
     spec:
       serviceAccountName: {{ include "mcp-hub.serviceAccountName" (dict "root" . "component" "api" "componentValues" .Values.api) }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
 {{ include "mcp-hub.podSecurityContext" . | indent 8 }}
       containers:
