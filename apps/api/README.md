@@ -24,6 +24,8 @@ curl -X POST http://localhost:4000/api/client-config/generate \
   -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000100"}'
 ```
 
+Seed data includes `stdio-sample` as a `stdio_adapter` transport server with upstream URL `http://localhost:5103/mcp` and platform-team grants for `stdio_echo` and `get_stdio_status`.
+
 Export OpenAPI with:
 
 ```sh
