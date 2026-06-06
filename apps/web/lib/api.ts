@@ -2,16 +2,24 @@ export type Environment = "dev" | "stg" | "prod" | "shared";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type ServerTransport = "streamable_http" | "sse_legacy" | "stdio_adapter" | "external";
 export type PolicyEffect = "allow" | "deny" | "needs_approval";
+export type GrantSubjectType = "user" | "team" | "service_account";
 
 export type AuthContext = {
   userId: string;
+  principalType: GrantSubjectType;
   email: string;
   displayName: string;
   teamIds: string[];
+  teams: string[];
+  groups: string[];
   roles: string[];
   clientId: string;
   issuer: string;
   audience: string;
+  isAdmin: boolean;
+  isPlatformAdmin: boolean;
+  authSource: "mock" | "oidc" | "service_account";
+  tokenIssuer: string;
 };
 
 export type ApiMcpServer = {
@@ -68,7 +76,7 @@ export type ApiMcpTool = {
 
 export type ApiGrant = {
   id: string;
-  subjectType: "user" | "team" | "service_account";
+  subjectType: GrantSubjectType;
   subjectId: string;
   projectId: string;
   serverId: string;
@@ -85,15 +93,24 @@ export type ApiGrant = {
 export type ApiApproval = {
   id: string;
   requesterId: string;
+  subjectType: GrantSubjectType;
+  subjectId: string;
   projectId: string;
   serverId: string;
+  requestedTools: string[];
+  environment: Environment;
   toolName?: string;
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
   requestedAction: string;
   reason: string;
+  ticketUrl?: string;
+  requestedExpiresAt?: string;
+  reviewerId?: string;
+  reviewComment?: string;
   decidedBy?: string;
   decidedAt?: string;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type ApiAuditEvent = {
@@ -154,6 +171,13 @@ export type ClientConfigResult = {
 export type EmergencyDenyResult = {
   enabled: boolean;
   reason: string;
+  global: boolean;
+  highCritical: boolean;
+  serverIds: string[];
+  serverSlugs: string[];
+  toolNames: string[];
+  subjectIds: string[];
+  clientIds: string[];
   createdAt: string;
 };
 
@@ -281,20 +305,43 @@ export async function listServerHealth() {
   return apiRequest<ListResponse<ApiServerHealth>>("/api/server-health");
 }
 
-export async function approveApproval(approvalId: string) {
-  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/approve`, { method: "POST" });
+export type ApproveApprovalInput = {
+  allowedTools?: string[];
+  expiresAt?: string;
+  reason?: string;
+  ticketUrl?: string;
+  reviewComment?: string;
+};
+
+export async function approveApproval(approvalId: string, input: ApproveApprovalInput = {}) {
+  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/approve`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
-export async function rejectApproval(approvalId: string) {
-  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/reject`, { method: "POST" });
+export type RejectApprovalInput = {
+  reviewComment?: string;
+};
+
+export async function rejectApproval(approvalId: string, input: RejectApprovalInput = {}) {
+  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/reject`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export type CreateApprovalInput = {
+  subjectType: GrantSubjectType;
+  subjectId: string;
   projectId: string;
   serverId: string;
-  toolName?: string;
-  requestedAction: string;
+  requestedTools: string[];
+  environment: Environment;
   reason: string;
+  ticketUrl?: string;
+  requestedExpiresAt?: string;
+  requestedAction: string;
 };
 
 export async function createApproval(input: CreateApprovalInput) {
@@ -305,7 +352,7 @@ export async function createApproval(input: CreateApprovalInput) {
 }
 
 export type CreateGrantInput = {
-  subjectType: ApiGrant["subjectType"];
+  subjectType: GrantSubjectType;
   subjectId: string;
   projectId: string;
   serverId: string;
