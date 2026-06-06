@@ -38,6 +38,12 @@ tests/          Cross-workspace smoke tests
 3. Run all development tasks with `pnpm dev`.
 4. Run validation with `pnpm typecheck`, `pnpm lint`, and `pnpm test`.
 
+## Policy Model
+
+MCP Hub uses mock local auth by default, normalizes principals for the API and Gateway, and evaluates shared policy decisions for connect, tool discovery, tool calls, approvals, and emergency deny scopes. The current skeleton keeps API and Gateway state in memory, while `@mcp-hub/auth` provides package-level OIDC JWT verifier support that is not wired into API or Gateway runtime handling.
+
+See [docs/POLICY.md](docs/POLICY.md) for the implemented auth, policy, approval, and emergency model.
+
 ## Development Order
 
 1. Establish shared schemas, database models, and package contracts.
