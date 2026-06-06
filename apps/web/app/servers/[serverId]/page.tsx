@@ -9,6 +9,7 @@ import { AuditTable, ToolTable } from "../../../components/tables";
 import type { ApiMcpTool } from "../../../lib/api";
 import { getServer, listAuditEvents, listServerHealth, listTools } from "../../../lib/api";
 import { loadResult } from "../../../lib/result";
+import { selectRecentServerAuditEvents, selectServerHealth } from "./page-helpers";
 
 type ServerDetailPageProps = Readonly<{
   params: Promise<{ serverId: string }>;
@@ -32,8 +33,8 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
     );
   }
 
-  const latestHealth = health.ok ? health.data.items.find((check) => check.serverId === serverId) : undefined;
-  const recentAudit = audit.ok ? audit.data.items.slice(0, 1) : [];
+  const latestHealth = health.ok ? selectServerHealth(health.data.items, serverId) : undefined;
+  const recentAudit = audit.ok ? selectRecentServerAuditEvents(audit.data.items) : [];
 
   return (
     <div className="page-stack">
