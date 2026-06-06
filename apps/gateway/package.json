@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@mcp-hub/auth": "workspace:*",
+    "@mcp-hub/logger": "workspace:*",
     "@mcp-hub/mcp-protocol": "workspace:*",
-    "@mcp-hub/policy": "workspace:*"
+    "@mcp-hub/policy": "workspace:*",
+    "prom-client": "^15.1.3"
   }
 }

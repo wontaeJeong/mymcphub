@@ -16,6 +16,8 @@
   "dependencies": {
     "@mcp-hub/auth": "workspace:*",
     "@mcp-hub/db": "workspace:*",
-    "fastify": "^5.4.0"
+    "@mcp-hub/logger": "workspace:*",
+    "fastify": "^5.4.0",
+    "prom-client": "^15.1.3"
   }
 }
