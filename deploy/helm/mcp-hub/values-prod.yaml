@@ -41,3 +41,6 @@ ingress:
         - path: /mcp
           pathType: Prefix
           service: gateway
+
+networkPolicy:
+  allowExternalEgress: false

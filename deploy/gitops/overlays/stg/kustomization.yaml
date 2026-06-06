@@ -27,6 +27,8 @@ helmCharts:
         replicas: 2
       worker:
         replicas: 1
+      networkPolicy:
+        allowExternalEgress: false
       ingress:
         hosts:
           - host: mcp-hub-stg.example.com
