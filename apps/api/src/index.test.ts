@@ -37,8 +37,10 @@ describe("createApiServer", () => {
     const servers = await app.inject({ method: "GET", url: "/api/servers" });
     const serverItems = servers.json<{ items: Array<{ id: string; slug: string }> }>().items;
     const echoServer = serverItems.find((server) => server.slug === "echo");
+    const stdioSampleServer = serverItems.find((server) => server.slug === "stdio-sample");
 
     expect(echoServer).toBeDefined();
+    expect(stdioSampleServer).toBeDefined();
 
     const grant = await app.inject({
       method: "POST",
