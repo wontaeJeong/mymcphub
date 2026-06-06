@@ -25,7 +25,7 @@ packages/
   policy/       Authorization policy contracts
   ui/           Shared UI package
 schemas/        OpenAPI, catalog, and policy schema placeholders
-deploy/         Helm and GitOps placeholders
+deploy/         Helm chart, GitOps overlays, and deployment examples
 docs/           Architecture and operations documentation
 scripts/        Local automation entrypoint
 tests/          Cross-workspace smoke tests
@@ -43,6 +43,12 @@ tests/          Cross-workspace smoke tests
 MCP Hub uses mock local auth by default, normalizes principals for the API and Gateway, and evaluates shared policy decisions for connect, tool discovery, tool calls, approvals, and emergency deny scopes. The current skeleton keeps API and Gateway state in memory, while `@mcp-hub/auth` provides package-level OIDC JWT verifier support that is not wired into API or Gateway runtime handling.
 
 See [docs/POLICY.md](docs/POLICY.md) for the implemented auth, policy, approval, and emergency model.
+
+## Kubernetes Deployment
+
+The full MCP Hub Helm chart lives in `deploy/helm/mcp-hub` with default, dev, stg, and prod values files. Install or upgrade with `helm upgrade --install mcp-hub deploy/helm/mcp-hub --namespace mcp-hub --create-namespace -f deploy/helm/mcp-hub/values-dev.yaml`, and roll back with `helm rollback mcp-hub <revision> --namespace mcp-hub`.
+
+GitOps examples for Argo CD or Flux live under `deploy/gitops` and require Kustomize with Helm support, for example `kustomize build --enable-helm deploy/gitops/overlays/dev`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for secret expectations, environment values, validation, install, upgrade, rollback, and GitOps usage.
 
 ## Development Order
 
