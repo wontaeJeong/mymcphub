@@ -10,7 +10,13 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "security:deps": "scripts/security/scan-deps.sh",
+    "security:images": "scripts/security/scan-images.sh",
+    "security:secrets": "scripts/security/scan-secrets.sh",
+    "security:k8s": "scripts/security/scan-k8s-manifests.sh",
+    "security:mcp-manifests": "tsx scripts/security/check-mcp-manifest.ts",
+    "security:check": "scripts/security/check-all.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
