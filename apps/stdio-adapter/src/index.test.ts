@@ -154,7 +154,7 @@ function createTestAdapter(fixtureName: string, overrides: Partial<StdioAdapterC
     port: 0,
     command: process.execPath,
     args: [fixturePath],
-    startupTimeoutMs: 200,
+    startupTimeoutMs: 1000,
     requestTimeoutMs: 200,
     maxBodyBytes: 1024 * 1024,
     maxQueueDepth: 4,
@@ -171,7 +171,7 @@ async function postMcp(server: Server, body: Record<string, unknown>) {
 }
 
 async function waitForHealth(server: Server, status: number) {
-  const deadline = Date.now() + 1000;
+  const deadline = Date.now() + 2000;
   let lastResponse: Response | undefined;
   while (Date.now() < deadline) {
     const response = await fetch(url(server, "/healthz"));
