@@ -44,6 +44,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@mcp-hub/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       fastify:
         specifier: ^5.4.0
         version: 5.8.5
