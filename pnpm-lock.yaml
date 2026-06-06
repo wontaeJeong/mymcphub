@@ -153,7 +153,14 @@ importers:
         specifier: workspace:*
         version: link:../../packages/mcp-protocol
 
-  tests: {}
+  tests:
+    dependencies:
+      '@mcp-hub/gateway':
+        specifier: workspace:*
+        version: link:../apps/gateway
+      '@mcp-hub/server-echo':
+        specifier: workspace:*
+        version: link:../servers/echo
 
 packages:
 
