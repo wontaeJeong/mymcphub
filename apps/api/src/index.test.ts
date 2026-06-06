@@ -512,7 +512,7 @@ describe("createApiServer", () => {
     await app.close();
   });
 
-  it("generates client config and applies emergency controls", async () => {
+  it("generates client config and applies kill-switch controls", async () => {
     const app = createApiServer();
     const serverId = "00000000-0000-4000-8000-000000000100";
 
@@ -520,6 +520,16 @@ describe("createApiServer", () => {
       method: "POST",
       url: "/api/client-config/generate",
       payload: { client: "opencode", serverId }
+    });
+    const tools = await app.inject({ method: "GET", url: `/api/servers/${serverId}/tools` });
+    const echoTool = tools.json<{ items: Array<{ id: string; name: string }> }>().items.find((tool) => tool.name === "echo_message");
+    const serverDisable = await app.inject({
+      method: "POST",
+      url: `/api/servers/${serverId}/disable`
+    });
+    const toolDisable = await app.inject({
+      method: "POST",
+      url: `/api/servers/${serverId}/tools/${echoTool?.id}/disable`
     });
     const emergency = await app.inject({
       method: "POST",
@@ -540,7 +550,15 @@ describe("createApiServer", () => {
     });
 
     expect(config.statusCode).toBe(200);
+    expect(tools.statusCode).toBe(200);
+    expect(echoTool).toBeDefined();
+    expect(serverDisable.statusCode).toBe(200);
+    expect(toolDisable.statusCode).toBe(200);
+    expect(emergency.statusCode).toBe(200);
+    expect(revoke.statusCode).toBe(200);
     expect(config.json()).toMatchObject({ client: "opencode" });
+    expect(serverDisable.json()).toMatchObject({ id: serverId, enabled: false });
+    expect(toolDisable.json()).toMatchObject({ id: echoTool?.id, name: "echo_message", enabled: false });
     expect(emergency.json()).toMatchObject({
       enabled: true,
       global: false,
@@ -550,7 +568,7 @@ describe("createApiServer", () => {
       subjectIds: ["00000000-0000-4000-8000-000000000001"],
       clientIds: ["local-dev-client"]
     });
-    expect(revoke.json()).toMatchObject({ serverId });
+    expect(revoke.json()).toMatchObject({ serverId, revoked: 1 });
 
     await app.close();
   });
