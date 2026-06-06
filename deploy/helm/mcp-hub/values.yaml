@@ -1,0 +1,199 @@
+image:
+  registry: registry.example.com
+  repositoryPrefix: mcp-hub
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+  annotations: {}
+
+runtime:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+config:
+  nodeEnv: production
+  logLevel: info
+  oidcClientId: mcp-hub
+  publicUrl: https://mcp-hub.example.com
+  apiUrl: http://mcp-hub-api:4000
+  gatewayUrl: http://mcp-hub-gateway:5000
+
+auth:
+  mode: mock
+  oidcIssuerUrl: ""
+  audience: mcp-hub
+  oidcClientSecret:
+    secretName: mcp-hub-oidc
+    secretKey: clientSecret
+
+postgres:
+  external:
+    enabled: true
+    databaseUrlSecretName: mcp-hub-db
+    databaseUrlSecretKey: databaseUrl
+  placeholder:
+    enabled: false
+    port: 5432
+
+redis:
+  external:
+    enabled: true
+    redisUrlSecretName: mcp-hub-redis
+    redisUrlSecretKey: redisUrl
+  placeholder:
+    enabled: false
+    port: 6379
+
+web:
+  enabled: true
+  replicas: 2
+  port: 3000
+  serviceAccountName: ""
+  image:
+    repository: web
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    enabled: true
+    readiness:
+      path: /
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    liveness:
+      path: /
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+api:
+  enabled: true
+  replicas: 2
+  port: 4000
+  serviceAccountName: ""
+  image:
+    repository: api
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    enabled: true
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+gateway:
+  enabled: true
+  replicas: 2
+  port: 5000
+  serviceAccountName: ""
+  image:
+    repository: gateway
+  service:
+    type: ClusterIP
+    port: 5000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    enabled: true
+    type: tcpSocket
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      path: /healthz
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      path: /healthz
+
+worker:
+  enabled: true
+  replicas: 1
+  port: 4100
+  serviceAccountName: ""
+  image:
+    repository: worker
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    enabled: false
+    readiness:
+      path: /metrics
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    liveness:
+      path: /metrics
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: mcp-hub.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /mcp
+          pathType: Prefix
+          service: gateway
+  tls: []
+
+networkPolicy:
+  enabled: true
+  allowExternalEgress: true
+  ingressNamespaceSelector: {}
+
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
