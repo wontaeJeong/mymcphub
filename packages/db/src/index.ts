@@ -1,8 +1,7 @@
-export type DatabaseConfig = {
-  databaseUrl: string;
-};
-
-export const databasePackage = {
-  name: "@mcp-hub/db",
-  purpose: "Database schema, migrations, and repositories will be implemented here."
-} as const;
+export * from "./domain";
+export * from "./migrate";
+export * from "./repositories";
+export * from "./schema";
+export * from "./seed";
+export * from "./seed-data";
+export * from "./validation";
