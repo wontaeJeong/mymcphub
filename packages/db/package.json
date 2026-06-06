@@ -8,7 +8,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
+    "migrate": "tsx src/migrate.ts",
+    "migrate:dry-run": "tsx src/migrate.ts --dry-run",
+    "seed": "tsx src/seed.ts",
+    "seed:dry-run": "tsx src/seed.ts --dry-run",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7",
+    "zod": "^3.25.76"
   }
 }
