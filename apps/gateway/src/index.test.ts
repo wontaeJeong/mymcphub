@@ -24,7 +24,8 @@ describe("gateway runtime", () => {
   it.each([
     ["echo", ["echo_message", "get_server_time"]],
     ["internal-docs", ["search_docs", "read_doc"]],
-    ["k8s-readonly", ["list_namespaces", "list_pods", "get_pod"]]
+    ["k8s-readonly", ["list_namespaces", "list_pods", "get_pod"]],
+    ["stdio-sample", ["stdio_echo", "get_stdio_status"]]
   ])("filters tools/list for %s to granted prompt-06 tools", async (slug, expectedTools) => {
     const gateway = createGatewayServer({ upstream: createServerShapedUpstream() });
     await listen(gateway.server);
@@ -78,7 +79,8 @@ describe("gateway runtime", () => {
 
   it.each([
     ["internal-docs", "search_docs", { query: "gateway" }],
-    ["k8s-readonly", "list_pods", { namespace: "platform" }]
+    ["k8s-readonly", "list_pods", { namespace: "platform" }],
+    ["stdio-sample", "stdio_echo", { message: "via adapter" }]
   ])("authorizes %s tools/call and returns upstream content", async (slug, toolName, argumentsJson) => {
     const gateway = createGatewayServer({ upstream: createServerShapedUpstream() });
     await listen(gateway.server);
@@ -94,6 +96,39 @@ describe("gateway runtime", () => {
     expect(await response.json()).toMatchObject({ result: { content: [{ type: "text" }] } });
 
     await close(gateway.server);
+  });
+
+  it("proxies stdio_adapter registrations to fake HTTP upstreams without spawning subprocesses", async () => {
+    const upstreamRequests: McpJsonRpcRequest[] = [];
+    const upstream = createServer(async (request, response) => {
+      const body = await readJsonBody(request);
+      upstreamRequests.push(body);
+      sendJson(response, 200, {
+        jsonrpc: "2.0",
+        id: body.id ?? null,
+        result: { content: [{ type: "text", text: JSON.stringify({ adapter: true }) }] }
+      });
+    });
+    await listen(upstream);
+
+    const registry = createRegistryWithUpstream("stdio-sample", `${url(upstream, "")}/mcp`);
+    const gateway = createGatewayServer({ registry });
+    await listen(gateway.server);
+
+    const response = await postMcp(gateway.server, "stdio-sample", {
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: { name: "stdio_echo", arguments: { message: "through gateway" } }
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ result: { content: [{ type: "text" }] } });
+    expect(upstreamRequests).toHaveLength(1);
+    expect(upstreamRequests[0]).toMatchObject({ method: "tools/call", params: { name: "stdio_echo" } });
+
+    await close(gateway.server);
+    await close(upstream);
   });
 
   it("denies unknown tools before calling upstream", async () => {
