@@ -1,5 +1,7 @@
 import type { Environment, PolicyEffect, RiskLevel, ServerTransport } from "@mcp-hub/db";
 
+import type { AuditJsonValue } from "./audit";
+
 export type AuthContext = {
   userId: string;
   principalType: "user" | "team" | "service_account";
@@ -114,7 +116,31 @@ export type ApiAuditEvent = {
   riskLevel: RiskLevel;
   policyDecision: PolicyEffect;
   traceId: string;
+  argumentHash?: string;
+  argumentRedactedJson?: AuditJsonValue;
+  latencyMs?: number;
+  upstreamStatus?: number;
+  errorCode?: string;
   metadataJson: Record<string, unknown>;
+};
+
+export type AuditContext = {
+  auth: AuthContext;
+  traceId: string;
+};
+
+export type AuditEventSearchFilters = {
+  from?: string;
+  to?: string;
+  user?: string;
+  team?: string;
+  project?: string;
+  server?: string;
+  tool?: string;
+  eventType?: string;
+  policyDecision?: PolicyEffect;
+  riskLevel?: RiskLevel;
+  traceId?: string;
 };
 
 export type ApiToolCallEvent = {
