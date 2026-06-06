@@ -9,11 +9,13 @@ apps/
   web/          Next.js App Router web UI
   api/          Control Plane API service
   gateway/      MCP Gateway service
+  stdio-adapter/Isolated HTTP-to-stdio MCP adapter runtime
   worker/       Tool scan, schema diff, and health check worker
 servers/
   echo/         First-party example MCP server package
   k8s-readonly/ Read-only Kubernetes MCP server package
   internal-docs/Internal documentation MCP server package
+  stdio-sample/ First-party stdio MCP server for adapter testing
 packages/
   auth/         Auth and principal contracts
   config/       Shared configuration helpers
