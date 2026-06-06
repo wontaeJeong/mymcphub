@@ -7,7 +7,7 @@ import { createAuditBase, createAuditRecorder, hashArguments, redactArguments } 
 import { validateBearerToken } from "./auth";
 import { allowedToolsForPrincipal, authorizeToolCall } from "./policy";
 import { createDefaultRegistry, findServerBySlug } from "./registry";
-import { CircuitBreaker, createLocalEchoTransport, withTimeout, type UpstreamTransport } from "./upstream";
+import { CircuitBreaker, createHttpJsonRpcTransport, withTimeout, type UpstreamTransport } from "./upstream";
 import type { GatewayAuditEvent, GatewayPrincipal, GatewayServer } from "./types";
 
 export type GatewayRuntimeOptions = {
@@ -19,7 +19,7 @@ export type GatewayRuntimeOptions = {
 
 export function createGatewayRuntime(options: GatewayRuntimeOptions = {}) {
   const registry = options.registry ?? createDefaultRegistry();
-  const upstream = options.upstream ?? createLocalEchoTransport();
+  const upstream = options.upstream ?? createHttpJsonRpcTransport();
   const timeoutMs = options.timeoutMs ?? 2_000;
   const circuitBreaker = options.circuitBreaker ?? new CircuitBreaker();
   const audit = createAuditRecorder();
@@ -65,7 +65,17 @@ export function createGatewayRuntime(options: GatewayRuntimeOptions = {}) {
       return;
     }
 
-    const parsed = parseJsonRpcRequest(await readJsonBody(request));
+    let parsed: McpJsonRpcRequest;
+    try {
+      parsed = parseJsonRpcRequest(await readJsonBody(request));
+    } catch (caught: unknown) {
+      if (caught instanceof JsonRpcRequestError) {
+        sendJson(response, 400, error(caught.id, caught.code, caught.message));
+        return;
+      }
+      throw caught;
+    }
+
     const reply = await handleMcpMessage(parsed, principal, server, upstream, audit.record, circuitBreaker, timeoutMs, startedAt);
     sendJson(response, reply.statusCode, reply.body);
   }
@@ -159,19 +169,45 @@ async function handleMcpMessage(
 
 function parseJsonRpcRequest(body: unknown): McpJsonRpcRequest {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return { jsonrpc: "2.0", id: null, method: "invalid" };
+    throw new JsonRpcRequestError(-32600, "Invalid Request");
   }
 
   const record = body as Record<string, unknown>;
-  const id = isJsonRpcId(record.id) ? record.id : undefined;
-  const params = record.params && typeof record.params === "object" && !Array.isArray(record.params) ? (record.params as Record<string, unknown>) : undefined;
+  const id = readRequestId(record.id);
+  const params = readRequestParams(record.params);
+
+  if (record.jsonrpc !== "2.0" || typeof record.method !== "string") {
+    throw new JsonRpcRequestError(-32600, "Invalid Request", id);
+  }
 
   return {
     jsonrpc: "2.0",
     id,
-    method: typeof record.method === "string" ? record.method : "invalid",
+    method: record.method,
     params
   };
+}
+
+function readRequestId(value: unknown): JsonRpcId | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isJsonRpcId(value)) {
+    throw new JsonRpcRequestError(-32600, "Invalid Request");
+  }
+
+  return value;
+}
+
+function readRequestParams(value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new JsonRpcRequestError(-32600, "Invalid Request");
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function isJsonRpcId(value: unknown): value is JsonRpcId {
@@ -207,16 +243,33 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 
   const body = Buffer.concat(chunks).toString("utf8");
   if (body.length === 0) {
-    return {};
+    throw new JsonRpcRequestError(-32600, "Invalid Request");
   }
 
-  return JSON.parse(body) as unknown;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch (caught: unknown) {
+    if (caught instanceof SyntaxError) {
+      throw new JsonRpcRequestError(-32700, "Parse error");
+    }
+    throw caught;
+  }
 }
 
 function sendJson(response: ServerResponse, statusCode: number, payload: Record<string, unknown> | McpJsonRpcResponse) {
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json");
   response.end(JSON.stringify(payload));
+}
+
+class JsonRpcRequestError extends Error {
+  constructor(
+    public readonly code: number,
+    message: string,
+    public readonly id: JsonRpcId | undefined = null
+  ) {
+    super(message);
+  }
 }
 
 function recordHttpAudit(
