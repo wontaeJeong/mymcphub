@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mcp-hub
+resources:
+  - ../../base
+helmGlobals:
+  chartHome: ../../../helm
+helmCharts:
+  - name: mcp-hub
+    releaseName: mcp-hub
+    namespace: mcp-hub
+    valuesFile: values.yaml
+    valuesInline:
+      image:
+        tag: prod
+      config:
+        publicUrl: https://mcp-hub.example.com
+      auth:
+        mode: oidc
+        oidcIssuerUrl: https://issuer.example.com
+        audience: mcp-hub
+      web:
+        replicas: 3
+      api:
+        replicas: 3
+      gateway:
+        replicas: 3
+      worker:
+        replicas: 1
+      ingress:
+        hosts:
+          - host: mcp-hub.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service: web
+              - path: /api
+                pathType: Prefix
+                service: api
+              - path: /mcp
+                pathType: Prefix
+                service: gateway
