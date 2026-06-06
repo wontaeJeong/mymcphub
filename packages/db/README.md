@@ -15,4 +15,4 @@ The initial migration creates `users`, `teams`, `team_memberships`, `projects`, 
 
 ## Seed Data
 
-The seed command includes an admin user, platform team, sample project, echo MCP server, internal-docs MCP server, k8s-readonly MCP server, and a sample grant for the echo server.
+The seed command includes an admin user, platform team, sample project, echo MCP server, internal-docs MCP server, k8s-readonly MCP server, stdio-sample adapter-backed MCP server, and sample platform-team grants for echo and stdio-sample tools.

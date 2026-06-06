@@ -35,3 +35,5 @@ MCP Hub separates identity, catalog, authorization, runtime session, audit, and 
 ## Shared Schemas
 
 Runtime validation schemas live in `packages/db/src/validation.ts`. The required shared schemas are `McpServerManifestSchema`, `McpToolSchema`, `McpGrantSchema`, `PolicyDecisionInputSchema`, `PolicyDecisionResultSchema`, `AuditEventSchema`, and `HealthCheckResultSchema`.
+
+The local seed data includes `stdio-sample` with transport `stdio_adapter` and upstream URL `http://localhost:5103/mcp`. This records the adapter HTTP endpoint in catalog data while keeping the stdio command and child-process configuration in the adapter deployment environment.
