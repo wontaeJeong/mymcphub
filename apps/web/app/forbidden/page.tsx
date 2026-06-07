@@ -8,8 +8,8 @@ export default function ForbiddenPage() {
       <div className="auth-card">
         <ForbiddenPanel />
         <div className="actions">
-          <Link className="button" href="/user">Open user area</Link>
-          <form action="/auth/logout" method="post"><button className="button button--ghost" type="submit">Sign out</button></form>
+          <Link className="button" href="/user">사용자 영역 열기</Link>
+          <form action="/auth/logout" method="post"><button className="button button--ghost" type="submit">로그아웃</button></form>
         </div>
       </div>
     </main>

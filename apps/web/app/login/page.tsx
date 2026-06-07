@@ -26,33 +26,33 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-page">
       <div className="auth-card">
-        <PageHero eyebrow="MCP Hub Sign In" title="Choose your trusted door." description="Only login providers enabled by server-side configuration are shown here." />
-        {error ? <div className="error-state"><strong>Sign-in failed</strong><p>{error}</p></div> : null}
-        {providers.length === 0 ? <div className="error-state"><strong>No login provider configured</strong><p>Set MCP_WEB_AUTH_ENABLED_PROVIDERS and provider-specific server env vars before exposing this console.</p></div> : null}
+        <PageHero eyebrow="MCP Hub 로그인" title="신뢰할 로그인 방식을 선택하세요." description="서버 설정으로 활성화된 로그인 provider만 여기에 표시됩니다." />
+        {error ? <div className="error-state"><strong>로그인 실패</strong><p>{error}</p></div> : null}
+        {providers.length === 0 ? <div className="error-state"><strong>설정된 로그인 provider 없음</strong><p>이 콘솔을 노출하기 전에 MCP_WEB_AUTH_ENABLED_PROVIDERS와 provider별 서버 환경 변수를 설정하세요.</p></div> : null}
         {localProvider ? (
           <form className="form-card" action="/auth/local" method="post">
-            <h2>Sign in with username/password</h2>
+            <h2>사용자 이름과 비밀번호로 로그인</h2>
             <input type="hidden" name="next" value={nextPath} />
-            <div className="field"><label htmlFor="username">Username</label><input id="username" name="username" autoComplete="username" required /></div>
-            <div className="field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required /></div>
-            <div className="form-actions"><button className="button" type="submit">Sign in</button></div>
+            <div className="field"><label htmlFor="username">사용자 이름</label><input id="username" name="username" autoComplete="username" required /></div>
+            <div className="field"><label htmlFor="password">비밀번호</label><input id="password" name="password" type="password" autoComplete="current-password" required /></div>
+            <div className="form-actions"><button className="button" type="submit">로그인</button></div>
           </form>
         ) : null}
         {oidcProviders.length > 0 ? (
           <section className="form-card">
-            <h2>Sign in with OIDC</h2>
+            <h2>OIDC로 로그인</h2>
             <div className="actions">
-              {oidcProviders.map((provider) => <a className="button" href={`/auth/oidc/${provider.id}?next=${encodeURIComponent(nextPath)}`} key={provider.id}>Continue with {provider.displayName}</a>)}
+              {oidcProviders.map((provider) => <a className="button" href={`/auth/oidc/${provider.id}?next=${encodeURIComponent(nextPath)}`} key={provider.id}>{provider.displayName}로 계속</a>)}
             </div>
           </section>
         ) : null}
         {devProvider ? (
           <section className="form-card">
-            <h2>Development login</h2>
-            <p>Available only outside production and intended for local development.</p>
+            <h2>개발 로그인</h2>
+            <p>production 외 환경에서만 사용할 수 있으며 로컬 개발용입니다.</p>
             <div className="actions">
-              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="user" /><button className="button button--ghost" type="submit">Continue as dev user</button></form>
-              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="admin" /><button className="button" type="submit">Continue as dev admin</button></form>
+              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="user" /><button className="button button--ghost" type="submit">개발 사용자로 계속</button></form>
+              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="admin" /><button className="button" type="submit">개발 관리자로 계속</button></form>
             </div>
           </section>
         ) : null}
@@ -68,18 +68,18 @@ function readParam(value: string | string[] | undefined) {
 function loginErrorMessage(error: string | undefined) {
   switch (error) {
     case "invalid_credentials":
-      return "The username or password is incorrect.";
+      return "사용자 이름 또는 비밀번호가 올바르지 않습니다.";
     case "rate_limited":
-      return "Too many failed attempts. Try again later.";
+      return "실패한 시도가 너무 많습니다. 나중에 다시 시도하세요.";
     case "oidc_state_invalid":
-      return "OIDC state validation failed. Start sign-in again.";
+      return "OIDC state 검증에 실패했습니다. 로그인을 다시 시작하세요.";
     case "oidc_callback_failed":
-      return "The OIDC provider callback could not be validated.";
+      return "OIDC provider callback을 검증할 수 없습니다.";
     case "provider_unavailable":
-      return "That login provider is not enabled.";
+      return "해당 로그인 provider가 활성화되어 있지 않습니다.";
     case "local_disabled":
     case "dev_disabled":
-      return "That login method is disabled.";
+      return "해당 로그인 방식이 비활성화되어 있습니다.";
     default:
       return undefined;
   }
