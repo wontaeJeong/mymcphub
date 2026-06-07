@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mcp-hub/mcp-hub/internal/auth"
 	"github.com/mcp-hub/mcp-hub/internal/config"
@@ -14,33 +15,45 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/httpx"
 	"github.com/mcp-hub/mcp-hub/internal/logger"
 	"github.com/mcp-hub/mcp-hub/internal/policy"
+	"github.com/mcp-hub/mcp-hub/internal/ratelimit"
 )
 
 type Server struct {
-	store *db.Store
-	log   logger.Logger
-	cfg   config.Config
+	store   *db.Store
+	log     logger.Logger
+	cfg     config.Config
+	limiter *ratelimit.Limiter
 }
 
 func NewServer(store *db.Store, cfg config.Config) *Server {
 	if store == nil {
 		store = db.NewSeedStore()
 	}
-	return &Server{store: store, cfg: cfg, log: logger.New("api")}
+	return &Server{store: store, cfg: cfg, log: logger.New("api"), limiter: ratelimit.NewStore(cfg.GatewayRateLimit, time.Duration(cfg.RateLimitWindow())*time.Second, store)}
 }
 func (s *Server) Store() *db.Store { return s.store }
 
 func (s *Server) Handler() http.Handler { return http.HandlerFunc(s.handle) }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
-	s.store.Refresh()
-	if r.Method != http.MethodGet {
-		defer s.store.Save()
-	}
 	traceID := auth.TraceID(r)
 	w.Header().Set("x-trace-id", traceID)
+	if err := s.store.Refresh(); err != nil {
+		httpx.WriteError(w, 503, "STORE_REFRESH_FAILED", "Runtime store could not be refreshed.", traceID, nil)
+		return
+	}
+	if r.Method != http.MethodGet {
+		defer func() {
+			if err := s.store.Save(); err != nil {
+				s.log.Error("api.store.save.failed", map[string]interface{}{"traceId": traceID, "error": err.Error()})
+			}
+		}()
+	}
 	principal := auth.ContextFromHeaders(r)
 	s.log.Info("api.request", map[string]interface{}{"traceId": traceID, "method": r.Method, "path": r.URL.Path})
+	if s.rateLimitAPI(w, r, principal, traceID) {
+		return
+	}
 
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/healthz":
@@ -339,27 +352,29 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request, trac
 		return
 	}
 	url := s.cfg.GatewayURL + "/mcp/" + server.Slug
-	if server.UpstreamURL != "" {
-		url = server.UpstreamURL
-	}
 	client := input.Client
 	if client == "" {
 		client = "generic"
 	}
-	config := map[string]interface{}{"transport": "streamable_http", "url": url}
+	profile := input.Profile
+	if profile == "" {
+		profile = "local"
+	}
+	authConfig := map[string]interface{}{"type": "bearer", "header": "authorization", "tokenEnv": "MCPHUB_TOKEN", "requiredScope": s.cfg.OIDCRequiredScope}
+	config := map[string]interface{}{"transport": "streamable_http", "url": url, "auth": authConfig}
 	placeholder := false
 	switch client {
 	case "opencode":
-		config = map[string]interface{}{"mcp": map[string]interface{}{server.Slug: map[string]interface{}{"type": "remote", "url": url}}}
+		config = map[string]interface{}{"mcp": map[string]interface{}{server.Slug: map[string]interface{}{"type": "remote", "url": url, "headers": map[string]interface{}{"authorization": "Bearer ${MCPHUB_TOKEN}"}}}}
 	case "claude-code", "codex", "vscode":
 		placeholder = true
-		config = map[string]interface{}{"mcpServers": map[string]interface{}{server.Slug: map[string]interface{}{"url": url, "note": "Placeholder remote MCP client format."}}}
+		config = map[string]interface{}{"mcpServers": map[string]interface{}{server.Slug: map[string]interface{}{"url": url, "headers": map[string]interface{}{"authorization": "Bearer ${MCPHUB_TOKEN}"}, "note": "Placeholder remote MCP client format."}}}
 	case "generic":
 	default:
 		httpx.WriteError(w, 400, "VALIDATION_ERROR", "Unsupported client config kind", traceID, map[string]interface{}{"supportedClients": []string{"generic", "opencode", "claude-code", "codex", "vscode"}})
 		return
 	}
-	httpx.WriteJSON(w, 200, map[string]interface{}{"client": client, "placeholder": placeholder, "gatewayUrl": url, "config": config})
+	httpx.WriteJSON(w, 200, map[string]interface{}{"client": client, "profile": profile, "placeholder": placeholder, "gatewayUrl": url, "serverSlug": server.Slug, "auth": authConfig, "config": config})
 }
 
 func (s *Server) handlePolicy(w http.ResponseWriter, r *http.Request, _ db.AuthContext, traceID string) {
@@ -400,6 +415,93 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, principal d
 		return
 	}
 	httpx.WriteError(w, 404, "NOT_FOUND", "Admin route not found", traceID, nil)
+}
+
+func (s *Server) rateLimitAPI(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) bool {
+	if !strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api/openapi.json" {
+		return false
+	}
+	decision := s.limiter.Check(s.apiRateLimitParts(principal, r))
+	writeRateLimitHeaders(w, decision)
+	if decision.Error != nil {
+		httpx.WriteError(w, 503, "RATE_LIMIT_STORE_FAILED", "Rate limit store unavailable", traceID, map[string]interface{}{"rateLimitKey": decision.Key})
+		return true
+	}
+	if !decision.Allowed {
+		httpx.WriteError(w, 429, "RATE_LIMITED", "Rate limit exceeded", traceID, map[string]interface{}{"limit": decision.Limit, "remaining": decision.Remaining, "resetAt": decision.ResetAt.Format(time.RFC3339)})
+		return true
+	}
+	return false
+}
+
+func (s *Server) apiRateLimitParts(principal db.AuthContext, r *http.Request) []string {
+	team := ""
+	if len(principal.TeamIDs) > 0 {
+		team = principal.TeamIDs[0]
+	}
+	serverID, toolID := s.apiRouteDimensions(r.URL.Path)
+	return []string{"plane:api", "user:" + principal.UserID, "team:" + team, "project:" + principal.ProjectID, "client:" + principal.ClientID, "server:" + serverID, "tool:" + toolID, "method:" + r.Method, "route:" + apiRouteKey(r.URL.Path)}
+}
+
+func (s *Server) apiRouteDimensions(path string) (string, string) {
+	parts := pathParts(path, "/api/servers")
+	if len(parts) == 0 {
+		return "", ""
+	}
+	serverID := ""
+	candidateServerID := parts[0]
+	if _, err := s.store.GetServer(candidateServerID); err == nil {
+		serverID = candidateServerID
+	}
+	toolID := ""
+	if serverID != "" && len(parts) >= 3 && parts[1] == "tools" {
+		candidateToolID := parts[2]
+		if tools, err := s.store.ListTools(serverID); err == nil {
+			for _, tool := range tools.Items {
+				if tool.ID == candidateToolID || tool.Name == candidateToolID {
+					toolID = candidateToolID
+					break
+				}
+			}
+		}
+	}
+	return serverID, toolID
+}
+
+func apiRouteKey(path string) string {
+	switch {
+	case path == "/api/me":
+		return "/api/me"
+	case strings.HasPrefix(path, "/api/servers"):
+		return "/api/servers"
+	case strings.HasPrefix(path, "/api/grants"):
+		return "/api/grants"
+	case strings.HasPrefix(path, "/api/approvals"):
+		return "/api/approvals"
+	case strings.HasPrefix(path, "/api/audit-events"):
+		return "/api/audit-events"
+	case path == "/api/tool-call-events":
+		return "/api/tool-call-events"
+	case path == "/api/server-health":
+		return "/api/server-health"
+	case path == "/api/client-config/generate":
+		return "/api/client-config/generate"
+	case strings.HasPrefix(path, "/api/policy"):
+		return "/api/policy"
+	case strings.HasPrefix(path, "/api/admin"):
+		return "/api/admin"
+	default:
+		return "/api/unknown"
+	}
+}
+
+func writeRateLimitHeaders(w http.ResponseWriter, decision ratelimit.Decision) {
+	w.Header().Set("x-ratelimit-limit", fmt.Sprintf("%d", decision.Limit))
+	w.Header().Set("x-ratelimit-remaining", fmt.Sprintf("%d", decision.Remaining))
+	w.Header().Set("x-ratelimit-reset", decision.ResetAt.Format(time.RFC3339))
+	if !decision.Allowed {
+		w.Header().Set("retry-after", fmt.Sprintf("%d", int(decision.RetryAfter.Seconds())))
+	}
 }
 
 func requireAdmin(w http.ResponseWriter, principal db.AuthContext, traceID string) bool {

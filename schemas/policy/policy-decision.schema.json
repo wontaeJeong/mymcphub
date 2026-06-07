@@ -6,6 +6,11 @@
   "properties": {
     "effect": { "enum": ["allow", "deny", "needs_approval"] },
     "reason": { "type": "string", "minLength": 1 },
+    "reasonCode": { "type": "string" },
+    "matchedGrantIds": { "type": "array", "items": { "type": "string" } },
+    "requiresApproval": { "type": "boolean" },
+    "requiresStepUp": { "type": "boolean" },
+    "discoverableToolNames": { "type": "array", "items": { "type": "string" } },
     "matchedPolicyVersion": { "type": "string" }
   }
 }
