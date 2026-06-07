@@ -26,7 +26,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
   ]);
 
   if (!server.ok) {
-    return <div className="page-stack"><PageHero eyebrow="Server detail" title="Server unavailable." description="The Control Plane could not return this MCP server." /><ErrorState message={server.error} /><Link className="button" href="/user/catalog">Back to catalog</Link></div>;
+    return <div className="page-stack"><PageHero eyebrow="Server detail" title="Server unavailable." description="Backend data for this MCP server is unavailable." /><ErrorState message={server.error} /><Link className="button" href="/user/catalog">Back to servers</Link></div>;
   }
 
   const latestHealth = health.ok ? selectServerHealth(health.data.items, serverId) : undefined;
@@ -40,7 +40,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
       <PageHero eyebrow={server.data.slug} title={server.data.displayName} description={server.data.description ?? "No server description published."} />
       <div className="detail-grid">
         <Surface>
-          <SectionHeader title="Server profile" description="Read-only Control Plane metadata for this MCP server." />
+          <SectionHeader title="Server profile" description="Read-only ownership, environment, transport, and lifecycle details." />
           <div className="grid">
             <p><strong>Server ID:</strong> {server.data.id}</p>
             <p><strong>Owner team:</strong> {server.data.ownerTeamId}</p>
@@ -51,7 +51,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
           </div>
         </Surface>
         <Surface className="panel--accent">
-          <SectionHeader title="Access posture" description="User pages show state only; admin controls live under /admin." />
+          <SectionHeader title="Access posture" description="Review risk, enabled state, and health before requesting access or generating setup." />
           <div className="actions">
             <StatusPill tone={riskTone(server.data.riskLevel)}>{server.data.riskLevel}</StatusPill>
             <StatusPill tone={enabledTone(server.data.enabled)}>{server.data.enabled ? "enabled" : "disabled"}</StatusPill>
@@ -61,7 +61,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
       </div>
       <section>
         <SectionHeader title="Tools" description="Tool schema and grant status for your visible user/team grants." />
-        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess /> : tools.ok ? <EmptyState title="No tools discovered" description="The server exists, but no tools were returned by the Control Plane." /> : <ErrorState message={tools.error} />}
+        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess /> : tools.ok ? <EmptyState title="No data yet" description="The server exists, but no tools have been discovered yet." /> : <ErrorState message={tools.error} />}
       </section>
       <section>
         <SectionHeader title="Your grants on this server" description="Filtered to this server and current session identifiers." />

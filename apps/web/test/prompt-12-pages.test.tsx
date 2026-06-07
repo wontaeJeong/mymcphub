@@ -182,7 +182,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("prompt-12 required web pages", () => {
+describe("MVP required web pages", () => {
   it("covers server catalog filtering and rendered catalog row state", () => {
     const matchingServer = buildServer();
     const disabledServer = buildServer({ id: "server-dev-ops", slug: "dev-ops", displayName: "Dev Ops", environment: "dev", enabled: false, riskLevel: "low" });
@@ -263,8 +263,8 @@ describe("prompt-12 required web pages", () => {
     const emptyHtml = renderToStaticMarkup(emptyPage);
 
     expect(emptyHtml).toContain("Production Docs");
-    expect(emptyHtml).toContain("No server versions");
-    expect(emptyHtml).toContain("No tools discovered");
+    expect(emptyHtml).toContain("No data yet");
+    expect(emptyHtml).toContain("The server exists, but no tools have been discovered yet.");
 
     stubServerDetailFetch({ type: "error" });
     const errorPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
@@ -273,7 +273,7 @@ describe("prompt-12 required web pages", () => {
     expect(errorHtml).toContain("Production Docs");
     expect(errorHtml).toContain("Server versions unavailable");
     expect(errorHtml).toContain("Versions endpoint unavailable (503)");
-    expect(errorHtml).toContain("No tools discovered");
+    expect(errorHtml).toContain("The server exists, but no tools have been discovered yet.");
   });
 
   it("covers approval queue partitioning and decision rendering", () => {

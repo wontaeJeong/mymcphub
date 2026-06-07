@@ -29,7 +29,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
   if (!server.ok) {
     return (
       <div className="page-stack">
-        <PageHero eyebrow="Server detail" title="Server unavailable." description="The Control Plane could not return this MCP server." />
+        <PageHero eyebrow="Server detail" title="Server unavailable." description="Backend data for this MCP server is unavailable." />
         <ErrorState message={server.error} />
         <Link className="button" href="/admin/servers">Back to catalog</Link>
       </div>
@@ -48,27 +48,27 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <PageHero eyebrow={server.data.slug} title={server.data.displayName} description={server.data.description ?? "No server description published."} />
       <div className="detail-grid">
         <Surface>
-          <SectionHeader title="Server profile" description="Control Plane metadata for this MCP server." />
+          <SectionHeader title="Server profile" description="Ownership, environment, transport, and lifecycle details for this server." />
           <div className="grid">
             <p><strong>Server ID:</strong> {server.data.id}</p>
             <p><strong>Owner team:</strong> {server.data.ownerTeamId}</p>
             <p><strong>Environment:</strong> {server.data.environment}</p>
             <p><strong>Transport:</strong> {server.data.transport}</p>
-            <p><strong>Upstream URL:</strong> {server.data.upstreamUrl ?? "Unavailable from Control Plane API"}</p>
-            <p><strong>Schema version:</strong> {server.data.schemaVersion ?? "Unavailable from Control Plane API"}</p>
+            <p><strong>Upstream URL:</strong> {server.data.upstreamUrl ?? "Unavailable from backend"}</p>
+            <p><strong>Schema version:</strong> {server.data.schemaVersion ?? "Unavailable from backend"}</p>
             <p><strong>Created:</strong> {formatDate(server.data.createdAt)}</p>
             <p><strong>Updated:</strong> {formatDate(server.data.updatedAt)}</p>
           </div>
         </Surface>
         <Surface className="panel--accent">
-          <SectionHeader title="Risk and controls" description="Enable or disable this server through existing Control Plane endpoints." />
+          <SectionHeader title="Risk and controls" description="Enable or disable this server after reviewing risk and latest health." />
           <div className="grid">
             <div className="actions">
               <StatusPill tone={riskTone(server.data.riskLevel)}>{server.data.riskLevel}</StatusPill>
               <StatusPill tone={enabledTone(server.data.enabled)}>{server.data.enabled ? "enabled" : "disabled"}</StatusPill>
               {latestHealth ? <StatusPill tone={healthTone(latestHealth.status)}>{latestHealth.status}</StatusPill> : <StatusPill>health unavailable</StatusPill>}
             </div>
-            {latestHealth ? <p className="muted">Latest health check: {formatDate(latestHealth.checkedAt)}{latestHealth.errorMessage ? ` · ${latestHealth.errorMessage}` : ""}</p> : <p className="muted">No /api/server-health row was returned for this server.</p>}
+            {latestHealth ? <p className="muted">Latest health check: {formatDate(latestHealth.checkedAt)}{latestHealth.errorMessage ? ` · ${latestHealth.errorMessage}` : ""}</p> : <p className="muted">No health check has been recorded for this server yet.</p>}
             <div className="actions">
               <form action={enableServerAction}>
                 <input type="hidden" name="serverId" value={server.data.id} />
@@ -83,21 +83,21 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
         </Surface>
       </div>
       <section>
-        <SectionHeader title="Server versions" description="Read-only release state from /api/servers/:serverId/versions." />
+        <SectionHeader title="Server versions" description="Read-only release state and active version selection." />
         {versions.ok && activeVersion ? (
           <div className="grid">
             <ActiveVersionSummary version={activeVersion} />
             <ServerVersionTable versions={versionItems} />
           </div>
-        ) : versions.ok ? <EmptyState title="No server versions" description="The Control Plane returned no versions for this server." /> : <ErrorState title="Server versions unavailable" message={versions.error} />}
+        ) : versions.ok ? <EmptyState title="No data yet" description="No versions have been recorded for this server." /> : <ErrorState title="Server versions unavailable" message={versions.error} />}
       </section>
       <section>
-        <SectionHeader title="Recent audit event" description="Most recent event for this server from /api/audit-events." />
+        <SectionHeader title="Recent audit event" description="Most recent event for this server in the loaded audit window." />
         {audit.ok && recentAudit.length > 0 ? <AuditTable events={recentAudit} /> : audit.ok ? <EmptyState title="No server audit event" description="No audit event in the fetched window references this server." /> : <ErrorState message={audit.error} />}
       </section>
       {!grants.ok ? <ErrorState title="Grant status unavailable" message={grants.error} /> : null}
       <section className="capability-section">
-        <SectionHeader title="Tools, resources, and prompts" description="Control Plane capability tabs show the live tools contract and explicitly mark resources/prompts when no Go API endpoint exposes them yet." />
+        <SectionHeader title="Tools, resources, and prompts" description="Tools are live when available. Resources and prompts are clearly marked when unsupported by this backend." />
         <div className="capability-tabs" role="tablist" aria-label="Server capabilities">
           <a className="capability-tab" href="#server-tools" role="tab" aria-selected="true">Tools</a>
           <a className="capability-tab" href="#server-resources" role="tab" aria-selected="false">Resources</a>
@@ -106,20 +106,20 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
         <div className="grid capability-panels">
           <div id="server-tools">
           <Surface className="capability-panel">
-            <SectionHeader title="Server tools" description="Tools discovered for this server via /api/servers/:serverId/tools, including schema visibility, grant status, and tool enablement controls." />
-            {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess actionSlot={ToolControls} /> : tools.ok ? <EmptyState title="No tools discovered" description="The server exists, but no tools were returned by the Control Plane." /> : <ErrorState message={tools.error} />}
+            <SectionHeader title="Server tools" description="Discovered tools with schema visibility, grant status, risk, and enablement controls." />
+            {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess actionSlot={ToolControls} /> : tools.ok ? <EmptyState title="No data yet" description="The server exists, but no tools have been discovered yet." /> : <ErrorState message={tools.error} />}
           </Surface>
           </div>
           <div id="server-resources">
           <Surface className="capability-panel">
-            <SectionHeader title="Resources" description="Gateway initialize advertises resource capability, but this Go Control Plane contract does not yet expose /resources list/read endpoints." />
-            <EmptyState title="Resources endpoint not exposed" description="No resources are rendered from mock data. Add a Control Plane resources contract before listing resource rows in Web." />
+            <SectionHeader title="Resources" description="Feature not supported by this backend yet." />
+            <EmptyState title="Unsupported by current backend" description="Resources are not listed until the backend exposes a resources contract." />
           </Surface>
           </div>
           <div id="server-prompts">
           <Surface className="capability-panel">
-            <SectionHeader title="Prompts" description="Gateway initialize advertises prompt capability, but this Go Control Plane contract does not yet expose /prompts list/get endpoints." />
-            <EmptyState title="Prompts endpoint not exposed" description="No prompts are rendered from mock data. Add a Control Plane prompts contract before listing prompt rows in Web." />
+            <SectionHeader title="Prompts" description="Feature not supported by this backend yet." />
+            <EmptyState title="Unsupported by current backend" description="Prompts are not listed until the backend exposes a prompts contract." />
           </Surface>
           </div>
         </div>

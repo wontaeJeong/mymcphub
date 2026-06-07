@@ -36,15 +36,12 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
         <thead>
           <tr>
             <th>Server</th>
-            <th>Slug</th>
-            <th>Owner team</th>
             <th>Environment</th>
-            <th>Transport</th>
             <th>Risk</th>
             <th>Health</th>
-            <th>Enabled</th>
-            <th>Operations</th>
-            <th>Updated</th>
+            <th>State</th>
+            <th>Ops</th>
+            <th>Last updated</th>
           </tr>
         </thead>
         <tbody>
@@ -59,11 +56,11 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                   <p className="muted">
                     {server.description ?? "No description published."}
                   </p>
+                  <p className="muted">
+                    {server.slug} · Owner {server.ownerTeamId} · {server.transport}
+                  </p>
                 </td>
-                <td>{server.slug}</td>
-                <td>{server.ownerTeamId}</td>
                 <td>{server.environment}</td>
-                <td>{server.transport}</td>
                 <td>
                   <StatusPill tone={riskTone(server.riskLevel)}>
                     {server.riskLevel}
@@ -183,9 +180,9 @@ export function ToolTable({
               <td>{formatDate(tool.lastSeenAt)}</td>
               {showAdminPlaceholder ? (
                 <td>
-                  <StatusPill tone="info">API pending</StatusPill>
+                  <StatusPill tone="info">Unsupported</StatusPill>
                   <p className="muted">
-                    Admin test-call endpoint is not part of prompt 05.
+                    Use policy dry-run for safe testing; live admin test calls are not supported by this backend yet.
                   </p>
                 </td>
               ) : null}
@@ -310,9 +307,8 @@ export function GrantTable({
         <thead>
           <tr>
             <th>Subject</th>
-            <th>Server</th>
+            <th>Access</th>
             <th>Tools</th>
-            <th>Environment</th>
             <th>Status</th>
             <th>Reason</th>
             {actionSlot ? <th>Controls</th> : null}
@@ -323,10 +319,10 @@ export function GrantTable({
             <tr key={grant.id}>
               <td>
                 {grant.subjectType}: {grant.subjectId}
+                <p className="muted">Project {grant.projectId}</p>
               </td>
-              <td>{serverNameById.get(grant.serverId) ?? grant.serverId}</td>
+              <td>{serverNameById.get(grant.serverId) ?? grant.serverId}<p className="muted">{grant.environment}</p></td>
               <td>{grant.allowedTools.join(", ")}</td>
-              <td>{grant.environment}</td>
               <td>
                 <StatusPill tone={enabledTone(grant.enabled)}>
                   {grant.enabled ? "active" : "revoked"}
@@ -708,7 +704,7 @@ export function HealthTable({
 function SchemaViewer({ tool }: Readonly<{ tool: ApiMcpTool }>) {
   const schema = tool.inputSchema ?? tool.inputSchemaJson;
   if (schema === undefined) {
-    return <span className="muted">Unavailable from Control Plane API</span>;
+    return <span className="muted">Schema unavailable from backend</span>;
   }
 
   return (
