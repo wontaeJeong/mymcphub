@@ -27,35 +27,35 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
     <div className="page-stack">
       <div className="form-grid">
         <form className="form-card" action={denyAction}>
-          <h2>Emergency Deny Enable</h2>
-          <p>Enable the Control Plane emergency deny circuit with an audit-ready reason.</p>
+          <h2>긴급 거부 활성화</h2>
+          <p>감사 가능한 사유와 함께 제어 플레인의 긴급 거부 회로를 활성화합니다.</p>
           <div className="field">
-            <label htmlFor="reason">Reason</label>
-            <textarea id="reason" name="reason" required placeholder="Incident reference and decision rationale" />
+            <label htmlFor="reason">사유</label>
+            <textarea id="reason" name="reason" required placeholder="장애 참조와 결정 근거" />
           </div>
           <label className="danger-confirm">
             <input type="checkbox" name="confirmEmergencyDeny" required />
-            Confirm this will deny gateway access while the Control Plane emergency mode is active.
+            제어 플레인 긴급 모드가 활성화된 동안 게이트웨이 접근이 거부됨을 확인합니다.
           </label>
           <div className="form-actions">
-            <button className="button button--danger" type="submit" disabled={denyPending}>{denyPending ? "Enabling..." : "Enable deny"}</button>
+            <button className="button button--danger" type="submit" disabled={denyPending}>{denyPending ? "활성화 중..." : "거부 활성화"}</button>
             {denyState.message ? <span className="muted">{denyState.message}</span> : null}
           </div>
         </form>
         <Surface>
-          <h2>Emergency Deny Disable</h2>
-          <p>Unavailable in prompt 05: no existing Control Plane endpoint was provided for disabling emergency deny, so the Web UI does not invent one.</p>
-          <StatusPill tone="warning">Unavailable</StatusPill>
+          <h2>긴급 거부 비활성화</h2>
+          <p>prompt 05 범위에서 사용할 수 없습니다. 긴급 거부를 비활성화하는 제어 플레인 엔드포인트가 제공되지 않아 Web UI에서 새로 만들지 않습니다.</p>
+          <StatusPill tone="warning">사용 불가</StatusPill>
         </Surface>
       </div>
       <div className="form-grid">
         <form className="form-card" action={serverAction}>
-          <h2>Server Disable</h2>
-          <p>Disable a selected registered server through /api/servers/:serverId/disable.</p>
+          <h2>서버 비활성화</h2>
+          <p>선택한 등록 서버를 /api/servers/:serverId/disable로 비활성화합니다.</p>
           {enabledServers.length > 0 ? (
             <>
               <div className="field">
-                <label htmlFor="disableServerId">Server</label>
+                <label htmlFor="disableServerId">서버</label>
                 <select id="disableServerId" name="serverId" required>
                   {enabledServers.map((server) => (
                     <option value={server.id} key={server.id}>{server.displayName}</option>
@@ -64,22 +64,22 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
               </div>
               <label className="danger-confirm">
                 <input type="checkbox" name="confirmServerDisable" required />
-                Confirm this server should be disabled for emergency containment.
+                긴급 확산 방지를 위해 이 서버를 비활성화해야 함을 확인합니다.
               </label>
               <div className="form-actions">
-                <button className="button button--danger" type="submit" disabled={serverPending}>{serverPending ? "Disabling..." : "Disable server"}</button>
+                <button className="button button--danger" type="submit" disabled={serverPending}>{serverPending ? "비활성화 중..." : "서버 비활성화"}</button>
                 {serverState.message ? <span className="muted">{serverState.message}</span> : null}
               </div>
             </>
-          ) : <EmptyState title="No enabled servers" description="There are no enabled servers available for emergency disable." />}
+          ) : <EmptyState title="활성 서버 없음" description="긴급 비활성화에 사용할 수 있는 활성 서버가 없습니다." />}
         </form>
         <form className="form-card" action={toolAction}>
-          <h2>Tool Disable</h2>
-          <p>Disable a selected tool through /api/servers/:serverId/tools/:toolId/disable.</p>
+          <h2>도구 비활성화</h2>
+          <p>선택한 도구를 /api/servers/:serverId/tools/:toolId/disable로 비활성화합니다.</p>
           {enabledTools.length > 0 ? (
             <>
               <div className="field">
-                <label htmlFor="disableToolRef">Tool</label>
+                <label htmlFor="disableToolRef">도구</label>
                 <select id="disableToolRef" name="toolRef" required>
                   {enabledTools.map((tool) => (
                     <option value={`${tool.serverId}::${tool.id}`} key={`${tool.serverId}:${tool.id}`}>{tool.serverName} · {tool.name}</option>
@@ -88,23 +88,23 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
               </div>
               <label className="danger-confirm">
                 <input type="checkbox" name="confirmToolDisable" required />
-                Confirm this tool should be disabled for emergency containment.
+                긴급 확산 방지를 위해 이 도구를 비활성화해야 함을 확인합니다.
               </label>
               <div className="form-actions">
-                <button className="button button--danger" type="submit" disabled={toolPending}>{toolPending ? "Disabling..." : "Disable tool"}</button>
+                <button className="button button--danger" type="submit" disabled={toolPending}>{toolPending ? "비활성화 중..." : "도구 비활성화"}</button>
                 {toolState.message ? <span className="muted">{toolState.message}</span> : null}
               </div>
             </>
-          ) : <EmptyState title="No enabled tools" description="There are no enabled tools available for emergency disable." />}
+          ) : <EmptyState title="활성 도구 없음" description="긴급 비활성화에 사용할 수 있는 활성 도구가 없습니다." />}
         </form>
       </div>
       <form className="form-card" action={revokeAction}>
-        <h2>Revoke All Grants For Server</h2>
-        <p>Immediately revoke all active grants for one MCP server through /api/admin/revoke-server-grants/:serverId. No global all-server revoke endpoint is used or invented.</p>
+        <h2>서버의 모든 권한 회수</h2>
+        <p>하나의 MCP 서버에 대한 모든 활성 권한을 /api/admin/revoke-server-grants/:serverId로 즉시 회수합니다. 전체 서버 일괄 회수 엔드포인트는 사용하거나 만들지 않습니다.</p>
         {servers.length > 0 ? (
           <>
             <div className="field">
-              <label htmlFor="adminServerId">Server</label>
+              <label htmlFor="adminServerId">서버</label>
               <select id="adminServerId" name="serverId" required>
                 {servers.map((server) => (
                   <option value={server.id} key={server.id}>{server.displayName}</option>
@@ -113,14 +113,14 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
             </div>
             <label className="danger-confirm">
               <input type="checkbox" name="confirmRevokeServerGrants" required />
-              Confirm every grant for the selected server should be revoked.
+              선택한 서버의 모든 권한을 회수해야 함을 확인합니다.
             </label>
             <div className="form-actions">
-              <button className="button button--danger" type="submit" disabled={revokePending}>{revokePending ? "Revoking..." : "Revoke server grants"}</button>
+              <button className="button button--danger" type="submit" disabled={revokePending}>{revokePending ? "회수 중..." : "서버 권한 회수"}</button>
               {revokeState.message ? <span className="muted">{revokeState.message}</span> : null}
             </div>
           </>
-        ) : <EmptyState title="No servers" description="Grant revocation requires a registered server." />}
+        ) : <EmptyState title="서버 없음" description="권한 회수에는 등록된 서버가 필요합니다." />}
       </form>
     </div>
   );
