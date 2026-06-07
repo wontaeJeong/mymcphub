@@ -23,3 +23,5 @@ curl -X POST http://localhost:4100/jobs/run \
 ```
 
 Each job records a result. Job failures are returned as failed job results and do not kill the Worker process.
+
+`schema-snapshot` records the current Store-backed tool schemas for the target server. `schema-diff` compares supplied previous/current snapshots when present, stores added/removed/changed/risk-change metadata, and marks approval-required diffs for API history lookup.

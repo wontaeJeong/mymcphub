@@ -98,13 +98,41 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 	case HealthCheck:
 		r.store.UpsertHealth(db.ServerHealth{ServerID: job.TargetServerID, Status: "healthy", LatencyMS: 10})
 		r.store.AddAudit(db.AuditEvent{EventType: "health.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "status": "healthy"}})
-	case ToolScan, ResourceScan, PromptScan, SchemaSnapshot:
+	case ToolScan, ResourceScan, PromptScan:
 		r.store.AddAudit(db.AuditEvent{EventType: "scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+	case SchemaSnapshot:
+		snapshot, err := r.store.RecordCurrentSchemaSnapshot(job.TargetServerID, string(job.Kind))
+		if err != nil {
+			result.Status = "failed"
+			result.FailureReason = err.Error()
+			break
+		}
+		r.store.AddAudit(db.AuditEvent{EventType: "schema.snapshot.recorded", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "snapshotId": snapshot.ID}})
+		result.Metadata["snapshotId"] = snapshot.ID
 	case SchemaDiff:
 		diffs := DiffToolSnapshots(job.PreviousSnapshot, job.CurrentSnapshot)
+		var recorded db.SchemaDiff
+		var err error
+		if len(job.PreviousSnapshot)+len(job.CurrentSnapshot) > 0 {
+			recorded, err = r.store.RecordSchemaDiffFromSnapshots(job.TargetServerID, string(job.Kind), toDBSnapshotItems(job.PreviousSnapshot), toDBSnapshotItems(job.CurrentSnapshot))
+		} else {
+			current, currentErr := r.store.SchemaDiff(job.TargetServerID)
+			if currentErr != nil {
+				err = currentErr
+			} else {
+				recorded, err = r.store.RecordSchemaDiff(job.TargetServerID, string(job.Kind), current.Changes)
+				diffs = toJobDiffs(current.Changes)
+			}
+		}
+		if err != nil {
+			result.Status = "failed"
+			result.FailureReason = err.Error()
+			break
+		}
 		r.store.AddAudit(db.AuditEvent{EventType: "schema.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "diffCount": len(diffs), "approvalRequired": approvalRequired(diffs)}})
 		result.Metadata["diffCount"] = len(diffs)
 		result.Metadata["approvalRequired"] = approvalRequired(diffs)
+		result.Metadata["schemaDiffId"] = recorded.ID
 	case StaleSessionCleanup, AuditRetentionCleanup, AuditExport:
 		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
 	default:
@@ -159,6 +187,23 @@ func index(snapshot []ToolSnapshot) map[string]ToolSnapshot {
 	}
 	return out
 }
+
+func toDBSnapshotItems(snapshot []ToolSnapshot) []db.ToolSchemaSnapshotItem {
+	items := make([]db.ToolSchemaSnapshotItem, 0, len(snapshot))
+	for _, tool := range snapshot {
+		items = append(items, db.ToolSchemaSnapshotItem{Name: tool.Name, Description: tool.Description, RiskLevel: tool.Risk, InputSchema: tool.InputSchema})
+	}
+	return items
+}
+
+func toJobDiffs(changes []db.SchemaChange) []Diff {
+	out := make([]Diff, 0, len(changes))
+	for _, change := range changes {
+		out = append(out, Diff{Type: change.Type, ToolName: change.ToolName, ApprovalRequired: change.ApprovalRequired, HighRisk: change.ToRiskLevel == db.RiskHigh || change.ToRiskLevel == db.RiskCritical || change.FromRiskLevel == db.RiskHigh || change.FromRiskLevel == db.RiskCritical})
+	}
+	return out
+}
+
 func high(risk db.RiskLevel) bool { return risk == db.RiskHigh || risk == db.RiskCritical }
 func approvalRequired(diffs []Diff) bool {
 	for _, diff := range diffs {

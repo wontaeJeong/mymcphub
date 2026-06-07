@@ -63,7 +63,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == "/metrics":
 		httpx.WriteText(w, 200, "text/plain; version=0.0.4", "mcp_api_request_info{service=\"api\"} 1\n")
 	case r.Method == http.MethodGet && (r.URL.Path == "/openapi.json" || r.URL.Path == "/api/openapi.json"):
-		httpx.WriteJSON(w, 200, openAPIDocument())
+		httpx.WriteJSON(w, 200, OpenAPIDocument())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/me":
 		httpx.WriteJSON(w, 200, map[string]interface{}{"auth": principal})
 	case strings.HasPrefix(r.URL.Path, "/api/servers"):
@@ -74,6 +74,10 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		s.handleApprovals(w, r, principal, traceID)
 	case strings.HasPrefix(r.URL.Path, "/api/audit-events"):
 		s.handleAudit(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/secret-bindings"):
+		s.handleSecretBindings(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/tenancy"):
+		s.handleTenancy(w, r, principal, traceID)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/tool-call-events":
 		httpx.WriteJSON(w, 200, s.store.ListToolCallEvents())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/server-health":
@@ -93,7 +97,7 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal
 	parts := pathParts(r.URL.Path, "/api/servers")
 	if len(parts) == 0 {
 		if r.Method == http.MethodGet {
-			httpx.WriteJSON(w, 200, s.store.ListServers())
+			httpx.WriteJSON(w, 200, s.store.ListServersWithOptions(listOptionsFromRequest(r, []string{"environment", "risk_level", "owner_team_id", "transport", "enabled", "published", "q"})))
 			return
 		}
 		if r.Method == http.MethodPost {
@@ -111,6 +115,12 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal
 		case http.MethodGet:
 			value, err := s.store.GetServer(serverID)
 			respond(w, traceID, value, err)
+		case http.MethodDelete:
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			err := s.store.DeleteServer(serverID, principal, traceID)
+			respond(w, traceID, map[string]interface{}{"deleted": true, "serverId": serverID}, err)
 		case http.MethodPatch:
 			if !requireAdmin(w, principal, traceID) {
 				return
@@ -128,10 +138,37 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal
 	switch parts[1] {
 	case "versions":
 		s.handleVersions(w, r, principal, traceID, serverID, parts[2:])
-	case "schema-diff":
+	case "rollout":
 		if r.Method == http.MethodGet {
+			value, err := s.store.RolloutStatus(serverID)
+			respond(w, traceID, value, err)
+			return
+		}
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+	case "schema-diff":
+		if len(parts) == 2 && r.Method == http.MethodGet {
 			value, err := s.store.SchemaDiff(serverID)
 			respond(w, traceID, value, err)
+			return
+		}
+		if len(parts) == 3 && parts[2] == "history" && r.Method == http.MethodGet {
+			value, err := s.store.ListSchemaDiffs(serverID, listOptionsFromRequest(r, nil))
+			respond(w, traceID, value, err)
+			return
+		}
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+	case "schema-snapshots":
+		if len(parts) == 2 && r.Method == http.MethodGet {
+			value, err := s.store.ListSchemaSnapshots(serverID)
+			respond(w, traceID, value, err)
+			return
+		}
+		if len(parts) == 2 && r.Method == http.MethodPost {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			value, err := s.store.RecordCurrentSchemaSnapshot(serverID, "api")
+			respondStatus(w, traceID, 201, value, err)
 			return
 		}
 		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
@@ -315,6 +352,27 @@ func (s *Server) handleApprovals(w http.ResponseWriter, r *http.Request, princip
 }
 
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if r.Method == http.MethodGet && r.URL.Path == "/api/audit-events/export/jobs" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		httpx.WriteJSON(w, 200, s.store.ListAuditExportJobs())
+		return
+	}
+	if r.Method == http.MethodPost && r.URL.Path == "/api/audit-events/export" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		var input struct {
+			Format  string            `json:"format"`
+			Filters map[string]string `json:"filters"`
+		}
+		if decode(w, r, traceID, &input) {
+			value, err := s.store.CreateAuditExportJob(input.Filters, input.Format, principal, traceID)
+			respondStatus(w, traceID, 202, value, err)
+		}
+		return
+	}
 	if r.Method == http.MethodGet && (r.URL.Path == "/api/audit-events" || r.URL.Path == "/api/audit-events/export") {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		filters := map[string]string{}
@@ -335,6 +393,142 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request, principal d
 		return
 	}
 	httpx.WriteError(w, 404, "NOT_FOUND", "Audit route not found", traceID, nil)
+}
+
+func (s *Server) handleSecretBindings(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	parts := pathParts(r.URL.Path, "/api/secret-bindings")
+	if len(parts) == 0 {
+		if r.Method == http.MethodGet {
+			httpx.WriteJSON(w, 200, s.store.ListSecretBindings(filtersFromRequest(r, []string{"scope_type", "scope_id", "provider"})))
+			return
+		}
+		if r.Method == http.MethodPost {
+			var raw map[string]interface{}
+			if !decode(w, r, traceID, &raw) {
+				return
+			}
+			if containsForbiddenSecretPayload(raw) {
+				httpx.WriteError(w, 400, "VALIDATION_ERROR", "Secret binding payload must contain only secret references and lease metadata.", traceID, nil)
+				return
+			}
+			encoded, _ := json.Marshal(raw)
+			var input db.SecretBinding
+			if err := json.Unmarshal(encoded, &input); err != nil {
+				httpx.WriteError(w, 400, "VALIDATION_ERROR", "Request body must be a valid secret binding", traceID, nil)
+				return
+			}
+			value, err := s.store.CreateSecretBinding(input, principal, traceID)
+			respondStatus(w, traceID, 201, value, err)
+			return
+		}
+	}
+	if len(parts) == 1 && r.Method == http.MethodDelete {
+		err := s.store.DeleteSecretBinding(parts[0], principal, traceID)
+		respond(w, traceID, map[string]interface{}{"deleted": true, "secretBindingId": parts[0]}, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Secret binding route not found", traceID, nil)
+}
+
+func (s *Server) handleTenancy(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	parts := pathParts(r.URL.Path, "/api/tenancy")
+	if len(parts) == 0 {
+		httpx.WriteError(w, 404, "NOT_FOUND", "Tenancy route not found", traceID, nil)
+		return
+	}
+	switch parts[0] {
+	case "users":
+		if len(parts) == 0 || len(parts) > 1 {
+			break
+		}
+		if r.Method == http.MethodGet {
+			httpx.WriteJSON(w, 200, s.store.ListUsers())
+			return
+		}
+		if r.Method == http.MethodPost {
+			var input db.User
+			if decode(w, r, traceID, &input) {
+				value, err := s.store.CreateUser(input, principal, traceID)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+	case "teams":
+		if len(parts) == 1 {
+			if r.Method == http.MethodGet {
+				httpx.WriteJSON(w, 200, s.store.ListTeams())
+				return
+			}
+			if r.Method == http.MethodPost {
+				var input db.Team
+				if decode(w, r, traceID, &input) {
+					value, err := s.store.CreateTeam(input, principal, traceID)
+					respondStatus(w, traceID, 201, value, err)
+				}
+				return
+			}
+		}
+		if len(parts) == 3 && parts[2] == "members" && r.Method == http.MethodPost {
+			var input db.TeamMembership
+			if decode(w, r, traceID, &input) {
+				input.TeamID = parts[1]
+				value, err := s.store.AddTeamMember(input, principal, traceID)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+		if len(parts) == 4 && parts[2] == "members" && r.Method == http.MethodDelete {
+			err := s.store.RemoveTeamMember(parts[1], parts[3], principal, traceID)
+			respond(w, traceID, map[string]interface{}{"deleted": true, "teamId": parts[1], "userId": parts[3]}, err)
+			return
+		}
+	case "projects":
+		if len(parts) == 1 {
+			if r.Method == http.MethodGet {
+				httpx.WriteJSON(w, 200, s.store.ListProjects())
+				return
+			}
+			if r.Method == http.MethodPost {
+				var input db.Project
+				if decode(w, r, traceID, &input) {
+					value, err := s.store.CreateProject(input, principal, traceID)
+					respondStatus(w, traceID, 201, value, err)
+				}
+				return
+			}
+		}
+		if len(parts) == 3 && parts[2] == "members" && r.Method == http.MethodPost {
+			var input db.ProjectMembership
+			if decode(w, r, traceID, &input) {
+				input.ProjectID = parts[1]
+				value, err := s.store.AddProjectMember(input, principal, traceID)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+		if len(parts) == 5 && parts[2] == "members" && r.Method == http.MethodDelete {
+			err := s.store.RemoveProjectMember(parts[1], db.GrantSubjectType(parts[3]), parts[4], principal, traceID)
+			respond(w, traceID, map[string]interface{}{"deleted": true, "projectId": parts[1], "subjectType": parts[3], "subjectId": parts[4]}, err)
+			return
+		}
+	case "policy-input":
+		if len(parts) == 1 && r.Method == http.MethodGet {
+			userID := r.URL.Query().Get("userId")
+			if userID == "" {
+				userID = principal.UserID
+			}
+			value, err := s.store.PolicyInputFor(userID, r.URL.Query().Get("projectId"))
+			respond(w, traceID, value, err)
+			return
+		}
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Tenancy route not found", traceID, nil)
 }
 
 func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request, traceID string) {
@@ -395,6 +589,14 @@ func (s *Server) handlePolicy(w http.ResponseWriter, r *http.Request, _ db.AuthC
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
 	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	if r.Method == http.MethodPost && r.URL.Path == "/api/admin/kill-switch" {
+		var input db.KillSwitchRequest
+		if decode(w, r, traceID, &input) {
+			value, err := s.store.ApplyKillSwitch(input, principal, traceID)
+			respond(w, traceID, value, err)
+		}
 		return
 	}
 	if r.Method == http.MethodPost && r.URL.Path == "/api/admin/emergency-deny" {
@@ -551,6 +753,31 @@ func pathParts(path, prefix string) []string {
 	return strings.Split(rest, "/")
 }
 
+func listOptionsFromRequest(r *http.Request, filterKeys []string) db.ListOptions {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	return db.ListOptions{Limit: limit, Cursor: r.URL.Query().Get("cursor"), Filters: filtersFromRequest(r, filterKeys)}
+}
+
+func filtersFromRequest(r *http.Request, keys []string) map[string]string {
+	filters := map[string]string{}
+	for _, key := range keys {
+		filters[key] = r.URL.Query().Get(key)
+	}
+	return filters
+}
+
+func containsForbiddenSecretPayload(value map[string]interface{}) bool {
+	for key := range value {
+		switch strings.ToLower(key) {
+		case "secret", "secretvalue", "plaintext", "value", "token", "password", "raw":
+			return true
+		}
+	}
+	return false
+}
+
+func OpenAPIDocument() map[string]interface{} { return openAPIDocument() }
+
 func openAPIDocument() map[string]interface{} {
 	return map[string]interface{}{
 		"openapi": "3.1.0",
@@ -560,38 +787,53 @@ func openAPIDocument() map[string]interface{} {
 			"/readyz":                            map[string]interface{}{"get": operation("Readiness check", false)},
 			"/metrics":                           map[string]interface{}{"get": operation("Prometheus metrics", false)},
 			"/api/me":                            map[string]interface{}{"get": operation("Current auth context", false)},
-			"/api/servers":                       map[string]interface{}{"get": operation("List MCP servers", false), "post": operation("Register MCP server", true)},
-			"/api/servers/{serverId}":            map[string]interface{}{"get": operation("Get MCP server", false), "patch": operation("Patch MCP server", true)},
+			"/api/servers":                       map[string]interface{}{"get": operation("List MCP servers", false), "post": operation("Register MCP server", true, 201)},
+			"/api/servers/{serverId}":            map[string]interface{}{"get": operation("Get MCP server", false), "patch": operation("Patch MCP server", true), "delete": operation("Delete MCP server", true)},
 			"/api/servers/{serverId}/publish":    map[string]interface{}{"post": operation("Publish server", true)},
 			"/api/servers/{serverId}/unpublish":  map[string]interface{}{"post": operation("Unpublish server", true)},
 			"/api/servers/{serverId}/disable":    map[string]interface{}{"post": operation("Disable server", true)},
 			"/api/servers/{serverId}/enable":     map[string]interface{}{"post": operation("Enable server", true)},
 			"/api/servers/{serverId}/quarantine": map[string]interface{}{"post": operation("Quarantine server", true)},
-			"/api/servers/{serverId}/versions":   map[string]interface{}{"get": operation("List server versions", false), "post": operation("Create server version", true)},
+			"/api/servers/{serverId}/rollout":    map[string]interface{}{"get": operation("Get server rollout status", false)},
+			"/api/servers/{serverId}/versions":   map[string]interface{}{"get": operation("List server versions", false), "post": operation("Create server version", true, 201)},
 			"/api/servers/{serverId}/versions/{versionId}/activate": map[string]interface{}{"post": operation("Activate server version", true)},
 			"/api/servers/{serverId}/versions/{versionId}/rollback": map[string]interface{}{"post": operation("Roll back server version", true)},
 			"/api/servers/{serverId}/schema-diff":                   map[string]interface{}{"get": operation("Get server schema diff", false)},
+			"/api/servers/{serverId}/schema-diff/history":           map[string]interface{}{"get": operation("List server schema diff history", false)},
+			"/api/servers/{serverId}/schema-snapshots":              map[string]interface{}{"get": operation("List server schema snapshots", false), "post": operation("Record server schema snapshot", true, 201)},
 			"/api/servers/{serverId}/tools":                         map[string]interface{}{"get": operation("List server tools", false)},
 			"/api/servers/{serverId}/tools/{toolId}":                map[string]interface{}{"patch": operation("Patch server tool", true)},
 			"/api/servers/{serverId}/tools/{toolId}/enable":         map[string]interface{}{"post": operation("Enable server tool", true)},
 			"/api/servers/{serverId}/tools/{toolId}/disable":        map[string]interface{}{"post": operation("Disable server tool", true)},
 			"/api/servers/{serverId}/tools/{toolId}/schema":         map[string]interface{}{"get": operation("Get tool schema", false)},
-			"/api/grants":                                map[string]interface{}{"get": operation("List grants", false), "post": operation("Create grant request", true)},
-			"/api/grants/{grantId}":                      map[string]interface{}{"patch": operation("Patch grant", true)},
-			"/api/grants/{grantId}/approve":              map[string]interface{}{"post": operation("Approve grant", true)},
-			"/api/grants/{grantId}/revoke":               map[string]interface{}{"post": operation("Revoke grant", true)},
-			"/api/approvals":                             map[string]interface{}{"get": operation("List approvals", false), "post": operation("Create approval request", true)},
-			"/api/approvals/{approvalId}/approve":        map[string]interface{}{"post": operation("Approve approval request", true)},
-			"/api/approvals/{approvalId}/reject":         map[string]interface{}{"post": operation("Reject approval request", true)},
-			"/api/audit-events":                          map[string]interface{}{"get": operation("Search audit events", false)},
-			"/api/audit-events/export":                   map[string]interface{}{"get": operation("Export audit events", false)},
-			"/api/audit-events/gateway":                  map[string]interface{}{"post": operation("Record gateway audit event", true)},
+			"/api/grants":                                  map[string]interface{}{"get": operation("List grants", false), "post": operation("Create grant request", true, 201)},
+			"/api/grants/{grantId}":                        map[string]interface{}{"patch": operation("Patch grant", true)},
+			"/api/grants/{grantId}/approve":                map[string]interface{}{"post": operation("Approve grant", true)},
+			"/api/grants/{grantId}/revoke":                 map[string]interface{}{"post": operation("Revoke grant", true)},
+			"/api/approvals":                               map[string]interface{}{"get": operation("List approvals", false), "post": operation("Create approval request", true, 201)},
+			"/api/approvals/{approvalId}/approve":          map[string]interface{}{"post": operation("Approve approval request", true)},
+			"/api/approvals/{approvalId}/reject":           map[string]interface{}{"post": operation("Reject approval request", true)},
+			"/api/audit-events":                            map[string]interface{}{"get": operation("Search audit events", false)},
+			"/api/audit-events/export":                     map[string]interface{}{"get": operation("Export audit events", false), "post": operation("Create audit export job", true, 202)},
+			"/api/audit-events/export/jobs":                map[string]interface{}{"get": operation("List audit export jobs", true)},
+			"/api/audit-events/gateway":                    map[string]interface{}{"post": operation("Record gateway audit event", true, 201)},
+			"/api/secret-bindings":                         map[string]interface{}{"get": operation("List secret bindings", true), "post": operation("Create secret binding", true, 201)},
+			"/api/secret-bindings/{secretBindingId}":       map[string]interface{}{"delete": operation("Delete secret binding", true)},
+			"/api/tenancy/users":                           map[string]interface{}{"get": operation("List tenancy users", true), "post": operation("Create tenancy user", true, 201)},
+			"/api/tenancy/teams":                           map[string]interface{}{"get": operation("List tenancy teams", true), "post": operation("Create tenancy team", true, 201)},
+			"/api/tenancy/teams/{teamId}/members":          map[string]interface{}{"post": operation("Add team member", true, 201)},
+			"/api/tenancy/teams/{teamId}/members/{userId}": map[string]interface{}{"delete": operation("Remove team member", true)},
+			"/api/tenancy/projects":                        map[string]interface{}{"get": operation("List tenancy projects", true), "post": operation("Create tenancy project", true, 201)},
+			"/api/tenancy/projects/{projectId}/members":    map[string]interface{}{"post": operation("Add project member", true, 201)},
+			"/api/tenancy/projects/{projectId}/members/{subjectType}/{subjectId}": map[string]interface{}{"delete": operation("Remove project member", true)},
+			"/api/tenancy/policy-input":                  map[string]interface{}{"get": operation("Get tenancy policy input", true)},
 			"/api/tool-call-events":                      map[string]interface{}{"get": operation("List tool call events", false)},
 			"/api/server-health":                         map[string]interface{}{"get": operation("List server health records", false)},
 			"/api/client-config/generate":                map[string]interface{}{"post": operation("Generate client config", false)},
 			"/api/policy/validate":                       map[string]interface{}{"post": operation("Validate policy", false)},
 			"/api/policy/simulate":                       map[string]interface{}{"post": operation("Simulate policy", false)},
 			"/api/policy/test-call":                      map[string]interface{}{"post": operation("Simulate one policy-protected tool call", false)},
+			"/api/admin/kill-switch":                     map[string]interface{}{"post": operation("Apply admin kill switch", true)},
 			"/api/admin/emergency-deny":                  map[string]interface{}{"post": operation("Enable emergency deny", true)},
 			"/api/admin/emergency-deny/disable":          map[string]interface{}{"post": operation("Disable emergency deny", true)},
 			"/api/admin/revoke-server-grants/{serverId}": map[string]interface{}{"post": operation("Revoke all grants for one server", true)},
@@ -600,8 +842,15 @@ func openAPIDocument() map[string]interface{} {
 	}
 }
 
-func operation(summary string, audit bool) map[string]interface{} {
-	out := map[string]interface{}{"summary": summary, "responses": map[string]interface{}{"200": map[string]interface{}{"description": summary}}}
+func operation(summary string, audit bool, statuses ...int) map[string]interface{} {
+	if len(statuses) == 0 {
+		statuses = []int{200}
+	}
+	responses := map[string]interface{}{}
+	for _, status := range statuses {
+		responses[strconv.Itoa(status)] = map[string]interface{}{"description": summary}
+	}
+	out := map[string]interface{}{"summary": summary, "responses": responses}
 	if audit {
 		out["x-audit-event-required"] = true
 	}
