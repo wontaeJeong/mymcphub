@@ -87,3 +87,25 @@ func TestCLIClientTestCallsGateway(t *testing.T) {
 		t.Fatalf("client test failed code=%d out=%s", code, out.String())
 	}
 }
+
+func TestCLIAuditExportBuildsComplianceQuery(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/audit-events/export" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("from") != "2026-06-07T00:00:00Z" || r.URL.Query().Get("to") != "2026-06-08T00:00:00Z" || r.URL.Query().Get("signed") != "true" {
+			t.Fatalf("unexpected query %s", r.URL.RawQuery)
+		}
+		if got := r.Header.Get("authorization"); got != "Bearer export-token" {
+			t.Fatalf("expected bearer token, got %q", got)
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"exportId":"exp","redacted":true,"signed":true}`))
+	}))
+	defer api.Close()
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--api-url", api.URL, "--output", "json", "audit", "export", "--from", "2026-06-07T00:00:00Z", "--to", "2026-06-08T00:00:00Z", "--signed"}, Token: "export-token", Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 || !strings.Contains(out.String(), "exportId") {
+		t.Fatalf("audit export failed code=%d out=%s", code, out.String())
+	}
+}

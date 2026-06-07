@@ -4,6 +4,7 @@ set -euo pipefail
 required=(
   schemas/jsonschema/mcp-server.schema.json
   schemas/jsonschema/policy.schema.json
+  schemas/jsonschema/policy-as-code.schema.json
   schemas/jsonschema/audit-event.schema.json
   schemas/jsonschema/grant-request.schema.json
   schemas/jsonschema/client-profile.schema.json

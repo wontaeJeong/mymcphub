@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mcp-hub/mcp-hub/internal/audit"
 	"github.com/mcp-hub/mcp-hub/internal/auth"
 	"github.com/mcp-hub/mcp-hub/internal/config"
 	"github.com/mcp-hub/mcp-hub/internal/db"
@@ -402,13 +404,14 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request, principal d
 		}
 		return
 	}
-	if r.Method == http.MethodGet && (r.URL.Path == "/api/audit-events" || r.URL.Path == "/api/audit-events/export") {
+	if r.Method == http.MethodGet && r.URL.Path == "/api/audit-events" {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-		filters := map[string]string{}
-		for _, key := range []string{"from", "to", "user", "team", "project", "server", "tool", "event_type", "policy_decision", "risk_level", "trace_id"} {
-			filters[key] = r.URL.Query().Get(key)
-		}
+		filters := auditFilters(r)
 		httpx.WriteJSON(w, 200, s.store.ListAuditEvents(limit, r.URL.Query().Get("cursor"), filters))
+		return
+	}
+	if r.Method == http.MethodGet && r.URL.Path == "/api/audit-events/export" {
+		s.handleAuditExport(w, r, principal, traceID)
 		return
 	}
 	if r.Method == http.MethodPost && r.URL.Path == "/api/audit-events/gateway" {
@@ -590,6 +593,47 @@ func analyticsFilters(r *http.Request) map[string]string {
 	return filters
 }
 
+func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	filters := auditFilters(r)
+	from := filters["from"]
+	to := filters["to"]
+	if from == "" || to == "" {
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", "Compliance export requires from and to query parameters.", traceID, nil)
+		return
+	}
+	if !validAuditTime(from) || !validAuditTime(to) {
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", "from and to must be RFC3339 date-time strings.", traceID, nil)
+		return
+	}
+	if strings.EqualFold(r.URL.Query().Get("redacted"), "false") {
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", "Raw audit export is not supported; exports are always redacted.", traceID, nil)
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	items := s.store.ExportAuditEvents(limit, filters)
+	export := audit.NewExport(items, filters, true)
+	if truthy(r.URL.Query().Get("signed")) {
+		key := strings.TrimSpace(os.Getenv("MCP_COMPLIANCE_EXPORT_SIGNING_KEY"))
+		if key == "" {
+			httpx.WriteError(w, 400, "SIGNING_KEY_REQUIRED", "Set MCP_COMPLIANCE_EXPORT_SIGNING_KEY to request a signed compliance export.", traceID, nil)
+			return
+		}
+		signed, err := audit.SignExport(export, key)
+		if err != nil {
+			httpx.WriteError(w, 500, "COMPLIANCE_EXPORT_SIGNING_FAILED", "Unable to sign compliance export.", traceID, nil)
+			return
+		}
+		export = signed
+	}
+	event := audit.NewEvent("audit.export.generated", principal, traceID, "", "", db.RiskLow, db.PolicyAllow)
+	event.MetadataJSON = map[string]interface{}{"exportId": export.ExportID, "from": export.From, "to": export.To, "count": export.Count, "redacted": export.Redacted, "signed": export.Signed}
+	s.store.AddAudit(event)
+	httpx.WriteJSON(w, 200, export)
+}
+
 func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request, traceID string) {
 	var input struct {
 		Client   string `json:"client"`
@@ -639,9 +683,9 @@ func (s *Server) handlePolicy(w http.ResponseWriter, r *http.Request, _ db.AuthC
 	if !decode(w, r, traceID, &input) {
 		return
 	}
-	result := policy.Allow("Policy document is syntactically valid for the Go control plane.", []string{})
+	result := policy.ValidateDocument(input)
 	if strings.HasSuffix(r.URL.Path, "/simulate") || strings.HasSuffix(r.URL.Path, "/test-call") {
-		result = policy.Deny("DENY_BY_DEFAULT", "Simulation requires a matching grant in the runtime store.")
+		result = policy.SimulateDocument(input)
 	}
 	httpx.WriteJSON(w, 200, result)
 }
@@ -853,6 +897,14 @@ func filtersFromRequest(r *http.Request, keys []string) map[string]string {
 	return filters
 }
 
+func auditFilters(r *http.Request) map[string]string {
+	filters := map[string]string{}
+	for _, key := range []string{"from", "to", "user", "team", "project", "server", "tool", "event_type", "policy_decision", "risk_level", "trace_id"} {
+		filters[key] = r.URL.Query().Get(key)
+	}
+	return filters
+}
+
 func containsForbiddenSecretPayload(value map[string]interface{}) bool {
 	for key := range value {
 		switch strings.ToLower(key) {
@@ -861,6 +913,18 @@ func containsForbiddenSecretPayload(value map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+func validAuditTime(value string) bool {
+	if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return true
+	}
+	_, err := time.Parse(time.RFC3339, value)
+	return err == nil
+}
+
+func truthy(value string) bool {
+	return strings.EqualFold(value, "true") || value == "1" || strings.EqualFold(value, "yes")
 }
 
 func OpenAPIDocument() map[string]interface{} { return openAPIDocument() }

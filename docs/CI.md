@@ -1,6 +1,6 @@
 # CI
 
-MCP Hub CI is secretless and uses only deterministic repository-local validation. It does not run network-dependent external scanners.
+MCP Hub CI is secretless by default and uses deterministic repository-local validation plus opt-in supply-chain scanners that skip when their external binaries are not installed locally.
 
 ## Local Commands
 
@@ -13,6 +13,8 @@ pnpm test:unit
 pnpm test:integration
 pnpm test:e2e
 pnpm build
+pnpm security:supply-chain
+pnpm security:sbom
 pnpm security:smoke
 pnpm helm:template
 pnpm run ci
@@ -29,9 +31,12 @@ The workflow in `.github/workflows/ci.yaml` has these jobs:
 - `go-core`: runs Go fmt, vet, tests, and builds.
 - `web-ui`: installs pnpm dependencies and runs Web UI lint, typecheck, tests, and build.
 - `schemas`: runs OpenAPI, JSON Schema, and MCP manifest drift checks.
+- `security-scan`: installs `govulncheck`, runs Go vulnerability checks, Web dependency audit, Python audit when Python manifests exist, and Trivy when available.
 - `helm-gitops`: renders Helm and GitOps overlays.
 - `e2e-security`: runs Go e2e and security negative tests.
-- `docker-build`: builds API, Gateway, Worker, CLI, Web, and k8s images.
+- `docker-build`: builds API, Gateway, Worker, CLI, Web, and k8s images, then runs image scan and SBOM/signing evidence scripts against the built tags.
+
+SBOM and signing checks use `SECURITY_IMAGES`. Keyless or key-based cosign signing requires repository or runner credentials; without them, the scripts report `SKIP:` locally and continue unless strict mode is enabled.
 
 Use `pnpm run ci` for the aggregate root script; pnpm `10.12.1` treats bare `pnpm ci` as the clean-install command. The aggregate script runs full-repository lint, typecheck, test, build, security smoke, and Helm template validation.
 

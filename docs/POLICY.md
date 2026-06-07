@@ -25,6 +25,28 @@ Set `OIDC_ISSUER_URL`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_SCOPE`, and either `OIDC_
 - High and critical tools require explicit approved grants.
 - Critical tools require one-time step-up token state before allow.
 
+## Policy-As-Code Validation
+
+`POST /api/policy/validate` accepts a policy document with a non-empty `rules` array. Each rule must declare `effect`, `reasonCode`, and at least one selector such as `toolNames`, `serverSlugs`, `subjectIds`, `clientIds`, `environments`, or `riskLevels`.
+
+`POST /api/policy/simulate` and `POST /api/policy/test-call` evaluate those rules against an optional `context` object. If no rule matches, simulation returns `DENY_BY_DEFAULT`. Allow rules targeting `high` or `critical` risk require `requiresApproval: true`.
+
+Example deny rule:
+
+```json
+{
+  "rules": [
+    {
+      "effect": "deny",
+      "reasonCode": "DENY_EXEC",
+      "reason": "Exec-style tools are not approved for this environment.",
+      "toolNames": ["exec", "shell"]
+    }
+  ],
+  "context": { "toolName": "exec" }
+}
+```
+
 ## Gateway Enforcement
 
 The Gateway validates bearer auth on every `/mcp/{serverSlug}` request, resolves the slug from the catalog cache, checks project-scoped connect policy, filters `tools/list`, rate-limits by principal/client/server/tool/method dimensions, and rechecks `tools/call` before upstream calls. Denies are audited. Approval-required and step-up-required denials return machine-readable JSON-RPC error data.

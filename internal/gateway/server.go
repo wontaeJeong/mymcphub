@@ -26,6 +26,7 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/policy"
 	"github.com/mcp-hub/mcp-hub/internal/ratelimit"
 	"github.com/mcp-hub/mcp-hub/internal/redaction"
+	"github.com/mcp-hub/mcp-hub/internal/security"
 	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
@@ -200,6 +201,11 @@ func (s *Server) handleMCP(ctx context.Context, request mcp.Request, principal d
 		}
 		allowed := make([]map[string]interface{}, 0, len(decision.DiscoverableToolNames))
 		for _, tool := range tools {
+			metadataScan := security.ScanToolMetadata(tool)
+			if metadataScan.QuarantineRecommended {
+				s.record(traceID, principal, "tool.metadata.quarantine_recommended", server.ID, tool.Name, tool.RiskLevel, db.PolicyDeny, "TOOL_METADATA_PROMPT_INJECTION_RISK", started, map[string]interface{}{"findings": metadataScan.Findings})
+				continue
+			}
 			if contains(decision.DiscoverableToolNames, tool.Name) {
 				allowed = append(allowed, map[string]interface{}{"name": tool.Name, "description": tool.Description, "inputSchema": tool.InputSchema})
 			}
@@ -221,6 +227,18 @@ func (s *Server) handleMCP(ctx context.Context, request mcp.Request, principal d
 		stepUp := s.stepUps.Consume(stepUpToken, principal, server.ID, toolName)
 		decision := policy.EvaluateToolCall(principal, server, tool, grants, emergency, stepUp)
 		redactedArgs := redaction.Redact(args(request))
+		if foundTool {
+			metadataScan := security.ScanToolMetadata(tool)
+			if metadataScan.QuarantineRecommended {
+				s.record(traceID, principal, "tool.call.denied", server.ID, toolName, tool.RiskLevel, db.PolicyDeny, "TOOL_METADATA_PROMPT_INJECTION_RISK", started, map[string]interface{}{"arguments": redactedArgs, "findings": metadataScan.Findings})
+				return 200, mcp.Error(request.ID, -32001, "Tool metadata contains prompt-injection language and requires quarantine review.")
+			}
+		}
+		dlp := redaction.Scan(args(request))
+		if dlp.Action == redaction.ActionBlock {
+			s.record(traceID, principal, "tool.call.denied", server.ID, toolName, riskFor(tool, server), db.PolicyDeny, "DLP_BLOCK", started, map[string]interface{}{"arguments": redactedArgs, "findings": dlp.Findings})
+			return 200, mcp.Error(request.ID, -32001, "Sensitive data policy blocked this tool call before upstream execution.")
+		}
 		if !foundTool || !decision.Allowed {
 			data := policyErrorData(decision, server, toolName)
 			auditData := policyErrorData(decision, server, toolName)
@@ -253,6 +271,14 @@ func (s *Server) handleMCP(ctx context.Context, request mcp.Request, principal d
 	if state == "open" {
 		s.recordDetailed(traceID, principal, "tool.call.failed", server.ID, toolName, riskFor(tool, server), db.PolicyDeny, "UPSTREAM_CIRCUIT_OPEN", started, redaction.Redact(args(request)), sessionID, map[string]interface{}{"circuitState": state})
 		return 503, mcp.ErrorData(request.ID, -32002, "Upstream circuit is open", map[string]interface{}{"code": "UPSTREAM_CIRCUIT_OPEN", "circuitState": state})
+	}
+	if strings.HasPrefix(request.Method, "prompts/") {
+		encodedArgs, _ := json.Marshal(args(request))
+		metadataScan := security.ScanText(request.Method, string(encodedArgs))
+		if metadataScan.QuarantineRecommended {
+			s.recordDetailed(traceID, principal, "prompt.metadata.quarantine_recommended", server.ID, toolName, riskFor(tool, server), db.PolicyDeny, "PROMPT_METADATA_INJECTION_RISK", started, map[string]interface{}{"findings": metadataScan.Findings}, sessionID, nil)
+			return 200, mcp.Error(request.ID, -32001, "Prompt metadata contains prompt-injection language and requires quarantine review.")
+		}
 	}
 	if err := validateUpstreamURL(server.UpstreamURL); err != nil {
 		s.recordDetailed(traceID, principal, "tool.call.failed", server.ID, toolName, riskFor(tool, server), db.PolicyDeny, "UPSTREAM_URL_BLOCKED", started, redaction.Redact(args(request)), sessionID, map[string]interface{}{"upstreamHost": upstreamHost(server.UpstreamURL)})

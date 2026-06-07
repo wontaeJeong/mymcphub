@@ -27,3 +27,12 @@ Run Worker schema-diff jobs and review approval-required changes. Schema diff mu
 ## Server Quarantine
 
 Run `mcphubctl server quarantine <server>` or use the Web admin surface. Verify Gateway traffic is denied before upstream calls and audit records are emitted.
+
+## Emergency Kill Switch And Quarantine
+
+1. Enable emergency deny with the API or CLI-backed admin surface. Do not patch the database or Kubernetes resources directly.
+2. Quarantine the affected server with `mcphubctl server quarantine <server-id>`.
+3. Verify Gateway calls return policy deny before upstream execution.
+4. Search audit with `mcphubctl --output json audit search --policy-decision deny --server <server-id>`.
+5. Export evidence with `mcphubctl --output json audit export --from <start> --to <end> --server <server-id> --signed` when a signing key is configured.
+6. Roll back only to a known-good image digest or Helm/GitOps revision, then disable emergency deny after Gateway and audit checks are clean.

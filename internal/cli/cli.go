@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -240,6 +241,9 @@ func auditCommand(client Client, args []string) (int, error) {
 	case "search":
 		return client.get("/api/audit-events" + query(args[1:]))
 	case "export":
+		if valueAfter(args[1:], "--from") == "" || valueAfter(args[1:], "--to") == "" {
+			return 2, errors.New("audit export requires --from and --to")
+		}
 		return client.get("/api/audit-events/export" + query(args[1:]))
 	default:
 		return 2, fmt.Errorf("unknown audit command %s", args[0])
@@ -511,18 +515,31 @@ func userHome() string {
 	return "."
 }
 func query(args []string) string {
-	params := []string{}
+	params := url.Values{}
+	keyMap := map[string]string{"from": "from", "to": "to", "user": "user", "team": "team", "project": "project", "server": "server", "tool": "tool", "event-type": "event_type", "policy-decision": "policy_decision", "risk-level": "risk_level", "trace-id": "trace_id", "limit": "limit", "cursor": "cursor", "redacted": "redacted", "signed": "signed"}
 	for i := 0; i < len(args); i++ {
-		if strings.HasPrefix(args[i], "--") && i+1 < len(args) {
-			key := strings.TrimPrefix(args[i], "--")
-			if key == "from" || key == "to" || key == "user" || key == "server" || key == "tool" {
-				params = append(params, key+"="+args[i+1])
+		if !strings.HasPrefix(args[i], "--") {
+			continue
+		}
+		key := strings.TrimPrefix(args[i], "--")
+		queryKey, ok := keyMap[key]
+		if !ok {
+			continue
+		}
+		if key == "signed" || key == "redacted" {
+			params.Set(queryKey, "true")
+			continue
+		}
+		if i+1 < len(args) {
+			if strings.HasPrefix(args[i+1], "--") {
+				continue
 			}
+			params.Set(queryKey, args[i+1])
 			i++
 		}
 	}
 	if len(params) == 0 {
 		return ""
 	}
-	return "?" + strings.Join(params, "&")
+	return "?" + params.Encode()
 }

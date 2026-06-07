@@ -20,7 +20,9 @@
     "typecheck": "pnpm --filter @mcp-hub/ui typecheck && pnpm --filter @mcp-hub/web typecheck",
     "format": "prettier --write .",
     "security:deps": "scripts/security/scan-deps.sh",
+    "security:supply-chain": "scripts/security/scan-supply-chain.sh",
     "security:images": "scripts/security/scan-images.sh",
+    "security:sbom": "scripts/security/sbom-sign-images.sh",
     "security:secrets": "scripts/security/scan-secrets.sh",
     "security:k8s": "scripts/security/scan-k8s-manifests.sh",
     "security:mcp-manifests": "go run ./scripts/security/check-mcp-manifest.go",
@@ -42,6 +44,11 @@
     "turbo": "^2.5.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0",
-    "vitest": "^3.2.3"
+    "vitest": "^4.1.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.10"
+    }
   }
 }
