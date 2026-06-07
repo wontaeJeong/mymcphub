@@ -1,6 +1,6 @@
 # Local Development
 
-This guide covers the prompt-13 local development flow for MCP Hub. It starts local-only support infrastructure with Docker Compose, then runs the existing API, Gateway, web app, worker, and HTTP first-party MCP servers from the monorepo.
+This guide covers the local development flow for MCP Hub. It starts local-only support infrastructure with Docker Compose, then runs the existing API, Gateway, web app, worker, and HTTP first-party MCP servers from the monorepo.
 
 ## Prerequisites
 
@@ -46,7 +46,7 @@ OIDC_CLIENT_SECRET=dev-secret
 MCP_AUTH_MODE=mock
 ```
 
-`MCP_AUTH_MODE=mock` is intentional for prompt-13. The API and Gateway are not changed to use real OIDC JWT validation in this local flow.
+`MCP_AUTH_MODE=mock` is intentional for local development. `@mcp-hub/auth` includes OIDC JWT verifier support, but the API and Gateway do not wire runtime JWKS verification in this skeleton.
 
 ## Local Infrastructure
 
@@ -123,7 +123,7 @@ internal-docs:  http://localhost:5101
 k8s-readonly:   http://localhost:5102
 ```
 
-`pnpm dev` starts the web app, API, Gateway, worker, echo, internal-docs, and k8s-readonly services. The prompt-13 smoke path uses the API, Gateway, and echo server; the other HTTP first-party servers are started because the Gateway registry references their default ports.
+`pnpm dev` starts the web app, API, Gateway, worker, echo, internal-docs, and k8s-readonly services. The smoke path uses the API, Gateway, and echo server; the other HTTP first-party servers are started because the Gateway registry references their default ports.
 
 The stdio sample is adapter-backed and needs a built child process plus adapter environment. Start it separately only when you need the `stdio-sample` Gateway route:
 
@@ -205,8 +205,11 @@ Compose binds support infrastructure to `127.0.0.1` only.
 
 ## Troubleshooting
 
+- API checks: `curl http://localhost:4000/healthz` and `curl http://localhost:4000/readyz`.
+- Gateway checks: `curl http://localhost:5000/metrics` and `curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'`.
 - If `pnpm dev:infra` fails on a port bind, another local Postgres, Redis, or Keycloak process is already using the port. Stop it or change the conflicting process.
 - If Keycloak takes longer to start, inspect it with `docker compose logs keycloak` and rerun the smoke test after the realm is imported.
+- If Postgres or Redis checks fail, inspect `docker compose logs postgres` or `docker compose logs redis`.
 - If `pnpm db:migrate` says `DATABASE_URL` is required, run it through the root script so the local default is applied.
 - If full smoke fails at Gateway calls, confirm `pnpm dev` is still running and the echo server is listening on `http://localhost:5100/health`.
 - If the `stdio-sample` Gateway route fails, run `pnpm dev:stdio-adapter` in another terminal; it is not part of the default `pnpm dev` stack because the adapter needs explicit child-process configuration.
@@ -215,7 +218,11 @@ Compose binds support infrastructure to `127.0.0.1` only.
 ## Caveats
 
 - Postgres, Redis, Keycloak, and the optional OTel collector are local support infrastructure only.
-- Prompt-13 does not wire API or Gateway runtime state to Postgres.
-- Prompt-13 does not add Redis queue or cache runtime behavior.
-- Prompt-13 does not implement real OIDC JWT validation for API or Gateway runtime requests.
+- The API runtime store is in memory for catalog, versions, grants, approvals, audit, tool-call events, health, and emergency deny state.
+- The Gateway registry, grants, emergency state, audit events, and metrics are in memory.
+- The current skeleton does not wire API or Gateway runtime state to Postgres.
+- The current skeleton does not add Redis queue or cache runtime behavior.
+- The current skeleton does not implement real OIDC JWT validation for API or Gateway runtime requests.
 - The local Keycloak realm exists so local OIDC URLs and discovery are available for development docs and future integration work.
+
+See [RUNBOOK.md](RUNBOOK.md) for operator incident procedures and [CLIENT_SETUP.md](CLIENT_SETUP.md) for local client setup examples.
