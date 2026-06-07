@@ -16,7 +16,7 @@ func TestSchemaDiffRequiresApprovalForInputSchemaChange(t *testing.T) {
 
 func TestRegistryRunsJobsWithoutKillingProcess(t *testing.T) {
 	registry := NewRegistry(db.NewSeedStore())
-	results := registry.RunOnce(context.Background(), []Job{{Kind: HealthCheck, TargetServerID: db.EchoServerID}, {Kind: Kind("missing"), TargetServerID: db.EchoServerID}})
+	results := registry.RunOnce(context.Background(), []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: Kind("missing"), TargetServerID: db.K8sReadonlyID}})
 	if len(results) != 2 {
 		t.Fatalf("expected two results")
 	}

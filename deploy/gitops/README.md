@@ -29,5 +29,3 @@ Kustomize Helm rendering currently expects a Helm v3-compatible binary.
 The overlays do not define plaintext secret data. Provision the referenced database, Redis, and OIDC client secret values through your cluster secret workflow before syncing.
 
 The Helm chart also includes a disabled canary placeholder under `rollout.canary`. The current overlays do not render traffic splitting resources.
-
-Prompt-07 includes `stdio-adapter.example.yaml` as a scoped example for one adapter-backed MCP server. It remains separate from the full environment overlays under `overlays/`.

@@ -18,4 +18,4 @@ Useful optional inputs:
 - `SECURITY_IMAGES=registry.example.com/mcp-hub/api@sha256:...` scans comma-separated images with installed image scanners.
 - `COSIGN_KEY` enables key-based cosign verification; `COSIGN_CERTIFICATE_IDENTITY` plus `COSIGN_CERTIFICATE_OIDC_ISSUER` enables keyless cosign verification.
 - `SECURITY_PNPM_AUDIT=1` enables `pnpm audit` from `scan-deps.sh`.
-- `pnpm security:mcp-manifests -- servers/echo/mcp-server.manifest.json` checks explicit manifest paths instead of the default `servers/*/mcp-server.manifest.json` set.
+- `pnpm security:mcp-manifests -- servers/k8s/mcp-server.manifest.json` checks explicit manifest paths instead of the default `servers/*/mcp-server.manifest.json` set.

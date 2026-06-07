@@ -21,6 +21,6 @@ run_check "dependency and filesystem scan" "${ROOT_DIR}/scripts/security/scan-de
 run_check "container image and Dockerfile scan" "${ROOT_DIR}/scripts/security/scan-images.sh"
 run_check "secret scan" "${ROOT_DIR}/scripts/security/scan-secrets.sh"
 run_check "Kubernetes manifest hardening scan" "${ROOT_DIR}/scripts/security/scan-k8s-manifests.sh"
-run_check "MCP manifest risk review" pnpm exec tsx scripts/security/check-mcp-manifest.ts
+run_check "MCP manifest risk review" go run ./scripts/security/check-mcp-manifest.go
 
 exit "${STATUS}"

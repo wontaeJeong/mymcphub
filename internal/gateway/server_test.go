@@ -50,7 +50,7 @@ func TestGatewayFiltersDiscoveryAndCallsAllowedTool(t *testing.T) {
 func TestGatewayDeniesUnauthenticatedMCP(t *testing.T) {
 	handler := NewServer(db.NewSeedStore(), config.Load(5000), nil).Handler()
 	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/mcp/echo", bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))))
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/mcp/k8s-readonly", bytes.NewReader([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))))
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", recorder.Code)
 	}

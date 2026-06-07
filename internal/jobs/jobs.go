@@ -62,7 +62,7 @@ func (r *Registry) Store() *db.Store { return r.store }
 
 func (r *Registry) RunOnce(ctx context.Context, jobs []Job) []Result {
 	if len(jobs) == 0 {
-		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.EchoServerID}, {Kind: ToolScan, TargetServerID: db.EchoServerID}, {Kind: SchemaDiff, TargetServerID: db.EchoServerID}}
+		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: ToolScan, TargetServerID: db.K8sReadonlyID}, {Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID}}
 	}
 	results := make([]Result, 0, len(jobs))
 	for _, job := range jobs {
