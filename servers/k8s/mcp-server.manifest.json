@@ -1,24 +1,21 @@
 {
   "slug": "k8s-readonly",
   "displayName": "Kubernetes Readonly MCP Server",
-  "description": "First-party medium-risk read-only Kubernetes MCP server using local mock data by default.",
+  "description": "First-party medium-risk read-only Kubernetes MCP server implemented in Go with local mock data by default.",
   "environment": "dev",
   "transport": "streamable_http",
   "upstreamUrl": "http://localhost:5102/mcp",
   "riskLevel": "medium",
   "ownerTeam": "Platform Team",
   "ownerTeamId": "00000000-0000-4000-8000-000000000010",
+  "implementationLanguage": "go",
   "tools": [
     {
       "name": "list_namespaces",
       "description": "List namespace names from the local read-only mock Kubernetes dataset.",
       "riskLevel": "medium",
       "readOnly": true,
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      }
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
     },
     {
       "name": "list_pods",
@@ -27,9 +24,7 @@
       "readOnly": true,
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "namespace": { "type": "string", "description": "Namespace to inspect." }
-        },
+        "properties": { "namespace": { "type": "string", "description": "Namespace to inspect." } },
         "required": ["namespace"],
         "additionalProperties": false
       }
