@@ -13,24 +13,28 @@ Use this index to find the smallest document set needed for the current work.
 
 ## 개발
 
-| Doc                                             | Use                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------- |
-| [Architecture](ARCHITECTURE.md)                 | Runtime planes, Go services, Web UI, schemas, and deployment shape. |
-| [Developer Guide](DEVELOPER_GUIDE.md)           | Go conventions, fixtures, and validation surfaces.                  |
-| [Control Plane API](API.md)                     | API routes and local curl checks.                                   |
-| [Gateway](GATEWAY.md)                           | Gateway auth, policy, redaction, and proxy behavior.                |
-| [Worker](WORKER.md)                             | Worker jobs and manual trigger endpoint.                            |
-| [CLI](CLI.md)                                   | `mcphubctl` command guide.                                          |
-| [Web Auth Route Split](WEB_AUTH_ROUTE_SPLIT.md) | Browser auth, user/admin route split, and provider configuration.   |
+| Doc                                                   | Use                                                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [Architecture](ARCHITECTURE.md)                       | Current runtime planes, Go services, Web UI, schemas, and deployment shape.                  |
+| [Developer Guide](DEVELOPER_GUIDE.md)                 | Go conventions, fixtures, and validation surfaces.                                          |
+| [Control Plane API](API.md)                           | Current API routes and local curl checks.                                                   |
+| [Gateway](GATEWAY.md)                                 | Gateway auth, policy, redaction, and proxy behavior.                                        |
+| [Worker](WORKER.md)                                   | Worker jobs and manual trigger endpoint.                                                    |
+| [CLI](CLI.md)                                         | `mcphubctl` command guide.                                                                  |
+| [Web Auth Route Split](WEB_AUTH_ROUTE_SPLIT.md)       | Browser auth, user/admin route split, and provider configuration.                           |
+| [Implementation Notes](IMPLEMENTATION_NOTES.md)       | Implementation context and history. Current behavior is governed by [Architecture](ARCHITECTURE.md). |
+| [API Implementation Notes](API_IMPLEMENTATION_NOTES.md) | API context and history. Current API behavior is governed by [API](API.md) and [Contracts](CONTRACTS.md). |
 
 ## 운영
 
-| Doc                                           | Use                                                                     |
-| --------------------------------------------- | ----------------------------------------------------------------------- |
-| [Operations](OPERATIONS.md)                   | Day-2 operating model.                                                  |
-| [Runbooks](RUNBOOKS.md)                       | Gateway, upstream, auth, policy, schema drift, and quarantine response. |
-| [Audit Observability](AUDIT_OBSERVABILITY.md) | Audit, metrics, and observability notes.                                |
-| [Policy](POLICY.md)                           | Authorization policy model.                                             |
+| Doc                                           | Use                                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [Operations](OPERATIONS.md)                   | Day-2 operating model.                                                                  |
+| [Runbooks](RUNBOOKS.md)                       | Open first for common incidents, quick triage, and links to detailed runbook material.  |
+| [Detailed Runbook](RUNBOOK.md)                | Detailed operational procedures referenced by the quick runbook index.                  |
+| [Emergency Runbooks](runbooks/)               | Topic-specific emergency and deep-dive runbooks, including security incident response.  |
+| [Audit Observability](AUDIT_OBSERVABILITY.md) | Audit, metrics, and observability notes.                                                |
+| [Policy](POLICY.md)                           | Authorization policy model.                                                             |
 
 ## 배포/보안
 
