@@ -16,6 +16,69 @@ export function getGeneratedApiBaseUrl() {
   return process.env.MCP_API_URL ?? process.env.NEXT_PUBLIC_MCP_API_URL ?? "http://localhost:4000";
 }
 
+export const MCP_HUB_OPENAPI_PATHS = [
+  "/api/admin/emergency-deny",
+  "/api/admin/emergency-deny/disable",
+  "/api/admin/kill-switch",
+  "/api/admin/revoke-server-grants/{serverId}",
+  "/api/approvals",
+  "/api/approvals/{approvalId}/approve",
+  "/api/approvals/{approvalId}/reject",
+  "/api/audit-events",
+  "/api/audit-events/export",
+  "/api/audit-events/export/jobs",
+  "/api/audit-events/gateway",
+  "/api/client-config/generate",
+  "/api/grants",
+  "/api/grants/{grantId}",
+  "/api/grants/{grantId}/approve",
+  "/api/grants/{grantId}/revoke",
+  "/api/me",
+  "/api/policy/simulate",
+  "/api/policy/test-call",
+  "/api/policy/validate",
+  "/api/secret-bindings",
+  "/api/secret-bindings/{secretBindingId}",
+  "/api/server-health",
+  "/api/servers",
+  "/api/servers/{serverId}",
+  "/api/servers/{serverId}/disable",
+  "/api/servers/{serverId}/enable",
+  "/api/servers/{serverId}/publish",
+  "/api/servers/{serverId}/quarantine",
+  "/api/servers/{serverId}/rollout",
+  "/api/servers/{serverId}/schema-diff",
+  "/api/servers/{serverId}/schema-diff/history",
+  "/api/servers/{serverId}/schema-snapshots",
+  "/api/servers/{serverId}/tools",
+  "/api/servers/{serverId}/tools/{toolId}",
+  "/api/servers/{serverId}/tools/{toolId}/disable",
+  "/api/servers/{serverId}/tools/{toolId}/enable",
+  "/api/servers/{serverId}/tools/{toolId}/schema",
+  "/api/servers/{serverId}/unpublish",
+  "/api/servers/{serverId}/versions",
+  "/api/servers/{serverId}/versions/{versionId}/activate",
+  "/api/servers/{serverId}/versions/{versionId}/rollback",
+  "/api/tenancy/policy-input",
+  "/api/tenancy/projects",
+  "/api/tenancy/projects/{projectId}/members",
+  "/api/tenancy/projects/{projectId}/members/{subjectType}/{subjectId}",
+  "/api/tenancy/teams",
+  "/api/tenancy/teams/{teamId}/members",
+  "/api/tenancy/teams/{teamId}/members/{userId}",
+  "/api/tenancy/users",
+  "/api/tool-call-events",
+  "/healthz",
+  "/metrics",
+  "/readyz"
+] as const;
+
+export type McpHubOpenApiPath = (typeof MCP_HUB_OPENAPI_PATHS)[number];
+
+export function isMcpHubOpenApiPath(path: string): path is McpHubOpenApiPath {
+  return (MCP_HUB_OPENAPI_PATHS as readonly string[]).includes(path);
+}
+
 export function formatGeneratedApiError(error: unknown) {
   if (error instanceof GeneratedApiClientError) {
     return error.status ? `${error.message} (${error.status})` : error.message;

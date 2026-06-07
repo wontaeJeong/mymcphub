@@ -9,6 +9,10 @@ import (
 
 func Redact(value interface{}) interface{} {
 	switch typed := value.(type) {
+	case nil:
+		return nil
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return typed
 	case map[string]interface{}:
 		out := make(map[string]interface{}, len(typed))
 		for key, item := range typed {
@@ -26,6 +30,13 @@ func Redact(value interface{}) interface{} {
 		}
 		return out
 	default:
+		encoded, err := json.Marshal(typed)
+		if err == nil {
+			var decoded interface{}
+			if json.Unmarshal(encoded, &decoded) == nil {
+				return Redact(decoded)
+			}
+		}
 		return typed
 	}
 }
@@ -37,6 +48,23 @@ func Hash(value interface{}) string {
 }
 
 func sensitive(key string) bool {
+	normalized := normalizedKey(key)
+	markers := []string{"secret", "token", "password", "passwd", "credential", "apikey", "authorization", "cookie", "kubeconfig", "privatekey", "bearer", "session", "accesskey"}
+	for _, marker := range markers {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedKey(key string) string {
 	lower := strings.ToLower(key)
-	return strings.Contains(lower, "secret") || strings.Contains(lower, "token") || strings.Contains(lower, "password") || strings.Contains(lower, "credential")
+	var out strings.Builder
+	for _, char := range lower {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			out.WriteRune(char)
+		}
+	}
+	return out.String()
 }

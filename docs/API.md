@@ -17,13 +17,16 @@ curl -X POST http://localhost:4000/api/client-config/generate \
 
 ## Route Groups
 
-- Catalog: `/api/servers`, `/api/servers/{serverId}`, publish, unpublish, enable, disable, quarantine.
-- Versions: `/api/servers/{serverId}/versions`, activate, rollback, schema diff.
+- Catalog: `/api/servers`, `/api/servers/{serverId}`, delete, publish, unpublish, enable, disable, quarantine, with pagination and filters on environment, risk, owner team, transport, enabled, published, and text query.
+- Versions and rollout: `/api/servers/{serverId}/versions`, activate, rollback, and `/api/servers/{serverId}/rollout` for active version, pending versions, rollback targets, image digest, and GitOps metadata.
 - Tools: list, patch, enable, disable, schema lookup.
 - Grants and approvals: list, request/create, approve, revoke/reject.
+- Schema history: `/api/servers/{serverId}/schema-diff`, `/api/servers/{serverId}/schema-diff/history`, and `/api/servers/{serverId}/schema-snapshots`.
+- Secret bindings: `/api/secret-bindings` stores provider refs and lease metadata only; plaintext secret values are rejected.
+- Tenancy: `/api/tenancy/users`, `/api/tenancy/teams`, `/api/tenancy/projects`, membership routes, and `/api/tenancy/policy-input`.
 - Policy: validate, simulate, test-call.
-- Audit: search and export.
-- Admin: emergency deny and revoke server grants.
+- Audit: search, redacted export payloads, and audit export job triggers.
+- Admin: emergency deny, kill switch, and revoke server grants.
 - Health/readiness/metrics/OpenAPI.
 
 Mutations require a platform-admin auth context and write audit events.

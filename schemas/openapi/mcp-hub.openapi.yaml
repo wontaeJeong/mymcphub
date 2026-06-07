@@ -4,50 +4,32 @@ info:
   version: 0.1.0
 paths:
   /healthz:
-    get:
-      summary: Health check
-      responses:
-        "200": { description: Healthy }
+    get: { summary: Health check, responses: { "200": { description: Healthy } } }
   /readyz:
-    get:
-      summary: Readiness check
-      responses:
-        "200": { description: Ready }
+    get: { summary: Readiness check, responses: { "200": { description: Ready } } }
   /metrics:
-    get:
-      summary: Prometheus metrics
-      responses:
-        "200": { description: Metrics }
+    get: { summary: Prometheus metrics, responses: { "200": { description: Metrics } } }
   /api/me:
-    get:
-      summary: Current auth context
-      responses:
-        "200": { description: Auth context }
+    get: { summary: Current auth context, responses: { "200": { description: Auth context } } }
   /api/servers:
     get:
       summary: List MCP servers
-      responses:
-        "200": { description: Server list }
-    post:
-      summary: Register MCP server
-      x-audit-event-required: true
-      responses:
-        "201": { description: Created server }
-        "403": { description: Platform admin required }
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: environment, in: query, schema: { enum: [dev, stg, prod, shared] } }
+        - { name: risk_level, in: query, schema: { enum: [low, medium, high, critical] } }
+        - { name: owner_team_id, in: query, schema: { type: string } }
+        - { name: transport, in: query, schema: { enum: [streamable_http, sse_legacy, stdio_adapter, external] } }
+        - { name: enabled, in: query, schema: { type: boolean } }
+        - { name: published, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string } }
+      responses: { "200": { description: Paginated server list } }
+    post: { summary: Register MCP server, x-audit-event-required: true, responses: { "201": { description: Created server }, "403": { description: Platform admin required } } }
   /api/servers/{serverId}:
-    get:
-      summary: Get MCP server
-      parameters:
-        - $ref: "#/components/parameters/serverId"
-      responses:
-        "200": { description: Server }
-    patch:
-      summary: Patch MCP server
-      x-audit-event-required: true
-      parameters:
-        - $ref: "#/components/parameters/serverId"
-      responses:
-        "200": { description: Updated server }
+    get: { summary: Get MCP server, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Server } } }
+    patch: { summary: Patch MCP server, x-audit-event-required: true, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Updated server } } }
+    delete: { summary: Delete MCP server, x-audit-event-required: true, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Deleted server } } }
   /api/servers/{serverId}/publish:
     post: { summary: Publish server, x-audit-event-required: true, responses: { "200": { description: Published server } } }
   /api/servers/{serverId}/unpublish:
@@ -58,6 +40,8 @@ paths:
     post: { summary: Enable server, x-audit-event-required: true, responses: { "200": { description: Enabled server } } }
   /api/servers/{serverId}/quarantine:
     post: { summary: Quarantine server, x-audit-event-required: true, responses: { "200": { description: Quarantined server } } }
+  /api/servers/{serverId}/rollout:
+    get: { summary: Get server rollout status, responses: { "200": { description: Rollout status with active version, pending versions, rollback targets, and GitOps metadata } } }
   /api/servers/{serverId}/versions:
     get: { summary: List server versions, responses: { "200": { description: Server versions } } }
     post: { summary: Create server version, x-audit-event-required: true, responses: { "201": { description: Created version } } }
@@ -66,7 +50,12 @@ paths:
   /api/servers/{serverId}/versions/{versionId}/rollback:
     post: { summary: Roll back server version, x-audit-event-required: true, responses: { "200": { description: Rolled back version } } }
   /api/servers/{serverId}/schema-diff:
-    get: { summary: Get server schema diff, responses: { "200": { description: Schema diff } } }
+    get: { summary: Get latest server schema diff, responses: { "200": { description: Schema diff with added, removed, changed, risk, and approval state } } }
+  /api/servers/{serverId}/schema-diff/history:
+    get: { summary: List server schema diff history, responses: { "200": { description: Schema diff history } } }
+  /api/servers/{serverId}/schema-snapshots:
+    get: { summary: List server schema snapshots, responses: { "200": { description: Schema snapshot history } } }
+    post: { summary: Record current server schema snapshot, x-audit-event-required: true, responses: { "201": { description: Recorded schema snapshot } } }
   /api/servers/{serverId}/tools:
     get: { summary: List server tools, responses: { "200": { description: Tool list } } }
   /api/servers/{serverId}/tools/{toolId}:
@@ -99,16 +88,49 @@ paths:
       parameters:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
         - { name: cursor, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
         - { name: user, in: query, schema: { type: string } }
+        - { name: team, in: query, schema: { type: string } }
+        - { name: project, in: query, schema: { type: string } }
         - { name: server, in: query, schema: { type: string } }
         - { name: tool, in: query, schema: { type: string } }
+        - { name: event_type, in: query, schema: { type: string } }
         - { name: policy_decision, in: query, schema: { enum: [allow, deny, needs_approval] } }
-      responses:
-        "200": { description: Paginated audit events }
+        - { name: risk_level, in: query, schema: { enum: [low, medium, high, critical] } }
+        - { name: trace_id, in: query, schema: { type: string } }
+      responses: { "200": { description: Paginated audit events with redacted payload only } }
   /api/audit-events/export:
-    get: { summary: Export audit events, responses: { "200": { description: Audit export } } }
+    get: { summary: Export audit events, responses: { "200": { description: Audit export payload } } }
+    post: { summary: Trigger audit export job, x-audit-event-required: true, responses: { "202": { description: Audit export job queued } } }
+  /api/audit-events/export/jobs:
+    get: { summary: List audit export jobs, x-audit-event-required: true, responses: { "200": { description: Audit export job list } } }
   /api/audit-events/gateway:
     post: { summary: Record gateway audit event, x-audit-event-required: true, responses: { "201": { description: Gateway audit event recorded } } }
+  /api/secret-bindings:
+    get: { summary: List secret binding metadata, x-audit-event-required: true, responses: { "200": { description: Secret binding list without plaintext values } } }
+    post: { summary: Create secret binding metadata, x-audit-event-required: true, responses: { "201": { description: Secret binding created } } }
+  /api/secret-bindings/{secretBindingId}:
+    delete: { summary: Delete secret binding metadata, x-audit-event-required: true, responses: { "200": { description: Secret binding deleted } } }
+  /api/tenancy/users:
+    get: { summary: List tenancy users, x-audit-event-required: true, responses: { "200": { description: User list } } }
+    post: { summary: Create tenancy user, x-audit-event-required: true, responses: { "201": { description: User created } } }
+  /api/tenancy/teams:
+    get: { summary: List tenancy teams, x-audit-event-required: true, responses: { "200": { description: Team list } } }
+    post: { summary: Create tenancy team, x-audit-event-required: true, responses: { "201": { description: Team created } } }
+  /api/tenancy/teams/{teamId}/members:
+    post: { summary: Add team member, x-audit-event-required: true, responses: { "201": { description: Team member upserted } } }
+  /api/tenancy/teams/{teamId}/members/{userId}:
+    delete: { summary: Remove team member, x-audit-event-required: true, responses: { "200": { description: Team member removed } } }
+  /api/tenancy/projects:
+    get: { summary: List tenancy projects, x-audit-event-required: true, responses: { "200": { description: Project list } } }
+    post: { summary: Create tenancy project, x-audit-event-required: true, responses: { "201": { description: Project created } } }
+  /api/tenancy/projects/{projectId}/members:
+    post: { summary: Add project member, x-audit-event-required: true, responses: { "201": { description: Project member upserted } } }
+  /api/tenancy/projects/{projectId}/members/{subjectType}/{subjectId}:
+    delete: { summary: Remove project member, x-audit-event-required: true, responses: { "200": { description: Project member removed } } }
+  /api/tenancy/policy-input:
+    get: { summary: Get tenancy-derived policy input, x-audit-event-required: true, responses: { "200": { description: Policy input } } }
   /api/tool-call-events:
     get: { summary: List tool call events, responses: { "200": { description: Tool call event list } } }
   /api/server-health:
@@ -121,6 +143,8 @@ paths:
     post: { summary: Simulate policy, responses: { "200": { description: Policy decision } } }
   /api/policy/test-call:
     post: { summary: Simulate one policy-protected tool call, responses: { "200": { description: Policy decision } } }
+  /api/admin/kill-switch:
+    post: { summary: Apply admin kill switch, x-audit-event-required: true, responses: { "200": { description: Kill switch result } } }
   /api/admin/emergency-deny:
     post: { summary: Enable emergency deny, x-audit-event-required: true, responses: { "200": { description: Emergency deny enabled } } }
   /api/admin/emergency-deny/disable:
@@ -129,11 +153,7 @@ paths:
     post: { summary: Revoke all grants for one server, x-audit-event-required: true, responses: { "200": { description: Grants revoked } } }
 components:
   parameters:
-    serverId:
-      name: serverId
-      in: path
-      required: true
-      schema: { type: string }
+    serverId: { name: serverId, in: path, required: true, schema: { type: string } }
   schemas:
     ErrorResponse:
       type: object
