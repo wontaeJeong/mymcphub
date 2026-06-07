@@ -91,9 +91,25 @@ Emergency deny state can be passed into shared policy evaluation or enabled thro
 
 The API stores emergency deny state in memory with `enabled`, `reason`, scope fields, and `createdAt`. This emergency state is not persisted to the database in the current skeleton.
 
+Operators can use `/admin` in the Web UI or the API routes listed in [SECURITY.md](SECURITY.md) for emergency actions. Common scopes are server slug, subject id, client id, tool name, high or critical risk, and global deny.
+
 ## Current Skeleton Limits
 
 - API data is in memory for servers, tools, grants, approvals, audit events, tool-call events, health, and emergency deny state.
 - Gateway registry, grants, emergency state, audit events, and metrics are in memory.
 - OIDC JWT verification exists in `@mcp-hub/auth`, but runtime JWKS configuration is not wired into API or Gateway request handling.
+- Shared deployments must use a trusted auth proxy or ingress that verifies identity, strips client-supplied identity headers, and injects trusted headers.
 - Emergency deny state is not persisted to the database in this skeleton.
+
+## Operator Checks
+
+Use these surfaces when investigating policy behavior:
+
+| Surface | Use |
+| --- | --- |
+| `/access` | Review grants and approvals. |
+| `/audit` | Review allow, deny, and needs-approval decisions. |
+| `/admin` | Disable servers or tools, revoke server grants, and manage emergency deny. |
+| `GET /api/grants` | Inspect in-memory grants. |
+| `GET /api/audit-events?policy_decision=deny&limit=25` | Inspect recent deny decisions. |
+| `curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'` | Check local Gateway auth and connect policy. |
