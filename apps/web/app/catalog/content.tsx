@@ -23,10 +23,10 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="MCP server catalog" title="Find the servers worth trusting." description={mode === "admin" ? "Browse, filter, and register MCP servers from live Control Plane catalog and health endpoints." : "Browse and filter MCP servers from the live Control Plane catalog without admin-only controls."} />
+      <PageHero eyebrow="Servers" title="Find the servers worth trusting." description={mode === "admin" ? "Browse, filter, and register MCP servers with health and ownership context." : "Browse trusted MCP servers and inspect what they expose before requesting access."} />
       <form className="form-card" action={mode === "admin" ? "/admin/servers" : "/user/catalog"}>
-        <h2>Search and filter catalog</h2>
-        <p>Filters apply to real /api/servers data, with health joined from /api/server-health when available.</p>
+        <h2>Search and filter servers</h2>
+        <p>Filter by name, environment, transport, risk, health, and enabled state so the next action is obvious.</p>
         <div className="filter-grid">
           <div className="field">
             <label htmlFor="catalogSearch">Search</label>
@@ -88,8 +88,8 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
       </form>
       {!health.ok ? <ErrorState title="Health unavailable" message={health.error} /> : null}
       <section>
-        <SectionHeader title="Catalog" description="Server listing includes slug, display name, owner team, environment, transport, risk, health, and enabled state." />
-        {servers.ok && filteredServers.length > 0 ? <ServerTable servers={filteredServers} healthByServerId={healthByServerId} serverBasePath={mode === "admin" ? "/admin/servers" : "/user/servers"} /> : servers.ok && serverItems.length > 0 ? <EmptyState title="No matching servers" description="The Control Plane returned servers, but none match the selected filters." /> : servers.ok ? <EmptyState title="No servers registered" description="The Control Plane returned an empty catalog. No seed data is injected by the UI." /> : <ErrorState message={servers.error} />}
+        <SectionHeader title="Servers" description="Primary status, risk, health, and owner context are easiest to scan; lower-level identifiers stay in muted metadata." />
+        {servers.ok && filteredServers.length > 0 ? <ServerTable servers={filteredServers} healthByServerId={healthByServerId} serverBasePath={mode === "admin" ? "/admin/servers" : "/user/servers"} /> : servers.ok && serverItems.length > 0 ? <EmptyState title="No matching servers" description="No registered server matches the selected filters." /> : servers.ok ? <EmptyState title="No data yet" description="Register the first server to start reviewing tools, grants, operations, and client setup." /> : <ErrorState message={servers.error} />}
       </section>
       {mode === "admin" ? <ServerRegistrationForm /> : null}
     </div>
