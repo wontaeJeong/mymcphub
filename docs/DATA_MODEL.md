@@ -6,9 +6,12 @@ Preserved SQL migration artifacts live in `internal/db/migrations`. Durable Post
 
 ## Current Store Areas
 
-- Servers, versions, tools, grants, approvals, audit events, tool-call events, health checks, and emergency deny.
+- Tenancy users, teams, team memberships, projects, and project memberships.
+- Servers, versions, rollout metadata, tools, grants, approvals, audit events, audit export jobs, tool-call events, health checks, and emergency deny.
+- Secret binding metadata with provider refs and lease metadata only; plaintext secret values are not stored.
+- Tool schema snapshots and schema diff history with approval state.
 - Gateway catalog snapshots and grants consumed from the same Go store.
-- Worker job results written as health rows and audit events.
+- Worker job results written as health rows, audit events, schema snapshots, and schema diffs.
 
 ## Neutral Schemas
 

@@ -24,3 +24,19 @@ func TestRegistryRunsJobsWithoutKillingProcess(t *testing.T) {
 		t.Fatalf("unexpected results: %#v", results)
 	}
 }
+
+func TestRegistryPersistsSchemaDiffToStore(t *testing.T) {
+	store := db.NewSeedStore()
+	registry := NewRegistry(store)
+	results := registry.RunOnce(context.Background(), []Job{{Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID, PreviousSnapshot: []ToolSnapshot{{Name: "probe", Description: "old", InputSchema: map[string]interface{}{"type": "object"}, Risk: db.RiskLow}}, CurrentSnapshot: []ToolSnapshot{{Name: "probe", Description: "old", InputSchema: map[string]interface{}{"type": "object", "required": []interface{}{"namespace"}}, Risk: db.RiskHigh}}}})
+	if len(results) != 1 || results[0].Status != "success" {
+		t.Fatalf("unexpected schema diff result: %#v", results)
+	}
+	diff, err := store.SchemaDiff(db.K8sReadonlyID)
+	if err != nil {
+		t.Fatalf("schema diff: %v", err)
+	}
+	if diff.Status != "changes_detected" || !diff.ApprovalRequired || len(diff.Changes) == 0 {
+		t.Fatalf("expected recorded approval-required diff, got %#v", diff)
+	}
+}

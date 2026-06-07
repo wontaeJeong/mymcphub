@@ -34,3 +34,5 @@ The workflow in `.github/workflows/ci.yaml` has these jobs:
 - `docker-build`: builds API, Gateway, Worker, CLI, Web, and k8s images.
 
 Use `pnpm run ci` for the aggregate root script; pnpm `10.12.1` treats bare `pnpm ci` as the clean-install command. The aggregate script runs full-repository lint, typecheck, test, build, security smoke, and Helm template validation.
+
+The OpenAPI check compares `schemas/openapi/mcp-hub.openapi.yaml`, runtime `/openapi.json` from `internal/controlplane`, generated `schemas/openapi/control-plane.openapi.json`, and the generated Web path list in `apps/web/lib/generated/mcp-hub-client.ts`.

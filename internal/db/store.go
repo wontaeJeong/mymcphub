@@ -32,38 +32,71 @@ var (
 )
 
 type Store struct {
-	mu             sync.RWMutex
-	persistPath    string
-	servers        []MCPServer
-	tools          []MCPTool
-	versions       []MCPServerVersion
-	grants         []Grant
-	approvals      []Approval
-	oauthClients   []OAuthClient
-	auditEvents    []AuditEvent
-	toolCallEvents []ToolCallEvent
-	rateLimits     []RateLimitBucket
-	health         []ServerHealth
-	emergencyDeny  *EmergencyDeny
+	mu              sync.RWMutex
+	persistPath     string
+	users           []User
+	teams           []Team
+	teamMembers     []TeamMembership
+	projects        []Project
+	projectMembers  []ProjectMembership
+	servers         []MCPServer
+	tools           []MCPTool
+	versions        []MCPServerVersion
+	grants          []Grant
+	approvals       []Approval
+	oauthClients    []OAuthClient
+	auditEvents     []AuditEvent
+	auditExports    []AuditExportJob
+	toolCallEvents  []ToolCallEvent
+	rateLimits      []RateLimitBucket
+	health          []ServerHealth
+	emergencyDeny   *EmergencyDeny
+	secretBindings  []SecretBinding
+	schemaSnapshots []ToolSchemaSnapshot
+	schemaDiffs     []SchemaDiff
 }
 
 type snapshot struct {
-	Servers        []MCPServer        `json:"servers"`
-	Tools          []MCPTool          `json:"tools"`
-	Versions       []MCPServerVersion `json:"versions"`
-	Grants         []Grant            `json:"grants"`
-	Approvals      []Approval         `json:"approvals"`
-	OAuthClients   []OAuthClient      `json:"oauthClients"`
-	AuditEvents    []AuditEvent       `json:"auditEvents"`
-	ToolCallEvents []ToolCallEvent    `json:"toolCallEvents"`
-	RateLimits     []RateLimitBucket  `json:"rateLimits"`
-	Health         []ServerHealth     `json:"health"`
-	EmergencyDeny  *EmergencyDeny     `json:"emergencyDeny,omitempty"`
+	Users           []User               `json:"users"`
+	Teams           []Team               `json:"teams"`
+	TeamMembers     []TeamMembership     `json:"teamMembers"`
+	Projects        []Project            `json:"projects"`
+	ProjectMembers  []ProjectMembership  `json:"projectMembers"`
+	Servers         []MCPServer          `json:"servers"`
+	Tools           []MCPTool            `json:"tools"`
+	Versions        []MCPServerVersion   `json:"versions"`
+	Grants          []Grant              `json:"grants"`
+	Approvals       []Approval           `json:"approvals"`
+	OAuthClients    []OAuthClient        `json:"oauthClients"`
+	AuditEvents     []AuditEvent         `json:"auditEvents"`
+	AuditExports    []AuditExportJob     `json:"auditExports"`
+	ToolCallEvents  []ToolCallEvent      `json:"toolCallEvents"`
+	RateLimits      []RateLimitBucket    `json:"rateLimits"`
+	Health          []ServerHealth       `json:"health"`
+	EmergencyDeny   *EmergencyDeny       `json:"emergencyDeny,omitempty"`
+	SecretBindings  []SecretBinding      `json:"secretBindings"`
+	SchemaSnapshots []ToolSchemaSnapshot `json:"schemaSnapshots"`
+	SchemaDiffs     []SchemaDiff         `json:"schemaDiffs"`
 }
 
 func NewSeedStore() *Store {
 	now := Now()
 	store := &Store{
+		users: []User{
+			{ID: AdminUserID, Email: "admin@example.com", DisplayName: "Admin User", Admin: true, CreatedAt: now},
+		},
+		teams: []Team{
+			{ID: PlatformTeamID, Slug: "platform", DisplayName: "Platform Team", CreatedAt: now},
+		},
+		teamMembers: []TeamMembership{
+			{TeamID: PlatformTeamID, UserID: AdminUserID, Role: "admin", CreatedAt: now},
+		},
+		projects: []Project{
+			{ID: SampleProjectID, Slug: "sample", DisplayName: "Sample Project", OwnerTeamID: PlatformTeamID, Environment: EnvironmentDev, CreatedAt: now},
+		},
+		projectMembers: []ProjectMembership{
+			{ProjectID: SampleProjectID, SubjectType: SubjectTeam, SubjectID: PlatformTeamID, Role: "admin", CreatedAt: now},
+		},
 		servers: []MCPServer{
 			seedServer(K8sReadonlyID, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", TransportStreamableHTTP, RiskMedium, "http://localhost:5102/mcp", now),
 		},
@@ -87,6 +120,7 @@ func NewSeedStore() *Store {
 		toolCallEvents: []ToolCallEvent{{ID: NewID(), AuditEventID: "seed-audit-event", ServerID: K8sReadonlyID, ToolName: "list_namespaces", Status: "ok", LatencyMS: 12, CreatedAt: now}},
 		health:         []ServerHealth{{ID: NewID(), ServerID: K8sReadonlyID, Status: "healthy", LatencyMS: 10, CheckedAt: now}},
 	}
+	store.recordSchemaSnapshotLocked(K8sReadonlyID, "seed")
 	return store
 }
 
@@ -111,6 +145,8 @@ func (s *Store) UsePersistence(path string) {
 	defer s.mu.Unlock()
 	s.persistPath = path
 	if err := s.loadLocked(); errors.Is(err, os.ErrNotExist) {
+		_ = s.saveLocked()
+	} else if err == nil {
 		_ = s.saveLocked()
 	}
 }
@@ -146,6 +182,11 @@ func (s *Store) loadSnapshotLocked() error {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return err
 	}
+	s.users = cloneSlice(state.Users)
+	s.teams = cloneSlice(state.Teams)
+	s.teamMembers = cloneSlice(state.TeamMembers)
+	s.projects = cloneSlice(state.Projects)
+	s.projectMembers = cloneSlice(state.ProjectMembers)
 	s.servers = cloneSlice(state.Servers)
 	s.tools = cloneSlice(state.Tools)
 	s.versions = cloneSlice(state.Versions)
@@ -157,10 +198,15 @@ func (s *Store) loadSnapshotLocked() error {
 		s.oauthClients = []OAuthClient{seedOAuthClient("mcp-client", "Local MCP Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}), seedOAuthClient("local-dev-client", "Local Development Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}), seedOAuthClient("oidc-client", "OIDC Gateway Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"})}
 	}
 	s.auditEvents = cloneSlice(state.AuditEvents)
+	s.auditExports = cloneSlice(state.AuditExports)
 	s.toolCallEvents = cloneSlice(state.ToolCallEvents)
 	s.rateLimits = cloneSlice(state.RateLimits)
 	s.health = cloneSlice(state.Health)
 	s.emergencyDeny = state.EmergencyDeny
+	s.secretBindings = cloneSlice(state.SecretBindings)
+	s.schemaSnapshots = cloneSlice(state.SchemaSnapshots)
+	s.schemaDiffs = cloneSlice(state.SchemaDiffs)
+	s.backfillSeedDataLocked()
 	return nil
 }
 
@@ -186,7 +232,7 @@ func (s *Store) saveLocked() error {
 }
 
 func snapshotFromStoreLocked(s *Store) snapshot {
-	return snapshot{Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, OAuthClients: s.oauthClients, AuditEvents: s.auditEvents, ToolCallEvents: s.toolCallEvents, RateLimits: s.rateLimits, Health: s.health, EmergencyDeny: s.emergencyDeny}
+	return snapshot{Users: s.users, Teams: s.teams, TeamMembers: s.teamMembers, Projects: s.projects, ProjectMembers: s.projectMembers, Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, OAuthClients: s.oauthClients, AuditEvents: s.auditEvents, AuditExports: s.auditExports, ToolCallEvents: s.toolCallEvents, RateLimits: s.rateLimits, Health: s.health, EmergencyDeny: s.emergencyDeny, SecretBindings: s.secretBindings, SchemaSnapshots: s.schemaSnapshots, SchemaDiffs: s.schemaDiffs}
 }
 
 func (s *Store) saveSnapshotLocked(state snapshot) error {
@@ -234,6 +280,9 @@ func (s *Store) CreateServer(input MCPServer, tools []MCPTool, auth AuthContext,
 	if strings.TrimSpace(input.Slug) == "" || strings.TrimSpace(input.DisplayName) == "" || strings.TrimSpace(input.OwnerTeamID) == "" {
 		return MCPServer{}, fmt.Errorf("%w: slug, displayName, and ownerTeamId are required", ErrValidation)
 	}
+	if len(tools) == 0 {
+		return MCPServer{}, fmt.Errorf("%w: at least one tool is required", ErrValidation)
+	}
 	now := Now()
 	input.ID = NewID()
 	input.CreatedAt = now
@@ -247,12 +296,31 @@ func (s *Store) CreateServer(input MCPServer, tools []MCPTool, auth AuthContext,
 	if input.RiskLevel == "" {
 		input.RiskLevel = RiskLow
 	}
+	if !validEnvironment(input.Environment) || !validTransport(input.Transport) || !validRisk(input.RiskLevel) {
+		return MCPServer{}, fmt.Errorf("%w: environment, transport, or riskLevel is invalid", ErrValidation)
+	}
 	input.Published = input.Enabled
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.teamIndexLocked(input.OwnerTeamID) < 0 {
+		return MCPServer{}, ErrNotFound
+	}
 	for _, server := range s.servers {
 		if server.Slug == input.Slug {
 			return MCPServer{}, fmt.Errorf("%w: server slug already exists", ErrValidation)
+		}
+	}
+	seenTools := map[string]bool{}
+	for _, tool := range tools {
+		if strings.TrimSpace(tool.Name) == "" {
+			return MCPServer{}, fmt.Errorf("%w: tool name is required", ErrValidation)
+		}
+		if seenTools[tool.Name] {
+			return MCPServer{}, fmt.Errorf("%w: duplicate tool name", ErrValidation)
+		}
+		seenTools[tool.Name] = true
+		if tool.RiskLevel != "" && !validRisk(tool.RiskLevel) {
+			return MCPServer{}, fmt.Errorf("%w: tool riskLevel is invalid", ErrValidation)
 		}
 	}
 	s.servers = append(s.servers, input)
@@ -266,6 +334,7 @@ func (s *Store) CreateServer(input MCPServer, tools []MCPTool, auth AuthContext,
 		}
 		s.tools = append(s.tools, tool)
 	}
+	s.recordSchemaSnapshotLocked(input.ID, "catalog.create")
 	s.recordAuditLocked(auth, traceID, "mcp_server.created", input.ID, "", PolicyAllow, input.RiskLevel, argument)
 	return input, nil
 }
@@ -364,9 +433,18 @@ func (s *Store) PatchTool(serverID, toolID string, patch map[string]interface{},
 		s.tools[idx].Enabled = v
 	}
 	if v, ok := patch["riskLevel"].(string); ok {
+		if !validRisk(RiskLevel(v)) {
+			return MCPTool{}, fmt.Errorf("%w: riskLevel is invalid", ErrValidation)
+		}
 		s.tools[idx].RiskLevel = RiskLevel(v)
 	}
+	if schema, ok := objectMap(patch["inputSchema"]); ok {
+		s.tools[idx].InputSchema = schema
+	}
 	s.tools[idx].LastSeenAt = Now()
+	if _, ok := patch["inputSchema"]; ok {
+		s.recordSchemaSnapshotLocked(serverID, "tool.patch")
+	}
 	s.recordAuditLocked(auth, traceID, "mcp_tool.updated", serverID, s.tools[idx].Name, PolicyAllow, s.tools[idx].RiskLevel, patch)
 	return s.tools[idx], nil
 }
@@ -420,11 +498,21 @@ func (s *Store) CreateVersion(serverID string, input MCPServerVersion, auth Auth
 	input.ServerID = serverID
 	input.CreatedAt = now
 	input.UpdatedAt = now
+	if input.CreatedBy == "" {
+		input.CreatedBy = auth.UserID
+	}
 	if input.Status == "" {
 		input.Status = "draft"
 	}
+	if input.RolloutStatus == "" {
+		input.RolloutStatus = "pending"
+	}
+	if input.ToolSchemaHash == "" {
+		input.ToolSchemaHash = schemaHashFromToolsLocked(s.toolsForServerLocked(serverID))
+	}
 	if input.Status == "active" {
 		input.ActivatedAt = now
+		input.RolloutStatus = "healthy"
 		s.deactivateVersionsLocked(serverID, "deprecated", input.ID)
 	}
 	s.versions = append(s.versions, input)
@@ -448,6 +536,7 @@ func (s *Store) ActivateVersion(serverID, versionID string, rollback bool, auth 
 	s.deactivateVersionsLocked(serverID, status, versionID)
 	now := Now()
 	s.versions[idx].Status = "active"
+	s.versions[idx].RolloutStatus = "healthy"
 	s.versions[idx].UpdatedAt = now
 	s.versions[idx].ActivatedAt = now
 	if rollback {
@@ -463,7 +552,7 @@ func (s *Store) SchemaDiff(serverID string) (SchemaDiff, error) {
 	if _, err := s.getServerLocked(serverID); err != nil {
 		return SchemaDiff{}, err
 	}
-	return SchemaDiff{ServerID: serverID, Status: "placeholder", GeneratedAt: Now(), Changes: []map[string]interface{}{}}, nil
+	return s.latestSchemaDiffLocked(serverID), nil
 }
 
 func (s *Store) ListGrants() ListResponse[Grant] {
@@ -500,10 +589,18 @@ func (s *Store) CreateGrant(input Grant, auth AuthContext, traceID string, argum
 	if input.SubjectID == "" || input.ProjectID == "" || input.ServerID == "" || len(input.AllowedTools) == 0 || input.Reason == "" {
 		return Grant{}, fmt.Errorf("%w: subjectId, projectId, serverId, allowedTools, and reason are required", ErrValidation)
 	}
+	if input.ExpiresAt != "" {
+		if _, err := time.Parse(time.RFC3339, input.ExpiresAt); err != nil {
+			return Grant{}, fmt.Errorf("%w: expiresAt must be RFC3339", ErrValidation)
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, err := s.getServerLocked(input.ServerID); err != nil {
 		return Grant{}, err
+	}
+	if s.projectIndexLocked(input.ProjectID) < 0 {
+		return Grant{}, ErrNotFound
 	}
 	input.ID = NewID()
 	input.CreatedAt = Now()
@@ -564,6 +661,11 @@ func (s *Store) CreateApproval(input Approval, auth AuthContext, traceID string,
 	if input.ServerID == "" || input.ProjectID == "" || input.Reason == "" || len(input.RequestedTools) == 0 {
 		return Approval{}, fmt.Errorf("%w: serverId, projectId, requestedTools, and reason are required", ErrValidation)
 	}
+	if input.RequestedExpiresAt != "" {
+		if _, err := time.Parse(time.RFC3339, input.RequestedExpiresAt); err != nil {
+			return Approval{}, fmt.Errorf("%w: requestedExpiresAt must be RFC3339", ErrValidation)
+		}
+	}
 	now := Now()
 	input.ID = NewID()
 	input.RequesterID = auth.UserID
@@ -588,6 +690,9 @@ func (s *Store) CreateApproval(input Approval, auth AuthContext, traceID string,
 	defer s.mu.Unlock()
 	if _, err := s.getServerLocked(input.ServerID); err != nil {
 		return Approval{}, err
+	}
+	if s.projectIndexLocked(input.ProjectID) < 0 {
+		return Approval{}, ErrNotFound
 	}
 	s.approvals = append(s.approvals, input)
 	s.recordAuditLocked(auth, traceID, "approval.created", input.ServerID, input.ToolName, PolicyNeedsApproval, RiskLow, argument)
@@ -618,7 +723,16 @@ func (s *Store) DecideApproval(id string, decision string, patch map[string]inte
 		if arr, ok := stringSlice(patch["allowedTools"]); ok && len(arr) > 0 {
 			allowed = arr
 		}
-		s.grants = append(s.grants, Grant{ID: NewID(), SubjectType: s.approvals[idx].SubjectType, SubjectID: s.approvals[idx].SubjectID, ProjectID: s.approvals[idx].ProjectID, ServerID: s.approvals[idx].ServerID, AllowedTools: allowed, Environment: s.approvals[idx].Environment, ApprovedBy: auth.UserID, Reason: s.approvals[idx].Reason, Enabled: true, CreatedAt: now})
+		expiresAt := s.approvals[idx].RequestedExpiresAt
+		if v, ok := patch["expiresAt"].(string); ok {
+			if v != "" {
+				if _, err := time.Parse(time.RFC3339, v); err != nil {
+					return Approval{}, fmt.Errorf("%w: expiresAt must be RFC3339", ErrValidation)
+				}
+			}
+			expiresAt = v
+		}
+		s.grants = append(s.grants, Grant{ID: NewID(), SubjectType: s.approvals[idx].SubjectType, SubjectID: s.approvals[idx].SubjectID, ProjectID: s.approvals[idx].ProjectID, ServerID: s.approvals[idx].ServerID, AllowedTools: allowed, Environment: s.approvals[idx].Environment, ExpiresAt: expiresAt, ApprovedBy: auth.UserID, Reason: s.approvals[idx].Reason, Enabled: true, CreatedAt: now})
 	}
 	effect := PolicyDeny
 	event := "approval.rejected"
@@ -703,7 +817,7 @@ func (s *Store) SetEmergencyDeny(input EmergencyDeny, auth AuthContext, traceID 
 	}
 	input.CreatedAt = Now()
 	s.emergencyDeny = &input
-	s.recordAuditLocked(auth, traceID, "emergency_policy.enabled", "", "", PolicyDeny, RiskLow, input)
+	s.recordAuditLocked(auth, traceID, "emergency_policy.enabled", "", "", PolicyDeny, RiskCritical, input)
 	return input
 }
 func (s *Store) DisableEmergencyDeny(auth AuthContext, traceID string) EmergencyDeny {
@@ -727,7 +841,7 @@ func (s *Store) RevokeServerGrants(serverID string, auth AuthContext, traceID st
 			revoked++
 		}
 	}
-	s.recordAuditLocked(auth, traceID, "admin.server_grants.revoked", serverID, "", PolicyDeny, RiskLow, nil)
+	s.recordAuditLocked(auth, traceID, "admin.server_grants.revoked", serverID, "", PolicyDeny, RiskCritical, nil)
 	return map[string]interface{}{"revoked": revoked, "serverId": serverID}, nil
 }
 

@@ -104,3 +104,72 @@ func TestClientConfigUsesGatewayAndBearerAuth(t *testing.T) {
 		t.Fatalf("client config must not bypass gateway: %s", recorder.Body.String())
 	}
 }
+
+func TestControlPlaneLaneBSurfaces(t *testing.T) {
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+
+	plainSecret := requestJSON(t, http.MethodPost, "/api/secret-bindings", map[string]interface{}{"scopeType": "server", "scopeId": db.K8sReadonlyID, "provider": "vault", "secretValue": "do-not-store"})
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, plainSecret)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected plaintext secret rejection, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPost, "/api/secret-bindings", map[string]interface{}{"scopeType": "server", "scopeId": db.K8sReadonlyID, "provider": "vault", "ref": "vault://mcp/k8s-readonly"}))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected secret binding create 201, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPost, "/api/audit-events/export", map[string]interface{}{"format": "json", "filters": map[string]string{"server": db.K8sReadonlyID}}))
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("expected audit export 202, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/tenancy/policy-input?userId="+db.AdminUserID+"&projectId="+db.SampleProjectID, nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected policy input 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPost, "/api/servers/"+db.K8sReadonlyID+"/schema-snapshots", map[string]interface{}{}))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected schema snapshot 201, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPost, "/api/admin/kill-switch", map[string]interface{}{"reason": "incident", "serverId": db.K8sReadonlyID, "revokeGrants": true}))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected kill switch 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestOpenAPIDocumentUsesMutationResponseStatuses(t *testing.T) {
+	document := OpenAPIDocument()
+	paths := document["paths"].(map[string]interface{})
+	servers := paths["/api/servers"].(map[string]interface{})
+	serverPost := servers["post"].(map[string]interface{})
+	serverResponses := serverPost["responses"].(map[string]interface{})
+	if _, ok := serverResponses["201"]; !ok {
+		t.Fatalf("expected server create response status 201, got %#v", serverResponses)
+	}
+	auditExport := paths["/api/audit-events/export"].(map[string]interface{})
+	auditExportPost := auditExport["post"].(map[string]interface{})
+	auditExportResponses := auditExportPost["responses"].(map[string]interface{})
+	if _, ok := auditExportResponses["202"]; !ok {
+		t.Fatalf("expected audit export response status 202, got %#v", auditExportResponses)
+	}
+}
+
+func requestJSON(t *testing.T, method, path string, body interface{}) *http.Request {
+	t.Helper()
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	request := httptest.NewRequest(method, path, bytes.NewReader(encoded))
+	request.Header.Set("content-type", "application/json")
+	return request
+}

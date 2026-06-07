@@ -40,6 +40,8 @@ export type ApiMcpServer = {
   transport: ServerTransport;
   upstreamUrl?: string;
   enabled: boolean;
+  published?: boolean;
+  quarantined?: boolean;
   riskLevel: RiskLevel;
   schemaVersion?: string;
   createdAt: string;
@@ -93,7 +95,12 @@ export type ApiMcpServerVersion = {
   configHash?: string;
   toolSchemaHash?: string;
   status: ServerVersionStatus;
+  rolloutStatus?: string;
+  rolloutMessage?: string;
   createdBy?: string;
+  gitOpsRepo?: string;
+  gitOpsPath?: string;
+  gitOpsRevision?: string;
   createdAt: string;
   updatedAt?: string;
   activatedAt?: string;

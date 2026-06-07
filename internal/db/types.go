@@ -109,12 +109,17 @@ type MCPServerVersion struct {
 	ServerID        string                 `json:"serverId"`
 	Version         string                 `json:"version"`
 	Status          string                 `json:"status"`
+	RolloutStatus   string                 `json:"rolloutStatus,omitempty"`
+	RolloutMessage  string                 `json:"rolloutMessage,omitempty"`
 	ImageRef        string                 `json:"imageRef,omitempty"`
 	ImageRepository string                 `json:"imageRepository,omitempty"`
 	ImageTag        string                 `json:"imageTag,omitempty"`
 	ImageDigest     string                 `json:"imageDigest,omitempty"`
 	ConfigHash      string                 `json:"configHash,omitempty"`
 	ToolSchemaHash  string                 `json:"toolSchemaHash,omitempty"`
+	GitOpsRepo      string                 `json:"gitOpsRepo,omitempty"`
+	GitOpsPath      string                 `json:"gitOpsPath,omitempty"`
+	GitOpsRevision  string                 `json:"gitOpsRevision,omitempty"`
 	CreatedBy       string                 `json:"createdBy,omitempty"`
 	CreatedAt       string                 `json:"createdAt"`
 	UpdatedAt       string                 `json:"updatedAt"`
@@ -223,12 +228,17 @@ type EmergencyDeny struct {
 }
 
 type SchemaDiff struct {
-	ServerID      string                   `json:"serverId"`
-	FromVersionID string                   `json:"fromVersionId,omitempty"`
-	ToVersionID   string                   `json:"toVersionId,omitempty"`
-	Status        string                   `json:"status"`
-	GeneratedAt   string                   `json:"generatedAt"`
-	Changes       []map[string]interface{} `json:"changes"`
+	ID               string         `json:"id,omitempty"`
+	ServerID         string         `json:"serverId"`
+	FromVersionID    string         `json:"fromVersionId,omitempty"`
+	ToVersionID      string         `json:"toVersionId,omitempty"`
+	FromSnapshotID   string         `json:"fromSnapshotId,omitempty"`
+	ToSnapshotID     string         `json:"toSnapshotId,omitempty"`
+	Status           string         `json:"status"`
+	ApprovalRequired bool           `json:"approvalRequired"`
+	ApprovalState    string         `json:"approvalState"`
+	GeneratedAt      string         `json:"generatedAt"`
+	Changes          []SchemaChange `json:"changes"`
 }
 
 type ListResponse[T any] struct {
