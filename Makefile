@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: dev build lint test ci fmt schema security gen-openapi gen-schemas release-notes
+.PHONY: dev build lint test ci fmt schema security gen-openapi gen-schemas demo-check release-notes
 
 dev:
 	./scripts/dev/run-go-core.sh
@@ -36,6 +36,12 @@ gen-schemas:
 	./scripts/gen/schemas.sh
 
 schema: gen-openapi gen-schemas
+
+demo-check:
+	go test ./internal/... ./tests/e2e ./tests/security
+	pnpm --filter @mcp-hub/web test:unit
+	pnpm typecheck
+	pnpm helm:template
 
 security:
 	./scripts/security/check-all.sh
