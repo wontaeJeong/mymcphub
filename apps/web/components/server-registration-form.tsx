@@ -10,90 +10,90 @@ export function ServerRegistrationForm() {
 
   return (
     <form className="form-card" action={formAction}>
-      <h2>Register Server</h2>
-      <p>Submit a concise manifest to POST /api/servers using the Control Plane McpServerManifestSchema contract.</p>
+      <h2>서버 등록</h2>
+      <p>제어 플레인 McpServerManifestSchema 계약에 맞춘 간단한 매니페스트를 /api/servers로 전송합니다.</p>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="registerSlug">Slug</label>
+          <label htmlFor="registerSlug">슬러그</label>
           <input id="registerSlug" name="slug" required pattern="[a-z0-9-]+" placeholder="internal-tools" />
         </div>
         <div className="field">
-          <label htmlFor="registerDisplayName">Display name</label>
-          <input id="registerDisplayName" name="displayName" required placeholder="Internal Tools MCP Server" />
+          <label htmlFor="registerDisplayName">표시 이름</label>
+          <input id="registerDisplayName" name="displayName" required placeholder="내부 도구 MCP 서버" />
         </div>
         <div className="field">
-          <label htmlFor="registerOwnerTeamId">Owner team ID</label>
-          <input id="registerOwnerTeamId" name="ownerTeamId" required placeholder="UUID for owning team" />
+          <label htmlFor="registerOwnerTeamId">소유 팀 ID</label>
+          <input id="registerOwnerTeamId" name="ownerTeamId" required placeholder="소유 팀 UUID" />
         </div>
         <div className="field">
-          <label htmlFor="registerEnvironment">Environment</label>
+          <label htmlFor="registerEnvironment">환경</label>
           <select id="registerEnvironment" name="environment" required>
-            <option value="dev">dev</option>
-            <option value="stg">stg</option>
-            <option value="prod">prod</option>
-            <option value="shared">shared</option>
+            <option value="dev">개발</option>
+            <option value="stg">스테이징</option>
+            <option value="prod">운영</option>
+            <option value="shared">공용</option>
           </select>
         </div>
         <div className="field">
-          <label htmlFor="registerTransport">Transport</label>
+          <label htmlFor="registerTransport">전송 방식</label>
           <select id="registerTransport" name="transport" required>
-            <option value="streamable_http">streamable_http</option>
-            <option value="sse_legacy">sse_legacy</option>
-            <option value="stdio_adapter">stdio_adapter</option>
-            <option value="external">external</option>
+            <option value="streamable_http">스트리밍 HTTP</option>
+            <option value="sse_legacy">레거시 SSE</option>
+            <option value="stdio_adapter">stdio 어댑터</option>
+            <option value="external">외부</option>
           </select>
         </div>
         <div className="field">
-          <label htmlFor="registerRiskLevel">Server risk</label>
+          <label htmlFor="registerRiskLevel">서버 위험도</label>
           <select id="registerRiskLevel" name="riskLevel" required>
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-            <option value="critical">critical</option>
+            <option value="low">낮음</option>
+            <option value="medium">중간</option>
+            <option value="high">높음</option>
+            <option value="critical">심각</option>
           </select>
         </div>
       </div>
       <div className="field">
-        <label htmlFor="registerDescription">Description</label>
-        <textarea id="registerDescription" name="description" placeholder="Operational purpose and ownership notes" />
+        <label htmlFor="registerDescription">설명</label>
+        <textarea id="registerDescription" name="description" placeholder="운영 목적과 소유권 메모" />
       </div>
       <div className="field">
-        <label htmlFor="registerUpstreamUrl">Upstream URL</label>
-        <input id="registerUpstreamUrl" name="upstreamUrl" type="url" placeholder="Optional for stdio adapters" />
+        <label htmlFor="registerUpstreamUrl">업스트림 URL</label>
+        <input id="registerUpstreamUrl" name="upstreamUrl" type="url" placeholder="stdio 어댑터는 선택 사항" />
       </div>
       <label className="danger-confirm registration-toggle">
         <input type="checkbox" name="enabled" defaultChecked />
-        Register server as enabled.
+        서버를 활성 상태로 등록합니다.
       </label>
       <div className="form-grid registration-tool-grid">
         <div className="field">
-          <label htmlFor="registerToolName">Initial tool name</label>
+          <label htmlFor="registerToolName">초기 도구 이름</label>
           <input id="registerToolName" name="toolName" required placeholder="search_docs" />
         </div>
         <div className="field">
-          <label htmlFor="registerToolRiskLevel">Tool risk</label>
+          <label htmlFor="registerToolRiskLevel">도구 위험도</label>
           <select id="registerToolRiskLevel" name="toolRiskLevel" required>
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-            <option value="critical">critical</option>
+            <option value="low">낮음</option>
+            <option value="medium">중간</option>
+            <option value="high">높음</option>
+            <option value="critical">심각</option>
           </select>
         </div>
       </div>
       <div className="field">
-        <label htmlFor="registerToolDescription">Initial tool description</label>
-        <input id="registerToolDescription" name="toolDescription" placeholder="What this tool does" />
+        <label htmlFor="registerToolDescription">초기 도구 설명</label>
+        <input id="registerToolDescription" name="toolDescription" placeholder="도구가 수행하는 작업" />
       </div>
       <div className="field">
-        <label htmlFor="registerToolInputSchema">Input schema JSON</label>
+        <label htmlFor="registerToolInputSchema">입력 스키마 JSON</label>
         <textarea id="registerToolInputSchema" name="toolInputSchema" required defaultValue={'{"type":"object","properties":{}}'} />
       </div>
       <label className="danger-confirm registration-toggle">
         <input type="checkbox" name="toolEnabled" defaultChecked />
-        Register initial tool as enabled.
+        초기 도구를 활성 상태로 등록합니다.
       </label>
       <div className="form-actions">
-        <button className="button" type="submit" disabled={pending}>{pending ? "Registering..." : "Register server"}</button>
+        <button className="button" type="submit" disabled={pending}>{pending ? "등록 중..." : "서버 등록"}</button>
         {state.message ? <span className="muted" role="status">{state.message}</span> : null}
       </div>
     </form>
