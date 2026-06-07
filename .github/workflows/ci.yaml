@@ -87,3 +87,7 @@ jobs:
       - run: docker build -f apps/cli/Dockerfile -t mcp-hub/mcphubctl:${{ github.sha }} .
       - run: docker build -f apps/web/Dockerfile -t mcp-hub/web:${{ github.sha }} .
       - run: docker build -f servers/k8s/Dockerfile -t mcp-hub/k8s-readonly:${{ github.sha }} .
+      - run: docker build -f servers/runtime-adapter/Dockerfile -t mcp-hub/runtime-adapter:${{ github.sha }} .
+      - run: docker build -f servers/github/Dockerfile -t mcp-hub/github-readonly:${{ github.sha }} .
+      - run: docker build -f servers/gitlab/Dockerfile -t mcp-hub/gitlab-readonly:${{ github.sha }} .
+      - run: docker build -f servers/internal-docs/Dockerfile -t mcp-hub/internal-docs-readonly:${{ github.sha }} .

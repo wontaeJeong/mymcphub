@@ -2,11 +2,15 @@ package worker
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/mcp-hub/mcp-hub/internal/auth"
 	"github.com/mcp-hub/mcp-hub/internal/config"
 	"github.com/mcp-hub/mcp-hub/internal/db"
 	"github.com/mcp-hub/mcp-hub/internal/httpx"
@@ -46,8 +50,23 @@ func (s *Server) Handler() http.Handler {
 		case r.Method == http.MethodGet && r.URL.Path == "/metrics":
 			httpx.WriteText(w, 200, "text/plain; version=0.0.4", fmt.Sprintf("mcp_worker_last_run_jobs_total %d\n", len(s.last)))
 		case r.Method == http.MethodPost && r.URL.Path == "/jobs/run":
+			if !s.authorizeJobRun(w, r) {
+				return
+			}
 			var input []jobs.Job
-			_ = json.NewDecoder(r.Body).Decode(&input)
+			decoder := json.NewDecoder(r.Body)
+			if err := decoder.Decode(&input); err != nil {
+				httpx.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body must be a JSON job array.", auth.TraceID(r), map[string]interface{}{"error": err.Error()})
+				return
+			}
+			if err := rejectTrailingJSON(decoder); err != nil {
+				httpx.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body must contain exactly one JSON job array.", auth.TraceID(r), map[string]interface{}{"error": err.Error()})
+				return
+			}
+			if input == nil {
+				httpx.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body must be a JSON job array.", auth.TraceID(r), nil)
+				return
+			}
 			s.last = s.registry.RunOnce(r.Context(), input)
 			httpx.WriteJSON(w, 202, map[string]interface{}{"results": s.last})
 		default:
@@ -56,8 +75,46 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
+func rejectTrailingJSON(decoder *json.Decoder) error {
+	var trailing struct{}
+	err := decoder.Decode(&trailing)
+	if err == io.EOF {
+		return nil
+	}
+	if err == nil {
+		return fmt.Errorf("unexpected trailing JSON value")
+	}
+	return err
+}
+
+func (s *Server) authorizeJobRun(w http.ResponseWriter, r *http.Request) bool {
+	if token := strings.TrimSpace(s.cfg.WorkerJobToken); token != "" {
+		actual := bearerToken(r)
+		if actual != "" && len(actual) == len(token) && subtle.ConstantTimeCompare([]byte(actual), []byte(token)) == 1 {
+			return true
+		}
+	}
+	if principal, ok := auth.PrincipalFromBearer(r); ok && auth.RequirePlatformAdmin(principal) {
+		return true
+	}
+	httpx.WriteError(w, http.StatusForbidden, "AUTHORIZATION_DENIED", "Worker job trigger requires a platform-admin bearer token or MCP_WORKER_JOB_TOKEN.", auth.TraceID(r), nil)
+	return false
+}
+
+func bearerToken(r *http.Request) string {
+	value := r.Header.Get("authorization")
+	if !strings.HasPrefix(value, "Bearer ") {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(value, "Bearer "))
+}
+
 func (s *Server) RunLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
+	interval := s.cfg.RuntimeReconcileInterval
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	s.runOnce(ctx)
 	for {

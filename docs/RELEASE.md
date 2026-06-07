@@ -39,6 +39,7 @@ The API skeleton includes these Control Plane endpoints for server version metad
 - `GET /api/servers/:serverId/schema-diff`
 
 These endpoints currently manage in-memory control-plane metadata in the API skeleton. They do not perform Kubernetes or Helm deployment actions, and they do not persist API version metadata or schema diff state to Postgres.
+Version list responses are platform-admin only because version records can include reviewed manifest metadata. `manifestJson` payloads are validated against the runtime manifest contract before storage.
 
 ## Promotion Flow, Dev To Stg To Prod
 

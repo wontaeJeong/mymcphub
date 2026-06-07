@@ -1,0 +1,63 @@
+{
+  "version": "v1",
+  "slug": "runtime-adapter",
+  "displayName": "Runtime Stdio Adapter",
+  "description": "Go adapter pod that wraps one configured stdio MCP subprocess with Streamable HTTP.",
+  "environment": "dev",
+  "transport": "stdio_adapter",
+  "upstreamUrl": "http://localhost:5110/mcp",
+  "riskLevel": "medium",
+  "ownerTeam": "Platform Team",
+  "ownerTeamId": "00000000-0000-4000-8000-000000000010",
+  "implementationLanguage": "go",
+  "policyTags": ["runtime-adapter", "stdio", "streamable-http"],
+  "runtime": {
+    "image": "registry.example.com/mcp-hub/runtime-adapter:latest",
+    "imagePullPolicy": "IfNotPresent",
+    "port": 5110,
+    "replicas": 1,
+    "path": "/mcp"
+  },
+  "secrets": [
+    {
+      "ref": "adapter-command-config",
+      "targetEnv": "STDIO_COMMAND",
+      "secretName": "runtime-adapter-command",
+      "secretKey": "command",
+      "leaseDurationSeconds": 1800
+    }
+  ],
+  "egress": {
+    "denyByDefault": true,
+    "allow": []
+  },
+  "sandbox": {
+    "profile": "restricted",
+    "runAsNonRoot": true,
+    "runAsUser": 10001,
+    "readOnlyRootFilesystem": true,
+    "allowPrivilegeEscalation": false,
+    "seccompProfileType": "RuntimeDefault",
+    "resources": {
+      "requests": { "cpu": "50m", "memory": "64Mi" },
+      "limits": { "cpu": "500m", "memory": "256Mi" }
+    }
+  },
+  "tools": [
+    {
+      "name": "stdio_adapter_bridge",
+      "description": "Bridge JSON-RPC messages to the configured stdio MCP subprocess through stdout-only responses.",
+      "riskLevel": "medium",
+      "readOnly": false,
+      "policyTags": ["runtime-adapter", "stdio", "subprocess"],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "method": { "type": "string" }
+        },
+        "required": ["method"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

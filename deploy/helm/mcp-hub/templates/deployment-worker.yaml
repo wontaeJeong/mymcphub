@@ -1,4 +1,7 @@
 {{- if .Values.worker.enabled }}
+{{- if and (eq .Values.auth.mode "oidc") (or (not .Values.worker.jobToken.secretName) (not .Values.worker.jobToken.secretKey)) }}
+{{- fail "worker.jobToken.secretName and worker.jobToken.secretKey are required when auth.mode=oidc" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +32,15 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.worker.port | quote }}
+            - name: MCP_RUNTIME_RECONCILE_INTERVAL
+              value: {{ .Values.managedRuntime.controller.reconcileInterval | quote }}
+{{- if .Values.worker.jobToken.secretName }}
+            - name: MCP_WORKER_JOB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.worker.jobToken.secretName }}
+                  key: {{ .Values.worker.jobToken.secretKey }}
+{{- end }}
 {{ include "mcp-hub.secretEnv" . | indent 12 }}
           envFrom:
 {{ include "mcp-hub.commonEnvFrom" . | indent 12 }}

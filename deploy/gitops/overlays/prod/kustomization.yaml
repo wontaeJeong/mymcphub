@@ -20,6 +20,9 @@ helmCharts:
         mode: oidc
         oidcIssuerUrl: https://issuer.example.com
         audience: mcp-hub
+        trustedHeaderToken:
+          secretName: mcp-hub-auth-proxy
+          secretKey: token
       web:
         replicas: 3
       api:
@@ -28,6 +31,9 @@ helmCharts:
         replicas: 3
       worker:
         replicas: 1
+        jobToken:
+          secretName: mcp-hub-worker-job
+          secretKey: token
       cli:
         image:
           repository: mcphubctl

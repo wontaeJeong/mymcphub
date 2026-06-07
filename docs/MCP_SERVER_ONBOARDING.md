@@ -1,6 +1,6 @@
 # MCP Server Onboarding
 
-Use this lifecycle when adding or promoting an MCP server through MCP Hub. The current skeleton supports manifests, seed data, Web/API catalog views, Gateway routing, policy review, local smoke checks, and release metadata placeholders. It does not run a real runtime `tools/list` scanner yet.
+Use this lifecycle when adding or promoting an MCP server through MCP Hub. The current skeleton supports manifests, seed data, Web/API catalog views, Gateway routing, policy review, local smoke checks, runtime manifest rendering, secret lease metadata, and release metadata placeholders. It does not apply rendered runtime manifests to a live cluster yet.
 
 ## Lifecycle Checklist
 
@@ -10,7 +10,7 @@ Use this lifecycle when adding or promoting an MCP server through MCP Hub. The c
 | owner team 지정 | Assign `ownerTeam` and `ownerTeamId` to the team accountable for tools, incidents, and approvals. | Seed data uses the platform team for first-party servers. |
 | transport 선택 | Choose `streamable_http` for direct HTTP MCP servers. | Gateway proxies HTTP JSON-RPC upstream URLs. |
 | local test | Start the upstream and call its `/health`, then call through the Gateway. | The seeded first-party server uses port `5102`. |
-| tools/list scan | Capture expected `tools/list` output and compare schemas with the manifest. | Worker has a schema diff helper and placeholder job, but no real runtime scanner is wired yet. |
+| tools/list scan | Capture expected `tools/list` output and compare schemas with the manifest. | Worker has schema diff helpers; server smoke tests cover first-party tool descriptors. |
 | risk review | Review server and tool risk levels, closed schemas, dangerous names, and high or critical tool descriptions. | `pnpm security:mcp-manifests` warns on dangerous keywords and fails missing required risk/schema fields. |
 | secret binding | Bind any required secrets through approved secret references or deployment environment. | Do not put secret values in manifests, docs, Helm values, or committed files. |
 | dev 등록 | Register the server in dev catalog data and verify Web `/catalog`, `/servers/:serverId`, and Gateway routing. | API catalog state is in memory unless represented by seed or current process state. |
@@ -28,7 +28,8 @@ First-party manifests live at `servers/*/mcp-server.manifest.json`. Include at l
 4. `transport`, usually `streamable_http`.
 5. `upstreamUrl`, such as `http://localhost:5102/mcp`.
 6. Server `riskLevel`.
-7. Tool entries with `name`, description, `riskLevel`, and closed input schemas.
+7. Tool entries with `name`, description, `riskLevel`, `readOnly`, `policyTags`, and closed input schemas.
+8. `runtime`, `egress`, `sandbox`, and reference-only `secrets` when the server is managed by the Worker runtime reconciler.
 
 Run manifest checks:
 
@@ -49,7 +50,7 @@ Every server needs an owner team before shared use. The owner team handles:
 
 ## Transport 선택
 
-Use `streamable_http` when the MCP server exposes HTTP JSON-RPC. The current first-party runtime is Go HTTP.
+Use `streamable_http` when the MCP server exposes HTTP JSON-RPC. Use `stdio_adapter` when `servers/runtime-adapter` wraps a configured stdio subprocess and exposes `/mcp` over HTTP. The current first-party runtime is Go HTTP.
 
 ## Local Test
 
@@ -65,6 +66,8 @@ curl http://localhost:5000/mcp/k8s-readonly \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
+For the runtime adapter, configure `STDIO_COMMAND`, optional `STDIO_ARGS`, and `REQUEST_TIMEOUT_MS`, then check `/health` and `/mcp`. The adapter only trusts JSON-RPC responses written to stdout and never forwards stderr to clients.
+
 Run the full local check after the stack is up:
 
 ```sh
@@ -73,7 +76,7 @@ pnpm dev:smoke-test
 
 ## Tools/List Scan
 
-Capture the `tools/list` output and compare it to the manifest before registering or promoting. Today this is a manual or test-driven check. The Worker has pure schema diff helpers and metrics skeletons, but it reports the runtime scanner path as a placeholder when no snapshots are supplied.
+Capture the `tools/list` output and compare it to the manifest before registering or promoting. Today this is a manual or test-driven check. The Worker has pure schema diff helpers and records runtime render status, but it does not claim live upstream readiness when no scanner snapshots are supplied.
 
 Review `GET /api/servers/:serverId/schema-diff` for current in-memory schema diff metadata. Do not treat it as proof that a live upstream scan has happened in this skeleton.
 
@@ -89,7 +92,33 @@ Review every high or critical tool before shared use. High and critical tools ne
 
 ## Secret Binding
 
-Do not store secrets in manifests. Use environment variables, Kubernetes Secrets, an external secret controller, or an approved sealed secret workflow. Keep docs examples limited to local mock token values such as `dev-admin-token`.
+Do not store secrets in manifests. Use `secrets[]` entries with `ref`, `targetEnv`, `secretName`, `secretKey`, and optional `leaseDurationSeconds`. The Worker records short-lived lease metadata and revocation state only; it never stores or returns secret material. Keep docs examples limited to local mock token values such as `dev-admin-token`.
+
+## Runtime Rendering
+
+Trigger a render-only reconciliation job with:
+
+```sh
+curl -X POST http://localhost:4100/jobs/run \
+  -H 'content-type: application/json' \
+  -H 'authorization: Bearer dev-admin-token' \
+  -d '[{"kind":"runtime-reconcile","targetServerId":"00000000-0000-4000-8000-000000000102","manifestPath":"servers/k8s/mcp-server.manifest.json"}]'
+```
+
+Then inspect with a platform-admin identity. In OIDC mode, these headers must be injected by a trusted auth proxy that also sets `x-auth-proxy-token` to the `MCP_TRUSTED_AUTH_HEADER_TOKEN` value:
+
+```sh
+curl http://localhost:4000/api/runtime/status \
+  -H 'x-auth-proxy-token: <trusted-proxy-token>' \
+  -H 'x-user-id: admin@example.com' \
+  -H 'x-roles: platform_admin'
+curl http://localhost:4000/api/runtime/secret-leases \
+  -H 'x-auth-proxy-token: <trusted-proxy-token>' \
+  -H 'x-user-id: admin@example.com' \
+  -H 'x-roles: platform_admin'
+```
+
+Rendered state includes Deployment, Service, ServiceAccount, NetworkPolicy, sandbox, egress, and secret reference objects, so runtime status and lease APIs are platform-admin only. It is a deterministic render plan for GitOps/controller handoff, not proof that pods are ready.
 
 ## Dev 등록
 

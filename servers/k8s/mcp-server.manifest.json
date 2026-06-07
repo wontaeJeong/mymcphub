@@ -6,15 +6,41 @@
   "transport": "streamable_http",
   "upstreamUrl": "http://localhost:5102/mcp",
   "riskLevel": "medium",
+  "version": "v1",
   "ownerTeam": "Platform Team",
   "ownerTeamId": "00000000-0000-4000-8000-000000000010",
   "implementationLanguage": "go",
+  "policyTags": ["kubernetes", "readonly", "namespace-scope"],
+  "runtime": {
+    "image": "registry.example.com/mcp-hub/k8s:latest",
+    "imagePullPolicy": "IfNotPresent",
+    "port": 5102,
+    "replicas": 1,
+    "path": "/mcp"
+  },
+  "egress": {
+    "denyByDefault": true,
+    "allow": []
+  },
+  "sandbox": {
+    "profile": "restricted",
+    "runAsNonRoot": true,
+    "runAsUser": 10001,
+    "readOnlyRootFilesystem": true,
+    "allowPrivilegeEscalation": false,
+    "seccompProfileType": "RuntimeDefault",
+    "resources": {
+      "requests": { "cpu": "25m", "memory": "64Mi" },
+      "limits": { "cpu": "250m", "memory": "256Mi" }
+    }
+  },
   "tools": [
     {
       "name": "list_namespaces",
       "description": "List namespace names from the local read-only mock Kubernetes dataset.",
       "riskLevel": "medium",
       "readOnly": true,
+      "policyTags": ["kubernetes", "readonly", "namespace-scope"],
       "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
     },
     {
@@ -22,6 +48,7 @@
       "description": "List pods in one namespace from the local read-only mock Kubernetes dataset.",
       "riskLevel": "medium",
       "readOnly": true,
+      "policyTags": ["kubernetes", "readonly", "pods"],
       "inputSchema": {
         "type": "object",
         "properties": { "namespace": { "type": "string", "description": "Namespace to inspect." } },
@@ -34,6 +61,7 @@
       "description": "Read one pod by namespace and name from the local read-only mock Kubernetes dataset.",
       "riskLevel": "medium",
       "readOnly": true,
+      "policyTags": ["kubernetes", "readonly", "pods"],
       "inputSchema": {
         "type": "object",
         "properties": {
