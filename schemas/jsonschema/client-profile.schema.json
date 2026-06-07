@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCP Hub Client Profile",
+  "type": "object",
+  "required": ["client", "profile"],
+  "properties": {
+    "client": { "enum": ["generic", "opencode", "claude-code", "codex", "vscode"] },
+    "profile": { "type": "string", "minLength": 1 },
+    "serverId": { "type": "string" },
+    "gatewayUrl": { "type": "string", "format": "uri" },
+    "config": { "type": "object" },
+    "placeholder": { "type": "boolean" }
+  }
+}

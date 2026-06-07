@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCP Hub Policy Decision",
+  "type": "object",
+  "required": ["effect", "allowed", "reason", "reasonCode", "matchedGrantIds"],
+  "properties": {
+    "effect": { "enum": ["allow", "deny", "needs_approval"] },
+    "allowed": { "type": "boolean" },
+    "reason": { "type": "string", "minLength": 1 },
+    "reasonCode": { "type": "string", "minLength": 1 },
+    "matchedGrantIds": { "type": "array", "items": { "type": "string" } },
+    "requiresApproval": { "type": "boolean" },
+    "requiresStepUp": { "type": "boolean" },
+    "discoverableToolNames": { "type": "array", "items": { "type": "string" } }
+  }
+}
