@@ -14,6 +14,7 @@ helmCharts:
       image:
         tag: prod
       config:
+        appEnv: production
         publicUrl: https://mcp-hub.example.com
       auth:
         mode: oidc
@@ -27,6 +28,9 @@ helmCharts:
         replicas: 3
       worker:
         replicas: 1
+      cli:
+        image:
+          repository: mcphubctl
       networkPolicy:
         allowExternalEgress: false
       ingress:

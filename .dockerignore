@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.turbo
+coverage
+.git
+.env
+.sisyphus
+mcp_hub_prompt_pack
+mcp_hub_parallel_prompt_pack
+mcp_hub_go_direct_rewrite_prompt_pack
+mcp_hub_go_parallel_prompt_pack
