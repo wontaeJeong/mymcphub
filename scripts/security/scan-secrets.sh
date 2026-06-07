@@ -19,7 +19,11 @@ echo "Scanning repository secret detection targets from ${ROOT_DIR}"
 
 if command -v gitleaks >/dev/null 2>&1; then
   if gitleaks git --help >/dev/null 2>&1; then
-    gitleaks git --source "${ROOT_DIR}" --redact=100 --no-banner || STATUS=1
+    if gitleaks git --help | grep -q -- '--source'; then
+      gitleaks git --source "${ROOT_DIR}" --redact=100 --no-banner || STATUS=1
+    else
+      gitleaks git "${ROOT_DIR}" --redact=100 --no-banner || STATUS=1
+    fi
   else
     echo "SKIP: gitleaks git subcommand not available"
     if [ "${STRICT}" = "1" ]; then
