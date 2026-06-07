@@ -137,7 +137,7 @@ button {
 
 .nav {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .session-card {
@@ -155,7 +155,22 @@ button {
   margin: 0;
 }
 
-.nav a {
+.nav__group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.nav__heading {
+  margin: 0 var(--space-4);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.nav__link {
+  position: relative;
   padding: var(--space-3) var(--space-4);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -163,13 +178,19 @@ button {
   transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
-.nav a:hover,
-.nav a:focus-visible {
+.nav__link:hover,
+.nav__link:focus-visible,
+.nav__link[aria-current="page"] {
   color: var(--color-ink);
   border-color: var(--color-border);
   background: var(--color-faint);
   transform: translateX(var(--space-1));
   outline: none;
+}
+
+.nav__link[aria-current="page"] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0.25rem 0 0 var(--color-accent);
 }
 
 .content {
@@ -263,6 +284,100 @@ button {
   border-radius: 999px;
   content: "";
   background: radial-gradient(circle, rgba(216, 178, 92, 0.18), transparent 70%);
+}
+
+.attention-list,
+.onboarding-steps {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.attention-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.attention-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(4, 8, 5, 0.36);
+}
+
+.attention-card h3,
+.onboarding-steps h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.attention-card p,
+.onboarding-steps p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.attention-card--danger {
+  border-color: rgba(228, 109, 95, 0.42);
+}
+
+.attention-card--warning {
+  border-color: rgba(240, 168, 75, 0.42);
+}
+
+.attention-card--success {
+  border-color: rgba(114, 214, 154, 0.38);
+}
+
+.onboarding-panel {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(145deg, rgba(216, 178, 92, 0.1), rgba(8, 13, 10, 0.78));
+  box-shadow: var(--shadow-panel);
+}
+
+.onboarding-panel h2 {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  letter-spacing: -0.03em;
+}
+
+.onboarding-panel p {
+  color: var(--color-muted);
+}
+
+.onboarding-steps {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.onboarding-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(244, 236, 216, 0.04);
+}
+
+.onboarding-step__number {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid var(--color-accent);
+  border-radius: 999px;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
 }
 
 .section-header {
@@ -443,6 +558,43 @@ button.button {
   font-size: 0.74rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.advanced-fields,
+.submission-summary {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(244, 236, 216, 0.04);
+}
+
+.advanced-fields summary {
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advanced-fields .field:first-of-type {
+  margin-top: var(--space-3);
+}
+
+.submission-summary ul {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
 }
 
 input,
@@ -660,6 +812,7 @@ input[type="checkbox"] {
   .metric-grid,
   .card-grid,
   .detail-grid,
+  .attention-list,
   .form-grid,
   .filter-grid {
     grid-template-columns: 1fr;

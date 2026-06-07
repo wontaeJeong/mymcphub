@@ -1,22 +1,53 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { WebSession } from "../lib/auth/session";
+import { NavLink } from "./nav-link";
 
-const userNavItems = [
-  ["User Home", "/user"],
-  ["Catalog", "/user/catalog"],
-  ["Access", "/user/access"],
-  ["Client Config", "/user/client-config"]
-] as const;
+type NavGroup = Readonly<{
+  label: string;
+  items: readonly Readonly<{ label: string; href: string }>[];
+}>;
 
-const adminNavItems = [
-  ["Admin Home", "/admin"],
-  ["Servers", "/admin/servers"],
-  ["Approvals", "/admin/approvals"],
-  ["Audit", "/admin/audit"],
-  ["Operations", "/admin/operations"],
-  ["Emergency", "/admin/emergency"]
-] as const;
+const userNavGroups: readonly NavGroup[] = [
+  {
+    label: "Operate",
+    items: [
+      { label: "Dashboard", href: "/user" },
+      { label: "Servers", href: "/user/catalog" },
+    ],
+  },
+  {
+    label: "Govern",
+    items: [{ label: "Access Grants", href: "/user/access" }],
+  },
+  {
+    label: "Configure",
+    items: [{ label: "Client Setup", href: "/user/client-config" }],
+  },
+];
+
+const adminNavGroups: readonly NavGroup[] = [
+  {
+    label: "Operate",
+    items: [
+      { label: "Dashboard", href: "/admin" },
+      { label: "Servers", href: "/admin/servers" },
+      { label: "Operations", href: "/admin/operations" },
+    ],
+  },
+  {
+    label: "Govern",
+    items: [
+      { label: "Access Grants", href: "/admin/access" },
+      { label: "Approvals", href: "/admin/approvals" },
+      { label: "Audit", href: "/admin/audit" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [{ label: "Admin / Emergency", href: "/admin/emergency" }],
+  },
+];
 
 export type AppShellProps = Readonly<{
   children: ReactNode;
@@ -25,20 +56,23 @@ export type AppShellProps = Readonly<{
 }>;
 
 export function AppShell({ children, section, session }: AppShellProps) {
-  const navItems = section === "admin" ? adminNavItems : userNavItems;
+  const navGroups = section === "admin" ? adminNavGroups : userNavGroups;
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
           <p className="brand__eyebrow">{section === "admin" ? "Admin Plane" : "User Plane"}</p>
           <h1>MCP Hub</h1>
-          <p>{section === "admin" ? "Approve access, audit activity, operate servers, and control incidents from the protected admin console." : "Discover MCP servers, request access, and generate client configuration from your user workspace."}</p>
+          <p>{section === "admin" ? "Operate servers, govern access, review activity, and keep emergency actions separated from daily work." : "Discover trusted MCP servers, request access, and generate client setup from your workspace."}</p>
         </div>
         <nav className="nav" aria-label="Primary navigation">
-          {navItems.map(([label, href]) => (
-            <Link href={href} key={href}>
-              {label}
-            </Link>
+          {navGroups.map((group) => (
+            <section className="nav__group" aria-label={group.label} key={group.label}>
+              <p className="nav__heading">{group.label}</p>
+              {group.items.map((item) => (
+                <NavLink href={item.href} label={item.label} key={item.href} />
+              ))}
+            </section>
           ))}
         </nav>
         <div className="session-card">
