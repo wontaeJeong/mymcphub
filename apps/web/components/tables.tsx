@@ -26,9 +26,10 @@ import {
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
   healthByServerId?: Map<string, ApiServerHealth>;
+  serverBasePath?: string;
 }>;
 
-export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
+export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers" }: ServerTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -52,7 +53,7 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
             return (
               <tr key={server.id}>
                 <td>
-                  <Link href={`/servers/${server.id}`}>
+                  <Link href={`${serverBasePath}/${server.id}`}>
                     {server.displayName}
                   </Link>
                   <p className="muted">
@@ -255,7 +256,7 @@ export type RolloutStatusRow = Readonly<{
   health?: ApiServerHealth;
 }>;
 
-export function RolloutStatusTable({ rows }: Readonly<{ rows: RolloutStatusRow[] }>) {
+export function RolloutStatusTable({ rows, serverBasePath = "/admin/servers" }: Readonly<{ rows: RolloutStatusRow[]; serverBasePath?: string }>) {
   return (
     <div className="table-wrap">
       <table>
@@ -273,7 +274,7 @@ export function RolloutStatusTable({ rows }: Readonly<{ rows: RolloutStatusRow[]
           {rows.map((row) => (
             <tr key={row.server.id}>
               <td>
-                <Link href={`/servers/${row.server.id}`}>{row.server.displayName}</Link>
+                <Link href={`${serverBasePath}/${row.server.id}`}>{row.server.displayName}</Link>
                 <p className="muted">{row.server.slug} · {row.server.environment}</p>
               </td>
               <td>{row.activeVersion ? <StatusPill tone="success">{row.activeVersion.version}</StatusPill> : <span className="muted">No active version</span>}</td>
@@ -497,7 +498,7 @@ function safeExternalUrl(value: string | undefined) {
   }
 }
 
-export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
+export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<{ events: ApiAuditEvent[]; auditBasePath?: string }>) {
   return (
     <div className="table-wrap">
       <table>
@@ -548,7 +549,7 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
                 <CopyButton value={event.traceId} label="Copy trace" />
                 <Link
                   className="button button--ghost"
-                  href={`/audit?trace_id=${encodeURIComponent(event.traceId)}`}
+                  href={`${auditBasePath}?trace_id=${encodeURIComponent(event.traceId)}`}
                 >
                   Trace link
                 </Link>
