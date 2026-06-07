@@ -138,6 +138,19 @@ helm template mcp-hub deploy/helm/mcp-hub \
 
 Inspect the rendered API Deployment image and confirm it uses `@sha256:` rather than `:<tag>` for that component. Repeat for each component when changing digest behavior.
 
+Generate Markdown release notes before handoff:
+
+```sh
+pnpm release:notes -- \
+  --version 0.1.0 \
+  --revision "$(git rev-parse HEAD)" \
+  --image-digest api=sha256:1111111111111111111111111111111111111111111111111111111111111111 \
+  --cli-artifacts "mcphubctl darwin/arm64, linux/amd64" \
+  --schema-changes "No breaking OpenAPI, JSON Schema, or DB migration changes."
+```
+
+The generator renders only local Markdown. It does not publish artifacts, push tags, mutate GitOps overlays, or contact a registry.
+
 For GitOps overlays, validate the selected environment before sync:
 
 ```sh

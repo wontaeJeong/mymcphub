@@ -47,9 +47,12 @@ Use these docs when running or extending MCP Hub:
 | [Operations](docs/OPERATIONS.md) | Day-2 operating model. |
 | [Runbooks](docs/RUNBOOKS.md) | Gateway, upstream, auth, policy, schema drift, and quarantine response. |
 | [Testing](docs/TESTING.md) | Go, TS, e2e, security, schema, and Helm validation. |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Go core coding conventions, fixtures, and validation surfaces. |
+| [MCP Client Compatibility](docs/MCP_CLIENT_COMPATIBILITY.md) | Client profile support matrix and Gateway compatibility checks. |
 | [Deployment](docs/DEPLOYMENT.md) | Helm/GitOps deployment for Go images. |
 | [Rollback](docs/ROLLBACK.md) | Roll back to previous Go image tags. |
 | [MCP Server Matrix](docs/MCP_SERVER_LANGUAGE_MATRIX.md) | First-party server language decisions. |
+| [Worktree Merge Guide](docs/WORKTREE_MERGE_GUIDE.md) | Parallel lane merge order, conflict handling, and test checklist. |
 
 ## Contracts
 

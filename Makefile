@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: dev build lint test ci fmt schema security gen-openapi gen-schemas
+.PHONY: dev build lint test ci fmt schema security gen-openapi gen-schemas release-notes
 
 dev:
 	./scripts/dev/run-go-core.sh
@@ -39,3 +39,6 @@ schema: gen-openapi gen-schemas
 
 security:
 	./scripts/security/check-all.sh
+
+release-notes:
+	bash scripts/release/generate-notes.sh --version "$${VERSION:?VERSION is required}"

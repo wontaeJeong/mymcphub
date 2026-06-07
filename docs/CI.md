@@ -34,6 +34,7 @@ The workflow in `.github/workflows/ci.yaml` has these jobs:
 - `security-scan`: installs `govulncheck`, runs Go vulnerability checks, Web dependency audit, Python audit when Python manifests exist, and Trivy when available.
 - `helm-gitops`: renders Helm and GitOps overlays.
 - `e2e-security`: runs Go e2e and security negative tests.
+- `compatibility-matrix`: runs Lane G contract, e2e, load, and migration suites on Ubuntu and macOS with Go 1.26.4.
 - `docker-build`: builds API, Gateway, Worker, CLI, Web, and k8s images, then runs image scan and SBOM/signing evidence scripts against the built tags.
 
 SBOM and signing checks use `SECURITY_IMAGES`. Keyless or key-based cosign signing requires repository or runner credentials; without them, the scripts report `SKIP:` locally and continue unless strict mode is enabled.
@@ -41,3 +42,9 @@ SBOM and signing checks use `SECURITY_IMAGES`. Keyless or key-based cosign signi
 Use `pnpm run ci` for the aggregate root script; pnpm `10.12.1` treats bare `pnpm ci` as the clean-install command. The aggregate script runs full-repository lint, typecheck, test, build, security smoke, and Helm template validation.
 
 The OpenAPI check compares `schemas/openapi/mcp-hub.openapi.yaml`, runtime `/openapi.json` from `internal/controlplane`, generated `schemas/openapi/control-plane.openapi.json`, and the generated Web path list in `apps/web/lib/generated/mcp-hub-client.ts`.
+
+Lane G compatibility tests can be run locally with:
+
+```sh
+go test ./tests/contract ./tests/e2e ./tests/load ./tests/migration
+```
