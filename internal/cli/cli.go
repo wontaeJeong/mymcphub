@@ -268,10 +268,52 @@ func clientCommand(client Client, args []string) (int, error) {
 		if server == "" && len(args) > 1 {
 			server = args[1]
 		}
-		return printValue(client, map[string]string{"server": server, "status": "client connectivity check delegated to Gateway"})
+		if server == "" {
+			server = "k8s-readonly"
+		}
+		gatewayURL := valueAfter(args, "--gateway-url")
+		if gatewayURL == "" {
+			return printValue(client, map[string]string{"server": server, "status": "client connectivity check requires --gateway-url"})
+		}
+		token := valueAfter(args, "--token")
+		if token == "" {
+			token = client.Token
+		}
+		return testGatewayClient(client, gatewayURL, server, token)
 	default:
 		return 2, fmt.Errorf("unknown client command %s", args[0])
 	}
+}
+
+func testGatewayClient(client Client, gatewayURL string, server string, token string) (int, error) {
+	body := map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+	encoded, _ := json.Marshal(body)
+	url := strings.TrimRight(gatewayURL, "/")
+	if !strings.Contains(url, "/mcp/") {
+		url += "/mcp/" + server
+	}
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(encoded))
+	if err != nil {
+		return 1, err
+	}
+	req.Header.Set("content-type", "application/json")
+	if token != "" {
+		req.Header.Set("authorization", "Bearer "+token)
+	}
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		return 1, err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return 1, fmt.Errorf("gateway request failed: %s", strings.TrimSpace(string(data)))
+	}
+	var value map[string]interface{}
+	_ = json.Unmarshal(data, &value)
+	result, _ := value["result"].(map[string]interface{})
+	tools, _ := result["tools"].([]interface{})
+	return printValue(client, map[string]interface{}{"server": server, "gatewayUrl": url, "status": "ok", "toolCount": len(tools)})
 }
 
 func (c Client) get(path string) (int, error) { return c.request(http.MethodGet, path, nil) }

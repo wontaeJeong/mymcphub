@@ -27,9 +27,16 @@ func NewServer(store *db.Store, cfg config.Config) *Server {
 
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.registry.Store().Refresh()
+		if err := s.registry.Store().Refresh(); err != nil {
+			httpx.WriteJSON(w, 503, map[string]string{"error": "store_refresh_failed"})
+			return
+		}
 		if r.Method == http.MethodPost {
-			defer s.registry.Store().Save()
+			defer func() {
+				if err := s.registry.Store().Save(); err != nil {
+					s.log.Error("worker.store.save.failed", map[string]interface{}{"error": err.Error()})
+				}
+			}()
 		}
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/healthz":
@@ -52,18 +59,25 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) RunLoop(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	s.registry.Store().Refresh()
-	s.last = s.registry.RunOnce(ctx, nil)
-	s.registry.Store().Save()
+	s.runOnce(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.registry.Store().Refresh()
-			s.last = s.registry.RunOnce(ctx, nil)
-			s.registry.Store().Save()
+			s.runOnce(ctx)
 		}
+	}
+}
+
+func (s *Server) runOnce(ctx context.Context) {
+	if err := s.registry.Store().Refresh(); err != nil {
+		s.log.Error("worker.store.refresh.failed", map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.last = s.registry.RunOnce(ctx, nil)
+	if err := s.registry.Store().Save(); err != nil {
+		s.log.Error("worker.store.save.failed", map[string]interface{}{"error": err.Error()})
 	}
 }
 

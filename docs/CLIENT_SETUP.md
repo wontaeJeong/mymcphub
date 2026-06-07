@@ -1,6 +1,6 @@
 # Client Setup
 
-This guide shows how to configure MCP clients from the current MCP Hub surfaces. Manual checks use Gateway routes. The current Web and API client config generator formats snippets from the catalog server `upstreamUrl` when one is present, and falls back to `/mcp/<server-slug>` only when no upstream URL is recorded.
+This guide shows how to configure MCP clients from the current MCP Hub surfaces. Manual checks use Gateway routes. The Web and API client config generator always emits Gateway URLs so clients do not bypass Gateway auth, policy, rate limiting, or audit.
 
 Local Gateway base URL:
 
@@ -14,7 +14,7 @@ Local mock bearer token for approved seeded tools:
 dev-admin-token
 ```
 
-Do not use local mock tokens in shared or production environments. Shared deployments must rely on the approved auth proxy or ingress flow for identity.
+Do not use local mock tokens in shared or production environments. Shared Gateway deployments should use OIDC bearer JWTs from the approved client flow; Control Plane trusted identity headers are accepted only behind an auth proxy with `MCP_TRUSTED_AUTH_HEADERS=true`.
 
 ## Generate From The Hub
 
@@ -32,7 +32,7 @@ curl -X POST http://localhost:4000/api/client-config/generate \
   -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000102"}'
 ```
 
-Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded k8s server, generated snippets use the catalog upstream URL `http://localhost:5102/mcp`. Use the Gateway checks below to verify the policy and audit path at `http://localhost:5000/mcp/k8s-readonly` before handing off client instructions.
+Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded k8s server, generated snippets use `http://localhost:5000/mcp/k8s-readonly` and include a bearer token header placeholder sourced from `MCPHUB_TOKEN`.
 
 ## Generic Remote MCP Client
 
@@ -41,7 +41,12 @@ The generic generator currently returns this shape for the seeded k8s server:
 ```json
 {
   "transport": "streamable_http",
-  "url": "http://localhost:5102/mcp"
+  "url": "http://localhost:5000/mcp/k8s-readonly",
+  "auth": {
+    "type": "bearer",
+    "header": "authorization",
+    "tokenEnv": "MCPHUB_TOKEN"
+  }
 }
 ```
 
@@ -56,7 +61,10 @@ The API generator returns this non-placeholder shape for opencode:
   "mcp": {
     "k8s-readonly": {
       "type": "remote",
-      "url": "http://localhost:5102/mcp"
+      "url": "http://localhost:5000/mcp/k8s-readonly",
+      "headers": {
+        "authorization": "Bearer ${MCPHUB_TOKEN}"
+      }
     }
   }
 }
@@ -76,7 +84,10 @@ The current API marks this as a placeholder because remote MCP client formats ca
 {
   "mcpServers": {
     "k8s-readonly": {
-      "url": "http://localhost:5102/mcp",
+      "url": "http://localhost:5000/mcp/k8s-readonly",
+      "headers": {
+        "authorization": "Bearer ${MCPHUB_TOKEN}"
+      },
       "note": "Placeholder format until Claude Code remote MCP config is finalized."
     }
   }
@@ -93,7 +104,10 @@ The current API returns a placeholder for Codex style config:
 {
   "mcpServers": {
     "k8s-readonly": {
-      "url": "http://localhost:5102/mcp",
+      "url": "http://localhost:5000/mcp/k8s-readonly",
+      "headers": {
+        "authorization": "Bearer ${MCPHUB_TOKEN}"
+      },
       "note": "Codex MCP remote config placeholder."
     }
   }
@@ -110,7 +124,10 @@ The current API returns a placeholder for VS Code style config:
 {
   "servers": {
     "k8s-readonly": {
-      "url": "http://localhost:5102/mcp",
+      "url": "http://localhost:5000/mcp/k8s-readonly",
+      "headers": {
+        "authorization": "Bearer ${MCPHUB_TOKEN}"
+      },
       "note": "VS Code MCP config placeholder."
     }
   }
@@ -142,6 +159,15 @@ curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Or use the CLI gateway probe:
+
+```sh
+MCPHUB_TOKEN=dev-admin-token \
+  go run ./apps/cli/cmd/mcphubctl client test \
+  --gateway-url http://localhost:5000 \
+  --server k8s-readonly
 ```
 
 4. If the client can connect but cannot see tools, check grants in `/access`, server detail at `/servers/:serverId`, and denies in `/audit`.

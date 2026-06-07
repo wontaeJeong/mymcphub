@@ -11,7 +11,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/mcp-hub/mcp-hub/internal/redaction"
 )
 
 const (
@@ -36,8 +39,10 @@ type Store struct {
 	versions       []MCPServerVersion
 	grants         []Grant
 	approvals      []Approval
+	oauthClients   []OAuthClient
 	auditEvents    []AuditEvent
 	toolCallEvents []ToolCallEvent
+	rateLimits     []RateLimitBucket
 	health         []ServerHealth
 	emergencyDeny  *EmergencyDeny
 }
@@ -48,8 +53,10 @@ type snapshot struct {
 	Versions       []MCPServerVersion `json:"versions"`
 	Grants         []Grant            `json:"grants"`
 	Approvals      []Approval         `json:"approvals"`
+	OAuthClients   []OAuthClient      `json:"oauthClients"`
 	AuditEvents    []AuditEvent       `json:"auditEvents"`
 	ToolCallEvents []ToolCallEvent    `json:"toolCallEvents"`
+	RateLimits     []RateLimitBucket  `json:"rateLimits"`
 	Health         []ServerHealth     `json:"health"`
 	EmergencyDeny  *EmergencyDeny     `json:"emergencyDeny,omitempty"`
 }
@@ -70,6 +77,11 @@ func NewSeedStore() *Store {
 		},
 		grants: []Grant{
 			{ID: SampleGrantID, SubjectType: SubjectTeam, SubjectID: PlatformTeamID, ProjectID: SampleProjectID, ServerID: K8sReadonlyID, AllowedTools: []string{"list_namespaces", "list_pods", "get_pod"}, Environment: EnvironmentDev, ApprovedBy: AdminUserID, Reason: "Initial sample grant for local development.", Enabled: true, CreatedAt: now},
+		},
+		oauthClients: []OAuthClient{
+			seedOAuthClient("mcp-client", "Local MCP Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}),
+			seedOAuthClient("local-dev-client", "Local Development Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}),
+			seedOAuthClient("oidc-client", "OIDC Gateway Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}),
 		},
 		auditEvents:    []AuditEvent{{ID: NewID(), Timestamp: now, UserID: AdminUserID, TeamID: PlatformTeamID, ProjectID: SampleProjectID, ClientID: "local-dev-client", ServerID: K8sReadonlyID, ToolName: "list_namespaces", EventType: "seed.audit_event", RiskLevel: RiskMedium, PolicyDecision: PolicyAllow, TraceID: "seed-trace", MetadataJSON: map[string]interface{}{"source": "seed"}}},
 		toolCallEvents: []ToolCallEvent{{ID: NewID(), AuditEventID: "seed-audit-event", ServerID: K8sReadonlyID, ToolName: "list_namespaces", Status: "ok", LatencyMS: 12, CreatedAt: now}},
@@ -103,22 +115,26 @@ func (s *Store) UsePersistence(path string) {
 	}
 }
 
-func (s *Store) Refresh() {
+func (s *Store) Refresh() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_ = s.loadLocked()
+	return s.loadLocked()
 }
 
-func (s *Store) Save() {
+func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_ = s.saveLocked()
+	return s.saveLocked()
 }
 
 func (s *Store) loadLocked() error {
 	if s.persistPath == "" {
 		return nil
 	}
+	return s.withPersistenceLockLocked(func() error { return s.loadSnapshotLocked() })
+}
+
+func (s *Store) loadSnapshotLocked() error {
 	data, err := os.ReadFile(s.persistPath)
 	if err != nil {
 		return err
@@ -135,8 +151,14 @@ func (s *Store) loadLocked() error {
 	s.versions = cloneSlice(state.Versions)
 	s.grants = cloneSlice(state.Grants)
 	s.approvals = cloneSlice(state.Approvals)
+	s.oauthClients = cloneSlice(state.OAuthClients)
+	if len(s.oauthClients) == 0 {
+		now := Now()
+		s.oauthClients = []OAuthClient{seedOAuthClient("mcp-client", "Local MCP Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}), seedOAuthClient("local-dev-client", "Local Development Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"}), seedOAuthClient("oidc-client", "OIDC Gateway Client", now, []string{"http://localhost:3000/oauth/callback", "http://127.0.0.1:3000/oauth/callback"})}
+	}
 	s.auditEvents = cloneSlice(state.AuditEvents)
 	s.toolCallEvents = cloneSlice(state.ToolCallEvents)
+	s.rateLimits = cloneSlice(state.RateLimits)
 	s.health = cloneSlice(state.Health)
 	s.emergencyDeny = state.EmergencyDeny
 	return nil
@@ -146,10 +168,31 @@ func (s *Store) saveLocked() error {
 	if s.persistPath == "" {
 		return nil
 	}
+	return s.withPersistenceLockLocked(func() error {
+		state := snapshotFromStoreLocked(s)
+		latest := state
+		if err := s.loadSnapshotInto(&latest); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		} else {
+			state.AuditEvents = mergeAuditEvents(state.AuditEvents, latest.AuditEvents)
+			state.RateLimits = mergeRateLimitBuckets(state.RateLimits, latest.RateLimits, time.Now().UTC())
+		}
+		s.auditEvents = cloneSlice(state.AuditEvents)
+		s.rateLimits = cloneSlice(state.RateLimits)
+		return s.saveSnapshotLocked(state)
+	})
+}
+
+func snapshotFromStoreLocked(s *Store) snapshot {
+	return snapshot{Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, OAuthClients: s.oauthClients, AuditEvents: s.auditEvents, ToolCallEvents: s.toolCallEvents, RateLimits: s.rateLimits, Health: s.health, EmergencyDeny: s.emergencyDeny}
+}
+
+func (s *Store) saveSnapshotLocked(state snapshot) error {
 	if err := os.MkdirAll(filepath.Dir(s.persistPath), 0o700); err != nil {
 		return err
 	}
-	state := snapshot{Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, AuditEvents: s.auditEvents, ToolCallEvents: s.toolCallEvents, Health: s.health, EmergencyDeny: s.emergencyDeny}
 	encoded, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
@@ -159,6 +202,26 @@ func (s *Store) saveLocked() error {
 		return err
 	}
 	return os.Rename(tmp, s.persistPath)
+}
+
+func (s *Store) withPersistenceLockLocked(fn func() error) error {
+	if s.persistPath == "" {
+		return fn()
+	}
+	if err := os.MkdirAll(filepath.Dir(s.persistPath), 0o700); err != nil {
+		return err
+	}
+	lockPath := s.persistPath + ".lock"
+	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	return fn()
 }
 
 func (s *Store) ListServers() ListResponse[MCPServer] {
@@ -239,6 +302,9 @@ func (s *Store) PatchServer(id string, patch map[string]interface{}, auth AuthCo
 	}
 	if v, ok := patch["enabled"].(bool); ok {
 		s.servers[idx].Enabled = v
+	}
+	if v, ok := intValue(patch["timeoutMs"]); ok {
+		s.servers[idx].TimeoutMS = v
 	}
 	s.servers[idx].UpdatedAt = Now()
 	s.recordAuditLocked(auth, traceID, "mcp_server.updated", id, "", PolicyAllow, s.servers[idx].RiskLevel, patch)
@@ -404,6 +470,30 @@ func (s *Store) ListGrants() ListResponse[Grant] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return ListResponse[Grant]{Items: cloneSlice(s.grants)}
+}
+
+func (s *Store) ValidateOAuthClient(clientID string, redirectURI string, allowDynamic bool) (OAuthClient, error) {
+	if strings.TrimSpace(clientID) == "" {
+		return OAuthClient{}, fmt.Errorf("%w: client_id is required", ErrUnauthorized)
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, client := range s.oauthClients {
+		if client.ClientID != clientID {
+			continue
+		}
+		if !client.Enabled {
+			return OAuthClient{}, fmt.Errorf("%w: client is disabled", ErrUnauthorized)
+		}
+		if strings.TrimSpace(redirectURI) != "" && !containsValue(client.RedirectURIs, redirectURI) {
+			return OAuthClient{}, fmt.Errorf("%w: redirect_uri is not registered for client", ErrUnauthorized)
+		}
+		return client, nil
+	}
+	if allowDynamic {
+		return OAuthClient{ID: clientID, ClientID: clientID, DisplayName: clientID, DCRAllowed: true, Enabled: true, CreatedAt: Now()}, nil
+	}
+	return OAuthClient{}, fmt.Errorf("%w: client is not registered", ErrUnauthorized)
 }
 
 func (s *Store) CreateGrant(input Grant, auth AuthContext, traceID string, argument interface{}) (Grant, error) {
@@ -585,7 +675,9 @@ func (s *Store) RecordGatewayAudit(event AuditEvent) AuditEvent {
 	if event.MetadataJSON == nil {
 		event.MetadataJSON = map[string]interface{}{"source": "gateway"}
 	}
+	event = sanitizeAuditEvent(event)
 	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
+	_ = s.persistAuditEventLocked(event)
 	return event
 }
 func (s *Store) ListToolCallEvents() ListResponse[ToolCallEvent] {
@@ -662,7 +754,153 @@ func (s *Store) AddAudit(event AuditEvent) {
 	if event.MetadataJSON == nil {
 		event.MetadataJSON = map[string]interface{}{}
 	}
+	event = sanitizeAuditEvent(event)
 	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
+	_ = s.persistAuditEventLocked(event)
+}
+
+func (s *Store) IncrementRateLimitBucket(key string, window time.Duration) (int, time.Time, error) {
+	if strings.TrimSpace(key) == "" {
+		key = "anonymous"
+	}
+	if window <= 0 {
+		window = time.Minute
+	}
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.persistPath == "" {
+		count, resetAt := incrementRateLimitBuckets(&s.rateLimits, key, window, now)
+		return count, resetAt, nil
+	}
+	var count int
+	var resetAt time.Time
+	err := s.withPersistenceLockLocked(func() error {
+		state := snapshotFromStoreLocked(s)
+		if err := s.loadSnapshotInto(&state); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+		count, resetAt = incrementRateLimitBuckets(&state.RateLimits, key, window, now)
+		if err := s.saveSnapshotLocked(state); err != nil {
+			return err
+		}
+		s.rateLimits = cloneSlice(state.RateLimits)
+		return nil
+	})
+	return count, resetAt, err
+}
+
+func incrementRateLimitBuckets(buckets *[]RateLimitBucket, key string, window time.Duration, now time.Time) (int, time.Time) {
+	*buckets = pruneRateLimitBuckets(*buckets, now)
+	for i := range *buckets {
+		if (*buckets)[i].Key != key {
+			continue
+		}
+		resetAt, err := time.Parse(time.RFC3339Nano, (*buckets)[i].ResetAt)
+		if err != nil || !now.Before(resetAt) {
+			resetAt = now.Add(window)
+			(*buckets)[i].ResetAt = resetAt.Format(time.RFC3339Nano)
+			(*buckets)[i].Count = 0
+		}
+		(*buckets)[i].Count++
+		return (*buckets)[i].Count, resetAt
+	}
+	resetAt := now.Add(window)
+	*buckets = append(*buckets, RateLimitBucket{Key: key, Count: 1, ResetAt: resetAt.Format(time.RFC3339Nano)})
+	return 1, resetAt
+}
+
+func mergeAuditEvents(current []AuditEvent, latest []AuditEvent) []AuditEvent {
+	seen := map[string]bool{}
+	merged := make([]AuditEvent, 0, len(current)+len(latest))
+	for _, event := range append(cloneSlice(current), latest...) {
+		if event.ID == "" || seen[event.ID] {
+			continue
+		}
+		seen[event.ID] = true
+		merged = append(merged, event)
+	}
+	sort.SliceStable(merged, func(i, j int) bool { return merged[i].Timestamp > merged[j].Timestamp })
+	return merged
+}
+
+func mergeRateLimitBuckets(current []RateLimitBucket, latest []RateLimitBucket, now time.Time) []RateLimitBucket {
+	merged := map[string]RateLimitBucket{}
+	for _, bucket := range append(pruneRateLimitBuckets(current, now), pruneRateLimitBuckets(latest, now)...) {
+		if bucket.Key == "" {
+			continue
+		}
+		if existing, ok := merged[bucket.Key]; !ok || newerRateLimitBucket(bucket, existing) {
+			merged[bucket.Key] = bucket
+		}
+	}
+	out := make([]RateLimitBucket, 0, len(merged))
+	for _, bucket := range merged {
+		out = append(out, bucket)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
+}
+
+func pruneRateLimitBuckets(buckets []RateLimitBucket, now time.Time) []RateLimitBucket {
+	out := make([]RateLimitBucket, 0, len(buckets))
+	for _, bucket := range buckets {
+		resetAt, err := time.Parse(time.RFC3339Nano, bucket.ResetAt)
+		if err != nil || now.Before(resetAt) {
+			out = append(out, bucket)
+		}
+	}
+	return out
+}
+
+func newerRateLimitBucket(candidate RateLimitBucket, existing RateLimitBucket) bool {
+	candidateReset, candidateErr := time.Parse(time.RFC3339Nano, candidate.ResetAt)
+	existingReset, existingErr := time.Parse(time.RFC3339Nano, existing.ResetAt)
+	if candidateErr != nil {
+		return false
+	}
+	if existingErr != nil || candidateReset.After(existingReset) {
+		return true
+	}
+	if candidateReset.Equal(existingReset) && candidate.Count > existing.Count {
+		return true
+	}
+	return false
+}
+
+func (s *Store) persistAuditEventLocked(event AuditEvent) error {
+	if s.persistPath == "" {
+		return nil
+	}
+	return s.withPersistenceLockLocked(func() error {
+		state := snapshotFromStoreLocked(s)
+		if err := s.loadSnapshotInto(&state); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return s.saveSnapshotLocked(state)
+			}
+			return err
+		}
+		for _, existing := range state.AuditEvents {
+			if existing.ID == event.ID {
+				return nil
+			}
+		}
+		state.AuditEvents = append([]AuditEvent{event}, state.AuditEvents...)
+		return s.saveSnapshotLocked(state)
+	})
+}
+
+func (s *Store) loadSnapshotInto(state *snapshot) error {
+	data, err := os.ReadFile(s.persistPath)
+	if err != nil {
+		return err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil
+	}
+	return json.Unmarshal(data, state)
 }
 
 func (s *Store) SnapshotGatewayRegistry() []GatewayServerSnapshot {
@@ -770,7 +1008,22 @@ func (s *Store) recordAuditLocked(auth AuthContext, traceID, eventType, serverID
 	if len(auth.TeamIDs) > 0 {
 		teamID = auth.TeamIDs[0]
 	}
-	s.auditEvents = append([]AuditEvent{{ID: NewID(), Timestamp: Now(), UserID: auth.UserID, TeamID: teamID, ProjectID: auth.ProjectID, ClientID: auth.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: effect, TraceID: traceID, MetadataJSON: map[string]interface{}{"issuer": auth.Issuer}, ArgumentRedactedJSON: argument}}, s.auditEvents...)
+	event := sanitizeAuditEvent(AuditEvent{ID: NewID(), Timestamp: Now(), UserID: auth.UserID, TeamID: teamID, ProjectID: auth.ProjectID, ClientID: auth.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: effect, TraceID: traceID, MetadataJSON: map[string]interface{}{"issuer": auth.Issuer}, ArgumentRedactedJSON: argument})
+	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
+}
+
+func sanitizeAuditEvent(event AuditEvent) AuditEvent {
+	event.ArgumentRedactedJSON = redaction.Redact(event.ArgumentRedactedJSON)
+	if event.ArgumentRedactedJSON != nil && event.ArgumentHash == "" {
+		event.ArgumentHash = redaction.Hash(event.ArgumentRedactedJSON)
+	}
+	if event.MetadataJSON == nil {
+		event.MetadataJSON = map[string]interface{}{}
+	}
+	if redacted, ok := redaction.Redact(event.MetadataJSON).(map[string]interface{}); ok {
+		event.MetadataJSON = redacted
+	}
+	return event
 }
 
 func seedServer(id, slug, display, description string, transport ServerTransport, risk RiskLevel, upstream string, now string) MCPServer {
@@ -778,6 +1031,9 @@ func seedServer(id, slug, display, description string, transport ServerTransport
 }
 func seedVersion(serverID, now string) MCPServerVersion {
 	return MCPServerVersion{ID: NewID(), ServerID: serverID, Version: "1.0.0", Status: "active", ConfigHash: "seed-config-" + serverID, ToolSchemaHash: "seed-tool-schema-" + serverID, CreatedAt: now, UpdatedAt: now, ActivatedAt: now}
+}
+func seedOAuthClient(clientID, display, now string, redirects []string) OAuthClient {
+	return OAuthClient{ID: NewID(), ClientID: clientID, DisplayName: display, OwnerTeamID: PlatformTeamID, RedirectURIs: redirects, Enabled: true, CreatedAt: now}
 }
 func seedTool(serverID, name, description string, risk RiskLevel, schema map[string]interface{}, now string) MCPTool {
 	return MCPTool{ID: NewID(), ServerID: serverID, Name: name, Description: description, Enabled: true, RiskLevel: risk, InputSchema: schema, DiscoveredAt: now, LastSeenAt: now}
@@ -818,6 +1074,29 @@ func stringSlice(value interface{}) ([]string, bool) {
 		out = append(out, text)
 	}
 	return out, true
+}
+
+func containsValue(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func intValue(value interface{}) (int, bool) {
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case float64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		return int(parsed), err == nil
+	default:
+		return 0, false
+	}
 }
 
 func auditMatches(event AuditEvent, filters map[string]string) bool {

@@ -1,6 +1,6 @@
 # MCP Hub Runbook
 
-Use these runbooks for local, development, staging, and production-style operations. Commands use current repository surfaces. In this skeleton, API state and Gateway state are in memory, Postgres and Redis are support infrastructure, runtime OIDC JWKS verification is not wired into API or Gateway, and canary routing is a disabled placeholder.
+Use these runbooks for local, development, staging, and production-style operations. Commands use current repository surfaces. In this skeleton, API state and Gateway state use the local runtime store, Postgres and Redis are support infrastructure, Gateway runtime OIDC/JWKS verification is wired for bearer JWTs, and canary routing is a disabled placeholder.
 
 Start with these checks unless the situation says otherwise:
 
@@ -87,7 +87,7 @@ Metrics should return to normal latency buckets, the Gateway curl should complet
 
 ### 사후 조치
 
-Add timeout expectations to the server owner runbook and document any approved config changes.
+Add timeout expectations to the server owner runbook and document any approved `timeoutMs` server override or `MCP_GATEWAY_UPSTREAM_TIMEOUT_SECONDS` default change.
 
 ## tool call deny 급증 (Tool Call Deny Spike)
 
@@ -221,7 +221,7 @@ Do not expose API or Gateway directly to bypass OIDC in shared environments. If 
 
 ### 근본 원인 확인
 
-Review Keycloak logs, issuer URL configuration, ingress/proxy health, token audience, and clock skew. Remember API and Gateway do not perform runtime JWKS verification themselves in this skeleton.
+Review Keycloak logs, issuer URL configuration, ingress/proxy health, token audience, `OIDC_REQUIRED_SCOPE`, `OIDC_JWKS_URL`, and clock skew. Gateway verifies bearer JWTs itself in OIDC mode; API trusted headers are accepted only when `MCP_TRUSTED_AUTH_HEADERS=true`.
 
 ### 복구 확인
 

@@ -68,3 +68,22 @@ func TestCLILoginStoresTokenWithoutPrintingIt(t *testing.T) {
 		t.Fatalf("config did not store token: %s", string(data))
 	}
 }
+
+func TestCLIClientTestCallsGateway(t *testing.T) {
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mcp/k8s-readonly" {
+			t.Fatalf("unexpected gateway path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("authorization"); got != "Bearer dev-admin-token" {
+			t.Fatalf("expected bearer token, got %q", got)
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"list_namespaces"}]}}`))
+	}))
+	defer gateway.Close()
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--output", "json", "client", "test", "--gateway-url", gateway.URL, "--server", "k8s-readonly"}, Token: "dev-admin-token", Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 || !strings.Contains(out.String(), `"status": "ok"`) || !strings.Contains(out.String(), `"toolCount": 1`) {
+		t.Fatalf("client test failed code=%d out=%s", code, out.String())
+	}
+}
