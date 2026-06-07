@@ -33,6 +33,7 @@ type Config struct {
 	SecretLeaseSeconds         int
 	RuntimeReconcileInterval   time.Duration
 	WorkerJobToken             string
+	WorkerIntervalSeconds      int
 }
 
 func Load(defaultPort int) Config {
@@ -62,6 +63,7 @@ func Load(defaultPort int) Config {
 		SecretLeaseSeconds:         getenvInt("MCP_SECRET_LEASE_SECONDS", 1800),
 		RuntimeReconcileInterval:   getenvDuration("MCP_RUNTIME_RECONCILE_INTERVAL", time.Minute),
 		WorkerJobToken:             os.Getenv("MCP_WORKER_JOB_TOKEN"),
+		WorkerIntervalSeconds:      getenvInt("MCP_WORKER_INTERVAL_SECONDS", 60),
 	}
 }
 

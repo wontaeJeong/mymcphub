@@ -14,7 +14,11 @@ Confirm bearer token handling at the Gateway and trusted identity headers at the
 
 ## Policy Deny Spike
 
-Search audit events by `policy_decision=deny`, identify `reasonCode`, and compare grants with requested tools. Do not bypass policy with direct DB updates.
+Search audit events by `policy_decision=deny`, review admin-only `GET /api/analytics/denied-calls`, identify `errorCode`, and compare grants with requested tools. Do not bypass policy with direct DB updates.
+
+## Observability Alerts
+
+The Helm chart can render `MCPHubGatewayErrorRateHigh`, `MCPHubAuthFailuresHigh`, `MCPHubUpstreamFailuresHigh`, and `MCPHubWorkerLagHigh` Prometheus alerts. Start with `/metrics`, `/operations`, `/audit`, and admin-only `GET /api/analytics/denied-calls`, then follow the matching detailed section in `docs/RUNBOOK.md`.
 
 ## Schema Drift
 

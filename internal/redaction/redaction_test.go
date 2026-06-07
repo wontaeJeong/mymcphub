@@ -25,7 +25,7 @@ func TestRedactCoversDocumentedSensitiveKeyVariants(t *testing.T) {
 		"session":        "secret",
 		"accessKeyId":    "secret",
 		"safe":           "kept",
-		"nested":         map[string]interface{}{"Authorization": "secret", "safe": "kept"},
+		"nested":         map[string]interface{}{"Authorization": "secret", "refresh.token": "secret", "safe": "kept"},
 		"headerVariants": []interface{}{map[string]interface{}{"x-api-key": "secret", "safe": "kept"}},
 	}
 
@@ -42,7 +42,7 @@ func TestRedactCoversDocumentedSensitiveKeyVariants(t *testing.T) {
 		t.Fatalf("expected safe field to be preserved, got %#v", redacted["safe"])
 	}
 	nested := redacted["nested"].(map[string]interface{})
-	if nested["Authorization"] != "[REDACTED]" || nested["safe"] != "kept" {
+	if nested["Authorization"] != "[REDACTED]" || nested["refresh.token"] != "[REDACTED]" || nested["safe"] != "kept" {
 		t.Fatalf("expected nested authorization redaction, got %#v", nested)
 	}
 	headerVariants := redacted["headerVariants"].([]interface{})

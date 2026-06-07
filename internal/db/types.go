@@ -206,12 +206,15 @@ type RateLimitBucket struct {
 }
 
 type ServerHealth struct {
-	ID           string `json:"id"`
-	ServerID     string `json:"serverId"`
-	Status       string `json:"status"`
-	LatencyMS    int    `json:"latencyMs,omitempty"`
-	ErrorMessage string `json:"errorMessage,omitempty"`
-	CheckedAt    string `json:"checkedAt"`
+	ID             string `json:"id"`
+	ServerID       string `json:"serverId"`
+	Status         string `json:"status"`
+	LatencyMS      int    `json:"latencyMs,omitempty"`
+	ErrorMessage   string `json:"errorMessage,omitempty"`
+	CheckedAt      string `json:"checkedAt"`
+	TraceID        string `json:"traceId,omitempty"`
+	Attempt        int    `json:"attempt,omitempty"`
+	BackoffSeconds int    `json:"backoffSeconds,omitempty"`
 }
 
 type RuntimeStatus struct {
@@ -277,4 +280,61 @@ type ListResponse[T any] struct {
 type PageInfo struct {
 	Limit      int    `json:"limit"`
 	NextCursor string `json:"nextCursor,omitempty"`
+}
+
+type UsageReport struct {
+	From    string            `json:"from,omitempty"`
+	To      string            `json:"to,omitempty"`
+	Period  string            `json:"period"`
+	GroupBy []string          `json:"groupBy"`
+	Items   []UsageReportItem `json:"items"`
+}
+
+type UsageReportItem struct {
+	Period       string `json:"period"`
+	TeamID       string `json:"teamId,omitempty"`
+	ProjectID    string `json:"projectId,omitempty"`
+	UserID       string `json:"userId,omitempty"`
+	ClientID     string `json:"clientId,omitempty"`
+	ServerID     string `json:"serverId,omitempty"`
+	ToolName     string `json:"toolName,omitempty"`
+	Calls        int    `json:"calls"`
+	Succeeded    int    `json:"succeeded"`
+	Failed       int    `json:"failed"`
+	Denied       int    `json:"denied"`
+	AvgLatencyMS int    `json:"avgLatencyMs"`
+	P95LatencyMS int    `json:"p95LatencyMs"`
+	P99LatencyMS int    `json:"p99LatencyMs"`
+}
+
+type DeniedCallAnalytics struct {
+	From         string                   `json:"from,omitempty"`
+	To           string                   `json:"to,omitempty"`
+	TotalDenied  int                      `json:"totalDenied"`
+	ByReason     []DeniedReasonCount      `json:"byReason"`
+	TopTools     []DeniedToolCount        `json:"topTools"`
+	TopServers   []DeniedServerCount      `json:"topServers"`
+	PolicyTuning []PolicyTuningSuggestion `json:"policyTuning"`
+}
+
+type DeniedReasonCount struct {
+	Reason string `json:"reason"`
+	Count  int    `json:"count"`
+}
+
+type DeniedToolCount struct {
+	ServerID string `json:"serverId,omitempty"`
+	ToolName string `json:"toolName,omitempty"`
+	Count    int    `json:"count"`
+}
+
+type DeniedServerCount struct {
+	ServerID string `json:"serverId,omitempty"`
+	Count    int    `json:"count"`
+}
+
+type PolicyTuningSuggestion struct {
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+	Count   int    `json:"count"`
 }

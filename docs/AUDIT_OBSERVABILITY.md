@@ -58,6 +58,24 @@ Supported filters:
 
 The Web `/audit` page sends these audit filters to `/api/audit-events` server-side. Its tool-call status filter is Web-only for `/api/tool-call-events`.
 
+## Usage and Denied-Call Analytics
+
+Lane E adds read-only analytics from normalized audit events:
+
+```txt
+GET /api/analytics/usage
+GET /api/analytics/usage/export
+GET /api/analytics/denied-calls
+```
+
+`/api/analytics/usage` supports `period=daily|monthly`, `group_by=team,project,user,client,server,tool`, and the same actor/server/tool/time filters used by audit search. It returns calls, succeeded, failed, denied, average latency, p95, and p99 by bucket. `/api/analytics/usage/export` returns the same report as CSV.
+
+`/api/analytics/denied-calls` groups denied tool-call audit events by reason, server, and tool, and returns policy-tuning guidance. The Web `/operations` page renders these aggregates next to server health.
+
+Analytics routes are protected by the existing platform-admin auth check because they expose cross-user audit aggregates.
+
+When `MCP_AUTH_MODE=oidc`, the API accepts identity headers only from a trusted auth proxy that also supplies `MCP_TRUSTED_PROXY_HEADER` with the shared `MCP_TRUSTED_PROXY_SECRET` value. Directly forged `x-user-id` or `x-roles` headers are treated as anonymous and cannot satisfy platform-admin checks.
+
 Gateway-observed audit events can be copied into the Control Plane API skeleton with:
 
 ```txt
@@ -76,7 +94,9 @@ curl 'http://localhost:4000/api/audit-events?from=2026-06-07T00:00:00Z&to=2026-0
 
 The API exposes Prometheus text at `/metrics`.
 
-- `mcp_api_requests_total`
+- `mcp_api_request_info`
+- `mcp_api_http_requests_total`
+- `mcp_api_http_request_duration_seconds_bucket`
 
 Example:
 
@@ -86,13 +106,13 @@ curl http://localhost:4000/metrics
 
 The Gateway exposes Prometheus text at `/metrics`.
 
-- `mcp_gateway_requests_total`
-- `mcp_gateway_request_duration_ms`
+- `mcp_gateway_request_info`
+- `mcp_gateway_http_requests_total`
+- `mcp_gateway_http_request_duration_seconds_bucket`
 - `mcp_gateway_tool_calls_total`
-- `mcp_gateway_tool_call_duration_ms`
+- `mcp_gateway_tool_call_duration_seconds_bucket`
 - `mcp_gateway_policy_denies_total`
 - `mcp_gateway_upstream_errors_total`
-- `mcp_gateway_active_sessions`
 
 Example:
 
@@ -102,10 +122,11 @@ curl http://localhost:5000/metrics
 
 The Worker has a metrics helper for local instrumentation and tests, plus a lightweight `createWorkerServer()` helper that serves Prometheus text at `GET /metrics`.
 
-- `mcp_worker_scan_total`
-- `mcp_worker_schema_changes_total`
+- `mcp_worker_jobs_total`
+- `mcp_worker_job_duration_seconds_bucket`
+- `mcp_worker_last_run_timestamp_seconds`
 
-Worker schema-diff jobs increment `mcp_worker_schema_changes_total` by `1` when the skeleton detects a schema change. The Worker also keeps in-memory audit events for `schema.changed` and `health.changed`, preserving `traceId`, `serverId`, timestamp, outcome, and basic metadata.
+Worker jobs increment `mcp_worker_jobs_total` by job kind and status. The Worker also keeps in-memory audit events for `schema.changed`, `health.changed`, `health.alert`, and `usage.report.generated`, preserving `traceId`, `serverId`, timestamp, outcome, and basic metadata.
 
 Emergency deny changes are represented in API audit events as `emergency_policy.enabled` and `emergency_policy.disabled`.
 
@@ -126,10 +147,11 @@ Put high-cardinality or sensitive values in audit events after redaction where a
 
 ## Trace Propagation
 
-Requests may provide `x-trace-id`. If it is missing, the API or Gateway creates one.
+Requests may provide `x-trace-id`, `x-request-id`, or W3C `traceparent`. If they are missing, the API, Gateway, or Worker creates correlation identifiers.
 
-- The API stores the trace id on the request, returns it in the response header, logs it, and stores it in audit events created by API actions.
-- The Gateway returns `x-trace-id` in the response header, records it in Gateway audit events, and forwards it upstream as `x-trace-id` when proxying MCP JSON-RPC calls.
+- The API stores the trace id on the request, returns `x-trace-id`, `x-request-id`, and `traceparent` response headers, logs trace/span/request ids, and stores the trace in audit events created by API actions.
+- The Gateway returns the same correlation headers, records the trace id in Gateway audit events, and forwards `x-trace-id`, `x-request-id`, and `traceparent` upstream when proxying MCP JSON-RPC calls.
+- The Worker propagates request trace ids into `/jobs/run` audit events and creates a root trace for scheduled runs.
 - Audit searches can filter by `trace_id` to connect API actions, Gateway decisions, and upstream calls that share the same trace.
 
 Example Gateway request with a trace header:
@@ -144,9 +166,19 @@ curl http://localhost:5000/mcp/k8s-readonly \
 
 ## OpenTelemetry Hook Scope
 
-The shared logger package includes a lightweight `withSpan` helper. It starts a span, attaches simple attributes, records exceptions, and ends the span around a callback.
+The shared telemetry package uses the Go OpenTelemetry SDK for tracing plus local Prometheus text metrics: correlation extraction, W3C `traceparent` propagation, HTTP request counters, duration histograms, Gateway tool-call metrics, Worker job metrics, and exporter configuration visibility.
 
-This is only a code hook. The current skeleton does not include an OpenTelemetry collector, exporter, backend, sampling policy, or deployment stack.
+Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_TRACES_SAMPLER_ARG`, and `OTEL_SDK_DISABLED` for collector/exporter intent. The current skeleton emits local Prometheus text and correlation headers; deploying an OpenTelemetry Collector remains an environment-level concern.
+
+## Dashboards and Alerts
+
+The Helm chart can render:
+
+- `ServiceMonitor` resources for API, Gateway, and Worker metrics.
+- A Grafana dashboard ConfigMap covering Gateway p50/p95/p99 latency, error rate, tool calls, and Worker jobs.
+- A `PrometheusRule` for Gateway error rate, auth failures, upstream failures, and Worker lag.
+
+The default chart keeps these optional, while environment values enable dashboards and ServiceMonitor. Staging and production values also enable alert rules.
 
 ## Operator Triage
 
@@ -162,11 +194,11 @@ curl 'http://localhost:4000/api/audit-events?policy_decision=deny&limit=25'
 
 Web pages:
 
-| Page | Use |
-| --- | --- |
-| `/audit` | Search policy, admin, and ingested Gateway audit events. |
-| `/operations` | Inspect server health records from the API skeleton. |
+| Page                 | Use                                                                     |
+| -------------------- | ----------------------------------------------------------------------- |
+| `/audit`             | Search policy, admin, and ingested Gateway audit events.                |
+| `/operations`        | Inspect server health records from the API skeleton.                    |
 | `/servers/:serverId` | Correlate one server's versions, tools, health, and recent audit event. |
-| `/admin` | Apply kill-switch actions when audit shows active impact. |
+| `/admin`             | Apply kill-switch actions when audit shows active impact.               |
 
-Current audit and health data is in memory. Preserve running API and Gateway processes during investigation if you need their current in-memory evidence.
+Current audit and health data uses the local in-memory/file-backed skeleton store. File-backed request cycles are serialized to avoid local lost updates, but this is still not a production database or SIEM pipeline. Preserve running API and Gateway processes during investigation if you need their current in-memory evidence.

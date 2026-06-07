@@ -275,6 +275,72 @@ func TestControlPlaneVersionManifestRejectsRawSecret(t *testing.T) {
 	}
 }
 
+func TestControlPlaneAnalyticsAndTraceHeaders(t *testing.T) {
+	store := db.NewSeedStore()
+	store.AddAudit(db.AuditEvent{Timestamp: "2026-06-07T10:00:00Z", UserID: db.AdminUserID, TeamID: db.PlatformTeamID, ProjectID: db.SampleProjectID, ClientID: "client-a", ServerID: db.K8sReadonlyID, ToolName: "list_pods", EventType: "tool.call.denied", RiskLevel: db.RiskHigh, PolicyDecision: db.PolicyDeny, TraceID: "trace-denied", ErrorCode: "NO_MATCHING_GRANT", LatencyMS: 19})
+	server := NewServer(store, config.Load(4000))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/analytics/denied-calls", nil)
+	req.Header.Set("x-trace-id", "trace-request")
+	req.Header.Set("x-request-id", "request-1")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Header().Get("x-trace-id") != "trace-request" || recorder.Header().Get("x-request-id") != "request-1" || recorder.Header().Get("traceparent") == "" {
+		t.Fatalf("missing correlation headers: %#v", recorder.Header())
+	}
+	var denied db.DeniedCallAnalytics
+	if err := json.Unmarshal(recorder.Body.Bytes(), &denied); err != nil {
+		t.Fatal(err)
+	}
+	if denied.TotalDenied != 1 || denied.ByReason[0].Reason != "NO_MATCHING_GRANT" {
+		t.Fatalf("unexpected denied analytics: %#v", denied)
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/analytics/usage/export?period=daily", nil))
+	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte("period,team_id")) {
+		t.Fatalf("expected usage CSV, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestControlPlaneAnalyticsRequiresAdmin(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+	req := httptest.NewRequest(http.MethodGet, "/api/analytics/usage", nil)
+	req.Header.Set("x-mcp-hub-trusted-proxy", "forged")
+	req.Header.Set("x-user-id", "attacker")
+	req.Header.Set("x-roles", "platform_admin")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected forged trusted header to be rejected with 403, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	t.Setenv("MCP_TRUSTED_PROXY_SECRET", "test-secret")
+	req = httptest.NewRequest(http.MethodGet, "/api/analytics/usage", nil)
+	req.Header.Set("x-user-id", "reader")
+	req.Header.Set("x-roles", "reader")
+	req.Header.Set("x-mcp-hub-trusted-proxy", "test-secret")
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/analytics/usage", nil)
+	req.Header.Set("x-user-id", "admin")
+	req.Header.Set("x-roles", "platform_admin")
+	req.Header.Set("x-mcp-hub-trusted-proxy", "test-secret")
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected trusted platform admin to get 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func requestJSON(t *testing.T, method, path string, body interface{}) *http.Request {
 	t.Helper()
 	encoded, err := json.Marshal(body)

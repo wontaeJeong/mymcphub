@@ -36,6 +36,7 @@ config:
   apiUrl: http://mcp-hub-api:4000
   gatewayUrl: http://mcp-hub-gateway:5000
   storePath: /tmp/mcp-hub/store.json
+  workerIntervalSeconds: 60
 
 auth:
   mode: oidc
@@ -47,6 +48,10 @@ auth:
   trustedHeaderToken:
     secretName: mcp-hub-auth-proxy
     secretKey: token
+  trustedProxy:
+    headerName: x-mcp-hub-trusted-proxy
+    secretName: mcp-hub-trusted-proxy
+    secretKey: sharedSecret
 
 postgres:
   external:
@@ -173,6 +178,10 @@ worker:
     # Set to sha256:<digest> to render registry.example.com/mcp-hub/worker@sha256:...
     # When set, digest rendering overrides image.tag for this component.
     digest: ""
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 4100
   resources:
     requests:
       cpu: 100m
@@ -223,7 +232,9 @@ rollout:
 networkPolicy:
   enabled: true
   allowExternalEgress: true
-  ingressNamespaceSelector: {}
+  ingressNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
 
 managedRuntime:
   namespace: mcp-runtime
@@ -242,3 +253,24 @@ serviceMonitor:
   namespace: ""
   interval: 30s
   scrapeTimeout: 10s
+  networkPolicy:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: monitoring
+    podSelector: {}
+
+prometheusRule:
+  enabled: false
+  namespace: ""
+  labels: {}
+  runbookURL: https://mcp-hub.example.com/docs/runbooks#observability-alerts
+  thresholds:
+    gatewayErrorRate: 0.05
+    authFailures: 20
+    upstreamFailures: 5
+    workerLagSeconds: 300
+
+grafanaDashboards:
+  enabled: false
+  labels:
+    grafana_dashboard: "1"

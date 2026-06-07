@@ -37,6 +37,10 @@ render_and_check() {
     "MCP_API_URL:" \
     "MCP_GATEWAY_URL:" \
     "MCP_STORE_PATH:" \
+    "MCP_TRUSTED_PROXY_HEADER:" \
+    "MCP_TRUSTED_PROXY_SECRET" \
+    "MCP_WORKER_INTERVAL_SECONDS:" \
+    "kubernetes.io/metadata.name: ingress-nginx" \
     "path: /api" \
     "path: /mcp"; do
     if ! grep -q "${expected}" "${RENDERED_OUTPUT}"; then
@@ -44,6 +48,26 @@ render_and_check() {
       exit 1
     fi
   done
+
+  if [ -n "${values_file}" ]; then
+    for expected in \
+      "kind: ServiceMonitor" \
+      "mcp-hub-observability.json" \
+      "kubernetes.io/metadata.name: monitoring" \
+      "port: 4100"; do
+      if ! grep -q "${expected}" "${RENDERED_OUTPUT}"; then
+        echo "rendered observability manifests missing ${expected}" >&2
+        exit 1
+      fi
+    done
+  fi
+
+  if [ "${values_file}" != "" ] && [ "${values_file##*/}" != "values-dev.yaml" ]; then
+    if ! grep -q "kind: PrometheusRule" "${RENDERED_OUTPUT}"; then
+      echo "rendered alert manifests missing PrometheusRule" >&2
+      exit 1
+    fi
+  fi
 }
 
 render_and_check ""

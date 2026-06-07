@@ -11,4 +11,4 @@ helm template mcp-hub deploy/helm/mcp-hub --namespace mcp-hub -f deploy/helm/mcp
 helm upgrade --install mcp-hub deploy/helm/mcp-hub --namespace mcp-hub --create-namespace -f deploy/helm/mcp-hub/values-dev.yaml
 ```
 
-The chart does not store plaintext secret values in Helm values. `DATABASE_URL`, `REDIS_URL`, and `OIDC_CLIENT_SECRET` are referenced only through `secretKeyRef`; create those Secrets outside this chart or with an external secret controller.
+The chart does not store plaintext secret values in Helm values. `DATABASE_URL`, `REDIS_URL`, `OIDC_CLIENT_SECRET`, and `MCP_TRUSTED_PROXY_SECRET` are referenced only through `secretKeyRef`; create those Secrets outside this chart or with an external secret controller. In OIDC mode, the trusted auth proxy must strip external identity headers and add the configured trusted-proxy header value.

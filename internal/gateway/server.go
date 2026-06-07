@@ -26,6 +26,7 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/policy"
 	"github.com/mcp-hub/mcp-hub/internal/ratelimit"
 	"github.com/mcp-hub/mcp-hub/internal/redaction"
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 type Upstream interface {
@@ -68,13 +69,18 @@ func NewServer(store *db.Store, cfg config.Config, upstream Upstream) *Server {
 	_ = server.reloadRegistry("startup")
 	return server
 }
-func (s *Server) Handler() http.Handler { return http.HandlerFunc(s.handle) }
+func (s *Server) Handler() http.Handler {
+	return telemetry.Handler("gateway", http.HandlerFunc(s.handle))
+}
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	finish := s.store.BeginRequest(gatewayWrites(r))
+	defer finish()
 	traceID := auth.TraceID(r)
 	w.Header().Set("x-trace-id", traceID)
 	started := time.Now()
 	s.metrics.RecordRequest()
+	s.log.InfoContext(r.Context(), "gateway.request", map[string]interface{}{"method": r.Method, "path": r.URL.Path})
 	if r.URL.Path == "/healthz" && r.Method == http.MethodGet {
 		httpx.WriteJSON(w, 200, map[string]string{"service": "gateway", "status": "ok"})
 		return
@@ -84,7 +90,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/metrics" && r.Method == http.MethodGet {
-		httpx.WriteText(w, 200, "text/plain; version=0.0.4", s.metrics.Render(s.sessions.Active()))
+		httpx.WriteText(w, 200, "text/plain; version=0.0.4", s.metrics.Render(s.sessions.Active())+"\n"+telemetry.MetricsText("gateway"))
 		return
 	}
 	reloadErr := s.reloadRegistry("request")
@@ -170,6 +176,10 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	status, response := s.handleMCP(r.Context(), request, principal, server, tools, grants, emergency, traceID, started, session.ID, r.Header.Get("x-mcp-step-up-token"))
 	httpx.WriteJSON(w, status, response)
+}
+
+func gatewayWrites(r *http.Request) bool {
+	return !(r.Method == http.MethodGet && (r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics"))
 }
 
 func (s *Server) handleMCP(ctx context.Context, request mcp.Request, principal db.AuthContext, server db.MCPServer, tools []db.MCPTool, grants []db.Grant, emergency *db.EmergencyDeny, traceID string, started time.Time, sessionID string, stepUpToken string) (int, mcp.Response) {
@@ -271,6 +281,7 @@ func (s *Server) handleMCP(ctx context.Context, request mcp.Request, principal d
 	event.ArgumentHash = redaction.Hash(args(request))
 	event.MetadataJSON = mergeMetadata(event.MetadataJSON, map[string]interface{}{"circuitState": s.breaker.State(server.Slug), "method": request.Method})
 	s.store.AddAudit(event)
+	telemetry.RecordMCPCall("gateway", request.Method, string(db.PolicyAllow), "succeeded", time.Since(started))
 	return 200, response
 }
 
@@ -279,9 +290,10 @@ func (s *Server) record(traceID string, principal db.AuthContext, eventType, ser
 }
 
 func (s *Server) recordDetailed(traceID string, principal db.AuthContext, eventType, serverID, toolName string, risk db.RiskLevel, decision db.PolicyEffect, errorCode string, started time.Time, argument interface{}, sessionID string, metadata map[string]interface{}) {
+	duration := time.Since(started)
 	event := audit.NewEvent(eventType, principal, traceID, serverID, toolName, risk, decision)
 	event.SessionID = sessionID
-	event.LatencyMS = int(time.Since(started).Milliseconds())
+	event.LatencyMS = int(duration.Milliseconds())
 	event.ErrorCode = errorCode
 	event.ArgumentRedactedJSON = redaction.Redact(argument)
 	if argument != nil {
@@ -289,6 +301,15 @@ func (s *Server) recordDetailed(traceID string, principal db.AuthContext, eventT
 	}
 	event.MetadataJSON = mergeMetadata(event.MetadataJSON, metadata)
 	s.store.AddAudit(event)
+	if strings.HasPrefix(eventType, "tool.call") {
+		telemetry.RecordMCPCall("gateway", "tools/call", string(decision), strings.TrimPrefix(eventType, "tool.call."), duration)
+	}
+	if decision == db.PolicyDeny {
+		telemetry.RecordPolicyDeny("gateway", errorCode)
+	}
+	if strings.HasPrefix(errorCode, "UPSTREAM") {
+		telemetry.RecordUpstreamError("gateway", errorCode)
+	}
 }
 
 func (s *Server) reloadRegistry(reason string) error {
@@ -415,6 +436,7 @@ func (u HTTPUpstream) Call(ctx context.Context, server db.MCPServer, request mcp
 		return mcp.Response{}, 0, err
 	}
 	req.Header.Set("content-type", "application/json")
+	telemetry.InjectHeaders(ctx, req.Header)
 	req.Header.Set("x-trace-id", traceID)
 	client := &http.Client{Timeout: u.Timeout, Transport: secureUpstreamTransport(), CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
@@ -839,6 +861,11 @@ func upstreamTimeout(server db.MCPServer, cfg config.Config) time.Duration {
 	return time.Duration(cfg.UpstreamTimeoutSeconds()) * time.Second
 }
 func ListenAndServe(store *db.Store, cfg config.Config) error {
+	shutdown, err := telemetry.Init(context.Background(), "gateway")
+	if err != nil {
+		return err
+	}
+	defer shutdown(context.Background())
 	address := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	server := NewServer(store, cfg, nil)
 	server.startSignalReload()

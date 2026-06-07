@@ -1,7 +1,7 @@
 {{- if .Values.serviceMonitor.enabled }}
 {{- $root := . }}
-{{- range $component, $componentValues := dict "api" .Values.api "gateway" .Values.gateway }}
-{{- if $componentValues.enabled }}
+{{- range $component, $componentValues := dict "api" .Values.api "gateway" .Values.gateway "worker" .Values.worker }}
+{{- if and $componentValues.enabled (or (ne $component "worker") $componentValues.service.enabled) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

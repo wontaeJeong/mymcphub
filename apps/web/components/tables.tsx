@@ -3,8 +3,25 @@ import type { ReactNode } from "react";
 import { StatusPill } from "@mcp-hub/ui";
 
 import { CopyButton } from "./copy-button";
-import type { ApiApproval, ApiAuditEvent, ApiGrant, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth, ApiToolCallEvent, ServerVersionStatus } from "../lib/api";
-import { approvalTone, enabledTone, formatDate, healthTone, policyTone, riskTone } from "./format";
+import type {
+  ApiApproval,
+  ApiAuditEvent,
+  ApiGrant,
+  ApiMcpServer,
+  ApiMcpServerVersion,
+  ApiMcpTool,
+  ApiServerHealth,
+  ApiToolCallEvent,
+  ServerVersionStatus,
+} from "../lib/api";
+import {
+  approvalTone,
+  enabledTone,
+  formatDate,
+  healthTone,
+  policyTone,
+  riskTone,
+} from "./format";
 
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
@@ -35,20 +52,56 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
             return (
               <tr key={server.id}>
                 <td>
-                  <Link href={`/servers/${server.id}`}>{server.displayName}</Link>
-                  <p className="muted">{server.description ?? "No description published."}</p>
+                  <Link href={`/servers/${server.id}`}>
+                    {server.displayName}
+                  </Link>
+                  <p className="muted">
+                    {server.description ?? "No description published."}
+                  </p>
                 </td>
                 <td>{server.slug}</td>
                 <td>{server.ownerTeamId}</td>
                 <td>{server.environment}</td>
                 <td>{server.transport}</td>
-                <td><StatusPill tone={riskTone(server.riskLevel)}>{server.riskLevel}</StatusPill></td>
-                <td>{health ? <StatusPill tone={healthTone(health.status)}>{health.status}</StatusPill> : <StatusPill>unavailable</StatusPill>}</td>
-                <td><StatusPill tone={enabledTone(server.enabled)}>{server.enabled ? "enabled" : "disabled"}</StatusPill></td>
+                <td>
+                  <StatusPill tone={riskTone(server.riskLevel)}>
+                    {server.riskLevel}
+                  </StatusPill>
+                </td>
+                <td>
+                  {health ? (
+                    <StatusPill tone={healthTone(health.status)}>
+                      {health.status}
+                    </StatusPill>
+                  ) : (
+                    <StatusPill>unavailable</StatusPill>
+                  )}
+                </td>
+                <td>
+                  <StatusPill tone={enabledTone(server.enabled)}>
+                    {server.enabled ? "enabled" : "disabled"}
+                  </StatusPill>
+                </td>
                 <td>
                   <div className="actions">
-                    <StatusPill tone={server.published ? "success" : server.published === false ? "warning" : "neutral"}>{server.published ? "published" : server.published === false ? "unpublished" : "publication n/a"}</StatusPill>
-                    <StatusPill tone={server.quarantined ? "danger" : "neutral"}>{server.quarantined ? "quarantined" : "not quarantined"}</StatusPill>
+                    <StatusPill
+                      tone={
+                        server.published
+                          ? "success"
+                          : server.published === false
+                            ? "warning"
+                            : "neutral"
+                      }
+                    >
+                      {server.published
+                        ? "published"
+                        : server.published === false
+                          ? "unpublished"
+                          : "publication n/a"}
+                    </StatusPill>
+                    <StatusPill tone={server.quarantined ? "danger" : "neutral"}>
+                      {server.quarantined ? "quarantined" : "not quarantined"}
+                    </StatusPill>
                   </div>
                 </td>
                 <td>{formatDate(server.updatedAt)}</td>
@@ -70,7 +123,14 @@ export type ToolTableProps = Readonly<{
   actionSlot?: (tool: ApiMcpTool) => ReactNode;
 }>;
 
-export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, showAccess = false, showAdminPlaceholder = false, actionSlot }: ToolTableProps) {
+export function ToolTable({
+  tools,
+  grantStatusByToolKey,
+  showSchema = false,
+  showAccess = false,
+  showAdminPlaceholder = false,
+  actionSlot,
+}: ToolTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -92,15 +152,42 @@ export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, sho
             <tr key={tool.id}>
               <td>
                 {tool.name}
-                <p className="muted">{tool.description ?? "No description published by the server."}</p>
+                <p className="muted">
+                  {tool.description ??
+                    "No description published by the server."}
+                </p>
               </td>
-              <td><StatusPill tone={riskTone(tool.riskLevel)}>{tool.riskLevel}</StatusPill></td>
-              <td><StatusPill tone={enabledTone(tool.enabled)}>{tool.enabled ? "enabled" : "disabled"}</StatusPill></td>
-              {showSchema ? <td><SchemaViewer tool={tool} /></td> : null}
-              {showAccess ? <td>{grantStatusByToolKey?.get(toolKey(tool)) ?? "No active grant found"}</td> : null}
+              <td>
+                <StatusPill tone={riskTone(tool.riskLevel)}>
+                  {tool.riskLevel}
+                </StatusPill>
+              </td>
+              <td>
+                <StatusPill tone={enabledTone(tool.enabled)}>
+                  {tool.enabled ? "enabled" : "disabled"}
+                </StatusPill>
+              </td>
+              {showSchema ? (
+                <td>
+                  <SchemaViewer tool={tool} />
+                </td>
+              ) : null}
+              {showAccess ? (
+                <td>
+                  {grantStatusByToolKey?.get(toolKey(tool)) ??
+                    "No active grant found"}
+                </td>
+              ) : null}
               <td>{formatDate(tool.discoveredAt)}</td>
               <td>{formatDate(tool.lastSeenAt)}</td>
-              {showAdminPlaceholder ? <td><StatusPill tone="info">API pending</StatusPill><p className="muted">Admin test-call endpoint is not part of prompt 05.</p></td> : null}
+              {showAdminPlaceholder ? (
+                <td>
+                  <StatusPill tone="info">API pending</StatusPill>
+                  <p className="muted">
+                    Admin test-call endpoint is not part of prompt 05.
+                  </p>
+                </td>
+              ) : null}
               {actionSlot ? <td>{actionSlot(tool)}</td> : null}
             </tr>
           ))}
@@ -110,7 +197,9 @@ export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, sho
   );
 }
 
-export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServerVersion[] }>) {
+export function ServerVersionTable({
+  versions,
+}: Readonly<{ versions: ApiMcpServerVersion[] }>) {
   return (
     <div className="table-wrap">
       <table>
@@ -129,13 +218,25 @@ export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServ
             <tr key={version.id}>
               <td>
                 {version.version}
-                <p className="muted">{version.createdBy ? `Created by ${version.createdBy}` : "Creator not recorded"}</p>
+                <p className="muted">
+                  {version.createdBy
+                    ? `Created by ${version.createdBy}`
+                    : "Creator not recorded"}
+                </p>
               </td>
-              <td><StatusPill tone={serverVersionTone(version.status)}>{version.status}</StatusPill></td>
-              <td><VersionImage version={version} /></td>
+              <td>
+                <StatusPill tone={serverVersionTone(version.status)}>
+                  {version.status}
+                </StatusPill>
+              </td>
+              <td>
+                <VersionImage version={version} />
+              </td>
               <td>
                 <p>{version.configHash ?? "Config hash not recorded"}</p>
-                <p className="muted">Schema {version.toolSchemaHash ?? "not recorded"}</p>
+                <p className="muted">
+                  Schema {version.toolSchemaHash ?? "not recorded"}
+                </p>
               </td>
               <td>{formatDate(version.createdAt)}</td>
               <td>{formatDate(version.activatedAt)}</td>
@@ -193,7 +294,15 @@ export function RolloutStatusTable({ rows }: Readonly<{ rows: RolloutStatusRow[]
   );
 }
 
-export function GrantTable({ grants, serverNameById, actionSlot }: Readonly<{ grants: ApiGrant[]; serverNameById: Map<string, string>; actionSlot?: (grant: ApiGrant) => ReactNode }>) {
+export function GrantTable({
+  grants,
+  serverNameById,
+  actionSlot,
+}: Readonly<{
+  grants: ApiGrant[];
+  serverNameById: Map<string, string>;
+  actionSlot?: (grant: ApiGrant) => ReactNode;
+}>) {
   return (
     <div className="table-wrap">
       <table>
@@ -211,11 +320,17 @@ export function GrantTable({ grants, serverNameById, actionSlot }: Readonly<{ gr
         <tbody>
           {grants.map((grant) => (
             <tr key={grant.id}>
-              <td>{grant.subjectType}: {grant.subjectId}</td>
+              <td>
+                {grant.subjectType}: {grant.subjectId}
+              </td>
               <td>{serverNameById.get(grant.serverId) ?? grant.serverId}</td>
               <td>{grant.allowedTools.join(", ")}</td>
               <td>{grant.environment}</td>
-              <td><StatusPill tone={enabledTone(grant.enabled)}>{grant.enabled ? "active" : "revoked"}</StatusPill></td>
+              <td>
+                <StatusPill tone={enabledTone(grant.enabled)}>
+                  {grant.enabled ? "active" : "revoked"}
+                </StatusPill>
+              </td>
               <td>{grant.reason}</td>
               {actionSlot ? <td>{actionSlot(grant)}</td> : null}
             </tr>
@@ -226,7 +341,13 @@ export function GrantTable({ grants, serverNameById, actionSlot }: Readonly<{ gr
   );
 }
 
-export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: ApiApproval[]; actionSlot?: (approval: ApiApproval) => ReactNode }>) {
+export function ApprovalTable({
+  approvals,
+  actionSlot,
+}: Readonly<{
+  approvals: ApiApproval[];
+  actionSlot?: (approval: ApiApproval) => ReactNode;
+}>) {
   return (
     <div className="table-wrap">
       <table>
@@ -256,17 +377,42 @@ export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: A
                 </td>
                 <td>
                   {approval.requestedAction}
-                  <p className="muted">{formatList(approval.requestedTools)} · {approval.environment}</p>
-                  {ticketUrl ? <p><a href={ticketUrl} target="_blank" rel="noreferrer">Ticket</a></p> : null}
-                  {approval.requestedExpiresAt ? <p className="muted">Requested expiry {formatDate(approval.requestedExpiresAt)}</p> : null}
+                  <p className="muted">
+                    {formatList(approval.requestedTools)} ·{" "}
+                    {approval.environment}
+                  </p>
+                  {ticketUrl ? (
+                    <p>
+                      <a href={ticketUrl} target="_blank" rel="noreferrer">
+                        Ticket
+                      </a>
+                    </p>
+                  ) : null}
+                  {approval.requestedExpiresAt ? (
+                    <p className="muted">
+                      Requested expiry {formatDate(approval.requestedExpiresAt)}
+                    </p>
+                  ) : null}
                   <p className="muted">{approval.reason}</p>
                 </td>
-                <td><StatusPill tone={approvalTone(approval.status)}>{approval.status}</StatusPill></td>
+                <td>
+                  <StatusPill tone={approvalTone(approval.status)}>
+                    {approval.status}
+                  </StatusPill>
+                </td>
                 <td>
                   {formatDate(approval.createdAt)}
-                  <p className="muted">Updated {formatDate(approval.updatedAt)}</p>
+                  <p className="muted">
+                    Updated {formatDate(approval.updatedAt)}
+                  </p>
                 </td>
-                <td>{actionSlot ? actionSlot(approval) : <ApprovalDecision approval={approval} />}</td>
+                <td>
+                  {actionSlot ? (
+                    actionSlot(approval)
+                  ) : (
+                    <ApprovalDecision approval={approval} />
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -285,7 +431,9 @@ function VersionImage({ version }: Readonly<{ version: ApiMcpServerVersion }>) {
     return (
       <div>
         <p>{version.imageRepository ?? "Image repository not recorded"}</p>
-        <p className="muted">{version.imageTag ?? version.imageDigest ?? "Image tag not recorded"}</p>
+        <p className="muted">
+          {version.imageTag ?? version.imageDigest ?? "Image tag not recorded"}
+        </p>
       </div>
     );
   }
@@ -317,8 +465,12 @@ function ApprovalDecision({ approval }: Readonly<{ approval: ApiApproval }>) {
   return (
     <div>
       {approval.reviewerId ? <p>Reviewer {approval.reviewerId}</p> : null}
-      {approval.decidedAt ? <p className="muted">Decided {formatDate(approval.decidedAt)}</p> : null}
-      {approval.reviewComment ? <p className="muted">{approval.reviewComment}</p> : null}
+      {approval.decidedAt ? (
+        <p className="muted">Decided {formatDate(approval.decidedAt)}</p>
+      ) : null}
+      {approval.reviewComment ? (
+        <p className="muted">{approval.reviewComment}</p>
+      ) : null}
     </div>
   );
 }
@@ -334,7 +486,9 @@ function safeExternalUrl(value: string | undefined) {
 
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? value : undefined;
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? value
+      : undefined;
   } catch (caught: unknown) {
     if (caught instanceof TypeError) {
       return undefined;
@@ -363,19 +517,53 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
         <tbody>
           {events.map((event) => (
             <tr key={event.id}>
-              <td>{event.eventType}<p className="muted">{event.toolName ?? event.serverId ?? "Hub scope"}</p></td>
-              <td><StatusPill tone={policyTone(event.policyDecision)}>{event.policyDecision}</StatusPill></td>
-              <td><StatusPill tone={riskTone(event.riskLevel)}>{event.riskLevel}</StatusPill></td>
-              <td>{event.userId ?? event.clientId ?? "unknown"}</td>
-              <td><AuditExecution event={event} /></td>
-              <td>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">Not recorded</span>}</td>
               <td>
-                <CopyButton value={event.traceId} label="Copy trace" />
-                <Link className="button button--ghost" href={`/audit?trace_id=${encodeURIComponent(event.traceId)}`}>Trace link</Link>
+                {event.eventType}
+                <p className="muted">
+                  {event.toolName ?? event.serverId ?? "Hub scope"}
+                </p>
               </td>
               <td>
-                <RedactedJsonDetails summary="View redacted arguments" value={event.argumentRedactedJson} emptyText="No redacted arguments returned" />
-                <RedactedJsonDetails summary="View redacted metadata" value={event.metadataJson} emptyText="No metadata returned" />
+                <StatusPill tone={policyTone(event.policyDecision)}>
+                  {event.policyDecision}
+                </StatusPill>
+              </td>
+              <td>
+                <StatusPill tone={riskTone(event.riskLevel)}>
+                  {event.riskLevel}
+                </StatusPill>
+              </td>
+              <td>{event.userId ?? event.clientId ?? "unknown"}</td>
+              <td>
+                <AuditExecution event={event} />
+              </td>
+              <td>
+                {event.argumentHash ? (
+                  <code>{event.argumentHash}</code>
+                ) : (
+                  <span className="muted">Not recorded</span>
+                )}
+              </td>
+              <td>
+                <CopyButton value={event.traceId} label="Copy trace" />
+                <Link
+                  className="button button--ghost"
+                  href={`/audit?trace_id=${encodeURIComponent(event.traceId)}`}
+                >
+                  Trace link
+                </Link>
+              </td>
+              <td>
+                <RedactedJsonDetails
+                  summary="View redacted arguments"
+                  value={event.argumentRedactedJson}
+                  emptyText="No redacted arguments returned"
+                />
+                <RedactedJsonDetails
+                  summary="View redacted metadata"
+                  value={event.metadataJson}
+                  emptyText="No metadata returned"
+                />
               </td>
               <td>{formatDate(event.timestamp)}</td>
             </tr>
@@ -389,14 +577,34 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
 function AuditExecution({ event }: Readonly<{ event: ApiAuditEvent }>) {
   return (
     <div>
-      <p>{event.latencyMs === undefined ? <span className="muted">Latency n/a</span> : `${event.latencyMs} ms`}</p>
-      {event.upstreamStatus === undefined ? <p className="muted">Upstream n/a</p> : <StatusPill tone={event.upstreamStatus < 400 ? "success" : "warning"}>{event.upstreamStatus}</StatusPill>}
-      {event.errorCode ? <p className="muted">Error {event.errorCode}</p> : null}
+      <p>
+        {event.latencyMs === undefined ? (
+          <span className="muted">Latency n/a</span>
+        ) : (
+          `${event.latencyMs} ms`
+        )}
+      </p>
+      {event.upstreamStatus === undefined ? (
+        <p className="muted">Upstream n/a</p>
+      ) : (
+        <StatusPill tone={event.upstreamStatus < 400 ? "success" : "warning"}>
+          {event.upstreamStatus}
+        </StatusPill>
+      )}
+      {event.errorCode ? (
+        <p className="muted">Error {event.errorCode}</p>
+      ) : null}
     </div>
   );
 }
 
-export function ToolCallTable({ events, serverNameById }: Readonly<{ events: ApiToolCallEvent[]; serverNameById: Map<string, string> }>) {
+export function ToolCallTable({
+  events,
+  serverNameById,
+}: Readonly<{
+  events: ApiToolCallEvent[];
+  serverNameById: Map<string, string>;
+}>) {
   return (
     <div className="table-wrap">
       <table>
@@ -414,8 +622,22 @@ export function ToolCallTable({ events, serverNameById }: Readonly<{ events: Api
             <tr key={event.id}>
               <td>{event.toolName}</td>
               <td>{serverNameById.get(event.serverId) ?? event.serverId}</td>
-              <td><StatusPill tone={isSuccessfulToolCallStatus(event.status) ? "success" : "warning"}>{event.status}</StatusPill></td>
-              <td>{event.latencyMs === undefined ? "n/a" : `${event.latencyMs} ms`}</td>
+              <td>
+                <StatusPill
+                  tone={
+                    isSuccessfulToolCallStatus(event.status)
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {event.status}
+                </StatusPill>
+              </td>
+              <td>
+                {event.latencyMs === undefined
+                  ? "n/a"
+                  : `${event.latencyMs} ms`}
+              </td>
               <td>{formatDate(event.createdAt)}</td>
             </tr>
           ))}
@@ -425,7 +647,13 @@ export function ToolCallTable({ events, serverNameById }: Readonly<{ events: Api
   );
 }
 
-export function HealthTable({ checks, serverNameById }: Readonly<{ checks: ApiServerHealth[]; serverNameById: Map<string, string> }>) {
+export function HealthTable({
+  checks,
+  serverNameById,
+}: Readonly<{
+  checks: ApiServerHealth[];
+  serverNameById: Map<string, string>;
+}>) {
   return (
     <div className="table-wrap">
       <table>
@@ -434,7 +662,9 @@ export function HealthTable({ checks, serverNameById }: Readonly<{ checks: ApiSe
             <th>Server</th>
             <th>Status</th>
             <th>Latency</th>
+            <th>Backoff</th>
             <th>Error</th>
+            <th>Trace</th>
             <th>Checked</th>
           </tr>
         </thead>
@@ -442,9 +672,29 @@ export function HealthTable({ checks, serverNameById }: Readonly<{ checks: ApiSe
           {checks.map((check) => (
             <tr key={check.id}>
               <td>{serverNameById.get(check.serverId) ?? check.serverId}</td>
-              <td><StatusPill tone={healthTone(check.status)}>{check.status}</StatusPill></td>
-              <td>{check.latencyMs === undefined ? "n/a" : `${check.latencyMs} ms`}</td>
+              <td>
+                <StatusPill tone={healthTone(check.status)}>
+                  {check.status}
+                </StatusPill>
+              </td>
+              <td>
+                {check.latencyMs === undefined
+                  ? "n/a"
+                  : `${check.latencyMs} ms`}
+              </td>
+              <td>
+                {check.backoffSeconds
+                  ? `${check.backoffSeconds}s after attempt ${check.attempt ?? 1}`
+                  : "none"}
+              </td>
               <td>{check.errorMessage ?? "None"}</td>
+              <td>
+                {check.traceId ? (
+                  <CopyButton value={check.traceId} label="Copy trace" />
+                ) : (
+                  <span className="muted">n/a</span>
+                )}
+              </td>
               <td>{formatDate(check.checkedAt)}</td>
             </tr>
           ))}
@@ -468,7 +718,11 @@ function SchemaViewer({ tool }: Readonly<{ tool: ApiMcpTool }>) {
   );
 }
 
-function RedactedJsonDetails({ summary, value, emptyText }: Readonly<{ summary: string; value: unknown; emptyText: string }>) {
+function RedactedJsonDetails({
+  summary,
+  value,
+  emptyText,
+}: Readonly<{ summary: string; value: unknown; emptyText: string }>) {
   if (value === undefined || value === null) {
     return <p className="muted">{emptyText}</p>;
   }
@@ -476,7 +730,9 @@ function RedactedJsonDetails({ summary, value, emptyText }: Readonly<{ summary: 
   return (
     <details className="schema-viewer">
       <summary>{summary}</summary>
-      <pre className="code-block">{JSON.stringify(redactAuditJson(value), null, 2)}</pre>
+      <pre className="code-block">
+        {JSON.stringify(redactAuditJson(value), null, 2)}
+      </pre>
     </details>
   );
 }
@@ -491,16 +747,27 @@ function redactAuditJson(value: unknown): unknown {
   }
 
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
-      key,
-      isSensitiveMetadataKey(key) ? "[REDACTED]" : redactAuditJson(nestedValue)
-    ])
+    Object.entries(value as Record<string, unknown>).map(
+      ([key, nestedValue]) => [
+        key,
+        isSensitiveMetadataKey(key)
+          ? "[REDACTED]"
+          : redactAuditJson(nestedValue),
+      ],
+    ),
   );
 }
 
 function isSensitiveMetadataKey(key: string) {
   const normalized = key.toLowerCase();
-  return normalized.includes("token") || normalized.includes("secret") || normalized.includes("password") || normalized.includes("authorization") || normalized.includes("credential") || normalized.endsWith("key");
+  return (
+    normalized.includes("token") ||
+    normalized.includes("secret") ||
+    normalized.includes("password") ||
+    normalized.includes("authorization") ||
+    normalized.includes("credential") ||
+    normalized.endsWith("key")
+  );
 }
 
 function toolKey(tool: ApiMcpTool) {
@@ -509,5 +776,9 @@ function toolKey(tool: ApiMcpTool) {
 
 function isSuccessfulToolCallStatus(status: string) {
   const normalized = status.toLowerCase();
-  return normalized === "ok" || normalized === "success" || normalized === "succeeded";
+  return (
+    normalized === "ok" ||
+    normalized === "success" ||
+    normalized === "succeeded"
+  );
 }
