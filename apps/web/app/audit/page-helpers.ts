@@ -47,7 +47,7 @@ export function filterToolCallEvents(events: ApiToolCallEvent[], filters: Record
   return events.filter((event) => matchesStringFilter(event.serverId, readFilter(filters, "server")) && matchesStringFilter(event.toolName, readFilter(filters, "tool")) && matchesStringFilter(event.status, readFilter(filters, "status")));
 }
 
-export function buildAuditPageHref(filters: Record<string, string | string[] | undefined>, cursor: string) {
+export function buildAuditPageHref(filters: Record<string, string | string[] | undefined>, cursor: string, basePath = "/admin/audit") {
   const params = new URLSearchParams();
   for (const field of auditFilterFields) {
     const value = field.name === "limit" ? readFilter(filters, field.name) || "100" : readFilter(filters, field.name);
@@ -57,7 +57,7 @@ export function buildAuditPageHref(filters: Record<string, string | string[] | u
   }
   params.set("cursor", cursor);
 
-  return `/audit?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 function matchesStringFilter(value: string | undefined, filter: string) {
