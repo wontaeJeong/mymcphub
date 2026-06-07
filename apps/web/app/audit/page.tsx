@@ -4,7 +4,7 @@ import { EmptyState } from "@mcp-hub/ui";
 import { PageHero, SectionHeader } from "../../components/chrome";
 import { ErrorState } from "../../components/states";
 import { AuditTable, ToolCallTable } from "../../components/tables";
-import { listAuditEvents, listServers, listToolCallEvents } from "../../lib/api";
+import { buildAuditExportPath, getApiBaseUrl, listAuditEvents, listServers, listToolCallEvents } from "../../lib/api";
 import { loadResult } from "../../lib/result";
 import { auditFilterFields, buildAuditPageHref, filterToolCallEvents, readAuditOptions, readFilter } from "./page-helpers";
 
@@ -14,7 +14,8 @@ type AuditPageProps = Readonly<{
 
 export default async function AuditPage({ searchParams }: AuditPageProps) {
   const filters = await searchParams;
-  const auditPromise = loadResult(listAuditEvents(readAuditOptions(filters)));
+  const auditOptions = readAuditOptions(filters);
+  const auditPromise = loadResult(listAuditEvents(auditOptions));
   const callsPromise = loadResult(listToolCallEvents());
   const serversPromise = loadResult(listServers());
   const [audit, calls, servers] = await Promise.all([auditPromise, callsPromise, serversPromise]);
@@ -22,6 +23,7 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
   const auditItems = audit.ok ? audit.data.items : [];
   const filteredCalls = calls.ok ? filterToolCallEvents(calls.data.items, filters) : [];
   const nextAuditHref = audit.ok && audit.data.pageInfo?.nextCursor ? buildAuditPageHref(filters, audit.data.pageInfo.nextCursor) : undefined;
+  const exportHref = new URL(buildAuditExportPath(auditOptions), getApiBaseUrl()).toString();
 
   return (
     <div className="page-stack">
@@ -43,7 +45,7 @@ export default async function AuditPage({ searchParams }: AuditPageProps) {
         </div>
       </form>
       <section>
-        <SectionHeader title="Policy and admin events" description="Paginated /api/audit-events results with server-side filters and redacted argument detail." action={nextAuditHref ? <Link className="button" href={nextAuditHref}>Next page</Link> : undefined} />
+        <SectionHeader title="Policy and admin events" description="Paginated /api/audit-events results with server-side filters and redacted argument detail." action={<div className="actions"><a className="button button--ghost" href={exportHref}>Export filtered JSON</a>{nextAuditHref ? <Link className="button" href={nextAuditHref}>Next page</Link> : null}</div>} />
         {audit.ok && auditItems.length > 0 ? <AuditTable events={auditItems} /> : audit.ok ? <EmptyState title="No audit events" description="No audit event matched the current server-side filters." /> : <ErrorState message={audit.error} />}
       </section>
       <section>

@@ -11,6 +11,7 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
   const [state, formAction, pending] = useActionState(generateClientConfigAction, initialFormActionState);
   const selectedServer = servers.find((server) => server.id === state.selectedServerId) ?? servers[0];
   const selectedClient = state.selectedClient ?? "opencode";
+  const selectedProfile = state.selectedProfile ?? "local";
 
   return (
     <form className="form-card" action={formAction}>
@@ -35,6 +36,10 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
             <option value="vscode">VS Code</option>
           </select>
         </div>
+        <div className="field">
+          <label htmlFor="profile">Client profile</label>
+          <input id="profile" name="profile" defaultValue={selectedProfile} placeholder="local, prod, incident-response" />
+        </div>
       </div>
       <div className="form-actions">
         <button className="button" type="submit" disabled={pending}>{pending ? "Generating..." : "Generate config"}</button>
@@ -43,7 +48,9 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
       <div className="config-summary">
         <p><strong>Selected server:</strong> {selectedServer?.displayName ?? "No server selected"}</p>
         <p><strong>Selected client:</strong> {selectedClient}</p>
+        <p><strong>Client profile:</strong> {selectedProfile}</p>
         <p><strong>Gateway URL:</strong> {state.gatewayUrl ? <CopyButton value={state.gatewayUrl} label="Copy URL" /> : <span className="muted">Unavailable from generated Control Plane response</span>}</p>
+        <p><strong>Test instruction:</strong> {state.gatewayUrl ? <code>mcphubctl --profile {selectedProfile} health && mcp inspector {state.gatewayUrl}</code> : <span className="muted">Generate a config to reveal the gateway test command.</span>}</p>
       </div>
       {state.payload ? (
         <div className="grid">

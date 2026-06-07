@@ -4,9 +4,10 @@ import { EmptyState, Surface } from "@mcp-hub/ui";
 import { PageHero, SectionHeader } from "../../components/chrome";
 import { ErrorState } from "../../components/states";
 import { ToolTable } from "../../components/tables";
-import type { ApiMcpTool } from "../../lib/api";
+import { ToolTestLab } from "../../components/tool-test-lab";
 import { listGrants, listServers, listTools } from "../../lib/api";
 import { loadResult } from "../../lib/result";
+import { buildGrantStatus, buildToolTestOptions } from "./page-helpers";
 
 export default async function ToolsPage() {
   const serversPromise = loadResult(listServers());
@@ -22,8 +23,10 @@ export default async function ToolsPage() {
   }
 
   const toolResults = await Promise.all(servers.data.items.map(async (server) => ({ server, tools: await loadResult(listTools(server.id)) })));
+  const toolItems = toolResults.flatMap((result) => result.tools.ok ? result.tools.data.items : []);
   const totalTools = toolResults.reduce((count, result) => count + (result.tools.ok ? result.tools.data.items.length : 0), 0);
-  const grantStatusByToolKey = buildGrantStatus(toolResults.flatMap((result) => result.tools.ok ? result.tools.data.items : []), grants.ok ? grants.data.items : []);
+  const grantStatusByToolKey = buildGrantStatus(toolItems, grants.ok ? grants.data.items : []);
+  const testOptions = buildToolTestOptions(servers.data.items, toolItems);
 
   return (
     <div className="page-stack">
@@ -35,22 +38,13 @@ export default async function ToolsPage() {
         <Surface><SectionHeader title="Grant source" /><p>{grants.ok ? "/api/grants" : "Grant status unavailable"}</p></Surface>
       </div>
       {!grants.ok ? <ErrorState title="Grant status unavailable" message={grants.error} /> : null}
+      <ToolTestLab options={testOptions} />
       {toolResults.map(({ server, tools }) => (
         <section key={server.id}>
           <SectionHeader title={server.displayName} description={server.description ?? server.slug} action={<Link className="button button--ghost" href={`/servers/${server.id}`}>Server detail</Link>} />
-          {tools.ok && tools.data.items.length > 0 ? <ToolTable tools={tools.data.items} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess showAdminPlaceholder /> : tools.ok ? <EmptyState title="No tools" description="This server returned an empty tool list." /> : <ErrorState message={tools.error} />}
+          {tools.ok && tools.data.items.length > 0 ? <ToolTable tools={tools.data.items} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess /> : tools.ok ? <EmptyState title="No tools" description="This server returned an empty tool list." /> : <ErrorState message={tools.error} />}
         </section>
       ))}
     </div>
   );
-}
-
-function buildGrantStatus(tools: ApiMcpTool[], grants: { serverId: string; allowedTools: string[]; enabled: boolean; subjectType: string; subjectId: string }[]) {
-  const statuses = new Map<string, string>();
-  for (const tool of tools) {
-    const matching = grants.filter((grant) => grant.enabled && grant.serverId === tool.serverId && (grant.allowedTools.includes(tool.name) || grant.allowedTools.includes("*")));
-    statuses.set(`${tool.serverId}:${tool.name}`, matching.length > 0 ? `${matching.length} active grant${matching.length === 1 ? "" : "s"}: ${matching.map((grant) => `${grant.subjectType}:${grant.subjectId}`).join(", ")}` : "No active grant found");
-  }
-
-  return statuses;
 }

@@ -4,6 +4,9 @@ export type FormActionState = {
   payload?: string;
   selectedServerId?: string;
   selectedClient?: string;
+  selectedProfile?: string;
+  selectedToolRef?: string;
+  policyEffect?: string;
   gatewayUrl?: string;
 };
 
