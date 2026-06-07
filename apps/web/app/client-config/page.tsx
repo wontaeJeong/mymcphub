@@ -1,19 +1,5 @@
-import { EmptyState } from "@mcp-hub/ui";
+import { redirect } from "next/navigation";
 
-import { PageHero } from "../../components/chrome";
-import { ClientConfigForm } from "../../components/client-config-form";
-import { ErrorState } from "../../components/states";
-import { listServers } from "../../lib/api";
-import { loadResult } from "../../lib/result";
-
-export default async function ClientConfigPage() {
-  const servers = await loadResult(listServers());
-  const enabledServers = servers.ok ? servers.data.items.filter((server) => server.enabled) : [];
-
-  return (
-    <div className="page-stack">
-      <PageHero eyebrow="클라이언트 설정 생성기" title="승인된 서버를 클라이언트 설정으로 변환하세요." description="opencode, Claude Code, Codex, VS Code 또는 일반 원격 MCP 클라이언트를 위한 실제 /api/client-config/generate 요청을 전송합니다." />
-      {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} /> : servers.ok ? <EmptyState title="활성 서버 없음" description="클라이언트 설정은 활성 서버에 대해서만 생성할 수 있습니다." /> : <ErrorState message={servers.error} />}
-    </div>
-  );
+export default function Page() {
+  redirect("/user/client-config");
 }
