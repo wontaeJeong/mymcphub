@@ -2,7 +2,11 @@ import { EmptyState, Surface } from "@mcp-hub/ui";
 
 import { PageHero, SectionHeader } from "../../components/chrome";
 import { ErrorState } from "../../components/states";
-import { HealthTable, RolloutStatusTable, ServerTable } from "../../components/tables";
+import {
+  HealthTable,
+  RolloutStatusTable,
+  ServerTable,
+} from "../../components/tables";
 import {
   listDeniedCallAnalytics,
   listServerHealth,
@@ -64,68 +68,68 @@ export default async function OperationsPage() {
         b.calls - a.calls ||
         usageItemKey(a).localeCompare(usageItemKey(b)),
     )
-      .slice(0, 10);
+    .slice(0, 10);
 
   return (
     <div className="page-stack">
       <PageHero
-        eyebrow="Health and operations"
-        title="Keep the hub in service."
-        description="Watch server status, denied-call analytics, usage accounting, and health worker output from the Control Plane."
+        eyebrow="상태 및 운영"
+        title="허브를 안정적으로 운영하세요."
+        description="제어 플레인의 서버 상태, 거부 호출 분석, 사용량 집계, 상태 워커 출력을 확인합니다."
       />
       <div className="card-grid">
         <Surface>
-          <SectionHeader title="Servers" />
+          <SectionHeader title="서버" />
           <p>{serverItems.length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Disabled" />
+          <SectionHeader title="비활성" />
           <p>{serverItems.filter((server) => !server.enabled).length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Incidents" />
+          <SectionHeader title="장애" />
           <p>{incidentCount}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Published" />
+          <SectionHeader title="게시됨" />
           <p>{serverItems.filter((server) => server.published).length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Quarantined" />
+          <SectionHeader title="격리됨" />
           <p>{serverItems.filter((server) => server.quarantined).length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Active rollouts" />
+          <SectionHeader title="활성 롤아웃" />
           <p>{rolloutRows.filter((row) => row.activeVersion).length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Tool calls" />
+          <SectionHeader title="도구 호출" />
           <p>{totalToolCalls}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="Denied calls" />
+          <SectionHeader title="거부 호출" />
           <p>{deniedToolCalls}</p>
         </Surface>
       </div>
       {versionErrors.length > 0 ? (
         <ErrorState
-          title="Rollout versions partially unavailable"
-          message={`${versionErrors.length} server version request(s) failed while building rollout status.`}
+          title="롤아웃 버전을 일부 사용할 수 없음"
+          message={`${versionErrors.length}개 서버 버전 요청이 롤아웃 상태를 구성하는 동안 실패했습니다.`}
         />
       ) : null}
       <section>
         <SectionHeader
-          title="Denied-call analytics"
-          description="Aggregated policy deny reasons and top denied tools from /api/analytics/denied-calls."
+          title="거부 호출 분석"
+          description="/api/analytics/denied-calls의 정책 거부 사유와 상위 거부 도구 집계입니다."
         />
         {denied.ok && deniedReasons.length > 0 ? (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Reason</th>
-                  <th>Count</th>
-                  <th>Policy tuning guidance</th>
+                  <th>사유</th>
+                  <th>수</th>
+                  <th>정책 조정 안내</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +143,7 @@ export default async function OperationsPage() {
                       <td>{reason.count}</td>
                       <td>
                         {tuning?.message ??
-                          "Review grants and policy before tuning."}
+                          "조정 전에 권한과 정책을 검토하세요."}
                       </td>
                     </tr>
                   );
@@ -149,8 +153,8 @@ export default async function OperationsPage() {
           </div>
         ) : denied.ok ? (
           <EmptyState
-            title="No denied calls"
-            description="No denied tool calls were found in the current audit window."
+            title="거부 호출 없음"
+            description="현재 감사 범위에서 거부된 도구 호출이 없습니다."
           />
         ) : (
           <ErrorState message={denied.error} />
@@ -158,15 +162,15 @@ export default async function OperationsPage() {
       </section>
       <section>
         <SectionHeader
-          title="Rollout and quarantine status"
-          description="Combines /api/servers, /api/servers/:serverId/versions, and /api/server-health so operators can see active versions, rollout freshness, and quarantine state together."
+          title="롤아웃 및 격리 상태"
+          description="/api/servers, /api/servers/:serverId/versions, /api/server-health를 결합해 활성 버전, 롤아웃 최신성, 격리 상태를 함께 표시합니다."
         />
         {servers.ok && rolloutRows.length > 0 ? (
           <RolloutStatusTable rows={rolloutRows} />
         ) : servers.ok ? (
           <EmptyState
-            title="No rollout rows"
-            description="Register servers before rollout status can be shown."
+            title="롤아웃 행 없음"
+            description="롤아웃 상태를 표시하려면 먼저 서버를 등록하세요."
           />
         ) : (
           <ErrorState message={servers.error} />
@@ -174,19 +178,19 @@ export default async function OperationsPage() {
       </section>
       <section>
         <SectionHeader
-          title="Usage accounting"
-          description="Daily team/project/user/server/tool aggregation from /api/analytics/usage."
+          title="사용량 집계"
+          description="/api/analytics/usage의 일별 팀/프로젝트/사용자/서버/도구 집계입니다."
         />
         {usage.ok && usageItems.length > 0 ? (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Period</th>
-                  <th>Server</th>
-                  <th>Tool</th>
-                  <th>Calls</th>
-                  <th>Denied</th>
+                  <th>기간</th>
+                  <th>서버</th>
+                  <th>도구</th>
+                  <th>호출</th>
+                  <th>거부</th>
                   <th>p95</th>
                   <th>p99</th>
                 </tr>
@@ -198,9 +202,9 @@ export default async function OperationsPage() {
                     <td>
                       {serverNameById.get(item.serverId ?? "") ??
                         item.serverId ??
-                        "Hub"}
+                        "허브"}
                     </td>
-                    <td>{item.toolName ?? "All tools"}</td>
+                    <td>{item.toolName ?? "전체 도구"}</td>
                     <td>{item.calls}</td>
                     <td>{item.denied}</td>
                     <td>{item.p95LatencyMs} ms</td>
@@ -212,8 +216,8 @@ export default async function OperationsPage() {
           </div>
         ) : usage.ok ? (
           <EmptyState
-            title="No usage rows"
-            description="Tool-call audit events will appear here after Gateway traffic is recorded."
+            title="사용량 행 없음"
+            description="Gateway 트래픽이 기록되면 도구 호출 감사 이벤트가 여기에 표시됩니다."
           />
         ) : (
           <ErrorState message={usage.error} />
@@ -221,15 +225,15 @@ export default async function OperationsPage() {
       </section>
       <section>
         <SectionHeader
-          title="Server health"
-          description="Rows returned by /api/server-health."
+          title="서버 상태"
+          description="/api/server-health가 반환한 행입니다."
         />
         {health.ok && healthItems.length > 0 ? (
           <HealthTable checks={healthItems} serverNameById={serverNameById} />
         ) : health.ok ? (
           <EmptyState
-            title="No health checks"
-            description="The Control Plane returned no health checks."
+            title="상태 확인 없음"
+            description="제어 플레인이 상태 확인을 반환하지 않았습니다."
           />
         ) : (
           <ErrorState message={health.error} />
@@ -237,18 +241,15 @@ export default async function OperationsPage() {
       </section>
       <section>
         <SectionHeader
-          title="Operational catalog state"
-          description="Server enablement and risk posture for operations review."
+          title="운영 카탈로그 상태"
+          description="운영 검토를 위한 서버 활성 여부와 위험 수준입니다."
         />
         {servers.ok && serverItems.length > 0 ? (
-          <ServerTable
-            servers={serverItems}
-            healthByServerId={healthByServerId}
-          />
+          <ServerTable servers={serverItems} healthByServerId={healthByServerId} />
         ) : servers.ok ? (
           <EmptyState
-            title="No servers"
-            description="The Control Plane returned no catalog entries."
+            title="서버 없음"
+            description="제어 플레인이 카탈로그 항목을 반환하지 않았습니다."
           />
         ) : (
           <ErrorState message={servers.error} />
