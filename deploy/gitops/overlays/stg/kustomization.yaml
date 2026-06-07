@@ -14,6 +14,7 @@ helmCharts:
       image:
         tag: stg
       config:
+        appEnv: staging
         publicUrl: https://mcp-hub-stg.example.com
       auth:
         mode: oidc
@@ -27,6 +28,9 @@ helmCharts:
         replicas: 2
       worker:
         replicas: 1
+      cli:
+        image:
+          repository: mcphubctl
       networkPolicy:
         allowExternalEgress: false
       ingress:

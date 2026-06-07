@@ -15,6 +15,7 @@ helmCharts:
         tag: dev
       config:
         nodeEnv: development
+        appEnv: development
         logLevel: debug
         publicUrl: https://mcp-hub-dev.example.com
       auth:
@@ -29,6 +30,9 @@ helmCharts:
         replicas: 1
       worker:
         replicas: 1
+      cli:
+        image:
+          repository: mcphubctl
       ingress:
         hosts:
           - host: mcp-hub-dev.example.com
