@@ -2,7 +2,7 @@
 
 ## Changed Files
 
-- `internal/db/types.go`, `internal/db/lane_b_store.go`, `internal/db/store.go`, `internal/db/store_test.go`
+- `internal/db/types.go`, `internal/db/control_plane_store.go`, `internal/db/store.go`, `internal/db/store_test.go`
 - `internal/controlplane/server.go`, `internal/controlplane/server_test.go`
 - `internal/jobs/jobs.go`, `internal/jobs/jobs_test.go`
 - `docs/WORKER.md`, `docs/API.md`
