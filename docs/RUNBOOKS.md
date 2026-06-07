@@ -1,5 +1,9 @@
 # Runbooks
 
+Use this file first during common incidents. It is the quick runbook index and triage entrypoint for Gateway, upstream MCP, auth, policy, observability, schema drift, and quarantine response.
+
+For detailed operational procedures, follow the matching section in [MCP Hub Runbook](RUNBOOK.md). For topic-specific emergency or deep-dive material, use the files under [docs/runbooks/](runbooks/), starting with [Emergency Response Runbook](runbooks/EMERGENCY_RESPONSE.md) during security incidents.
+
 ## Gateway Outage
 
 Check `/healthz`, `/readyz`, `/metrics`, recent Gateway audit denies, and upstream circuit state through `GET /mcp/{serverSlug}` with a valid token. Roll back only to a previous Go Gateway image tag or digest.
