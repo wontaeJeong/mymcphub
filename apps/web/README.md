@@ -8,7 +8,7 @@ From the repository root:
 
 ```sh
 pnpm install
-pnpm --filter @mcp-hub/api dev
+go run ./apps/api/cmd/api
 pnpm --filter @mcp-hub/web dev
 ```
 
@@ -35,6 +35,8 @@ pnpm lint
 pnpm test
 pnpm build
 ```
+
+The Web API boundary is generated at `apps/web/lib/generated/mcp-hub-client.ts` from the OpenAPI source under `schemas/openapi/`.
 
 The web workspace also includes a component test for the dashboard summary:
 

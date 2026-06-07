@@ -1,3 +1,10 @@
+import {
+  GeneratedApiClientError,
+  formatGeneratedApiError,
+  generatedApiRequest,
+  getGeneratedApiBaseUrl
+} from "./generated/mcp-hub-client";
+
 export type Environment = "dev" | "stg" | "prod" | "shared";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type ServerTransport = "streamable_http" | "sse_legacy" | "stdio_adapter" | "external";
@@ -227,60 +234,19 @@ export type RevokeServerGrantsResult = {
   serverId: string;
 };
 
-export class ApiClientError extends Error {
-  readonly status?: number;
-  readonly details?: unknown;
-
-  constructor(message: string, status?: number, details?: unknown) {
-    super(message);
-    this.name = "ApiClientError";
-    this.status = status;
-    this.details = details;
-  }
-}
+export const ApiClientError = GeneratedApiClientError;
+export type ApiClientError = GeneratedApiClientError;
 
 export function getApiBaseUrl() {
-  return process.env.MCP_API_URL ?? process.env.NEXT_PUBLIC_MCP_API_URL ?? "http://localhost:4000";
+  return getGeneratedApiBaseUrl();
 }
 
 export function formatApiError(error: unknown) {
-  if (error instanceof ApiClientError) {
-    return error.status ? `${error.message} (${error.status})` : error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "The Control Plane API is unavailable.";
+  return formatGeneratedApiError(error);
 }
 
 export async function apiRequest<Result>(path: string, init: RequestInit = {}): Promise<Result> {
-  const headers = new Headers(init.headers);
-  if (init.body && !headers.has("content-type")) {
-    headers.set("content-type", "application/json");
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(new URL(path, getApiBaseUrl()), {
-      ...init,
-      headers,
-      cache: "no-store"
-    });
-  } catch (error) {
-    throw new ApiClientError("Unable to reach the Control Plane API.", undefined, error);
-  }
-
-  if (!response.ok) {
-    throw new ApiClientError(await readErrorMessage(response), response.status);
-  }
-
-  if (response.status === 204) {
-    return undefined as Result;
-  }
-
-  return (await response.json()) as Result;
+  return generatedApiRequest<Result>(path, init);
 }
 
 export async function getMe() {
@@ -462,32 +428,4 @@ export async function revokeServerGrants(serverId: string) {
   return apiRequest<RevokeServerGrantsResult>(`/api/admin/revoke-server-grants/${encodeURIComponent(serverId)}`, {
     method: "POST"
   });
-}
-
-async function readErrorMessage(response: Response) {
-  try {
-    const body = (await response.json()) as unknown;
-    if (isErrorResponse(body)) {
-      return body.error.message;
-    }
-  } catch {
-    return response.statusText || "Control Plane API request failed.";
-  }
-
-  return response.statusText || "Control Plane API request failed.";
-}
-
-function isErrorResponse(value: unknown): value is { error: { message: string } } {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const error = candidate.error;
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const errorRecord = error as Record<string, unknown>;
-  return typeof errorRecord.message === "string";
 }
