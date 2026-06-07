@@ -37,9 +37,10 @@ import {
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
   healthByServerId?: Map<string, ApiServerHealth>;
+  serverBasePath?: string;
 }>;
 
-export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
+export function ServerTable({ servers, healthByServerId, serverBasePath = "/servers" }: ServerTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -63,7 +64,7 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
             return (
               <tr key={server.id}>
                 <td>
-                  <Link href={`/servers/${server.id}`}>
+                  <Link href={`${serverBasePath}/${server.id}`}>
                     {server.displayName}
                   </Link>
                   <p className="muted">
