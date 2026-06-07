@@ -1,0 +1,159 @@
+openapi: 3.1.0
+info:
+  title: MCP Hub Control Plane API
+  version: 0.1.0
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200": { description: Healthy }
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200": { description: Ready }
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200": { description: Metrics }
+  /api/me:
+    get:
+      summary: Current auth context
+      responses:
+        "200": { description: Auth context }
+  /api/servers:
+    get:
+      summary: List MCP servers
+      responses:
+        "200": { description: Server list }
+    post:
+      summary: Register MCP server
+      x-audit-event-required: true
+      responses:
+        "201": { description: Created server }
+        "403": { description: Platform admin required }
+  /api/servers/{serverId}:
+    get:
+      summary: Get MCP server
+      parameters:
+        - $ref: "#/components/parameters/serverId"
+      responses:
+        "200": { description: Server }
+    patch:
+      summary: Patch MCP server
+      x-audit-event-required: true
+      parameters:
+        - $ref: "#/components/parameters/serverId"
+      responses:
+        "200": { description: Updated server }
+  /api/servers/{serverId}/publish:
+    post: { summary: Publish server, x-audit-event-required: true, responses: { "200": { description: Published server } } }
+  /api/servers/{serverId}/unpublish:
+    post: { summary: Unpublish server, x-audit-event-required: true, responses: { "200": { description: Unpublished server } } }
+  /api/servers/{serverId}/disable:
+    post: { summary: Disable server, x-audit-event-required: true, responses: { "200": { description: Disabled server } } }
+  /api/servers/{serverId}/enable:
+    post: { summary: Enable server, x-audit-event-required: true, responses: { "200": { description: Enabled server } } }
+  /api/servers/{serverId}/quarantine:
+    post: { summary: Quarantine server, x-audit-event-required: true, responses: { "200": { description: Quarantined server } } }
+  /api/servers/{serverId}/versions:
+    get: { summary: List server versions, responses: { "200": { description: Server versions } } }
+    post: { summary: Create server version, x-audit-event-required: true, responses: { "201": { description: Created version } } }
+  /api/servers/{serverId}/versions/{versionId}/activate:
+    post: { summary: Activate server version, x-audit-event-required: true, responses: { "200": { description: Activated version } } }
+  /api/servers/{serverId}/versions/{versionId}/rollback:
+    post: { summary: Roll back server version, x-audit-event-required: true, responses: { "200": { description: Rolled back version } } }
+  /api/servers/{serverId}/schema-diff:
+    get: { summary: Get server schema diff, responses: { "200": { description: Schema diff } } }
+  /api/servers/{serverId}/tools:
+    get: { summary: List server tools, responses: { "200": { description: Tool list } } }
+  /api/servers/{serverId}/tools/{toolId}:
+    patch: { summary: Patch server tool, x-audit-event-required: true, responses: { "200": { description: Updated tool } } }
+  /api/servers/{serverId}/tools/{toolId}/enable:
+    post: { summary: Enable server tool, x-audit-event-required: true, responses: { "200": { description: Enabled tool } } }
+  /api/servers/{serverId}/tools/{toolId}/disable:
+    post: { summary: Disable server tool, x-audit-event-required: true, responses: { "200": { description: Disabled tool } } }
+  /api/servers/{serverId}/tools/{toolId}/schema:
+    get: { summary: Get tool schema, responses: { "200": { description: Tool schema } } }
+  /api/grants:
+    get: { summary: List grants, responses: { "200": { description: Grant list } } }
+    post: { summary: Create grant request, x-audit-event-required: true, responses: { "201": { description: Created grant } } }
+  /api/grants/{grantId}:
+    patch: { summary: Patch grant, x-audit-event-required: true, responses: { "200": { description: Updated grant } } }
+  /api/grants/{grantId}/approve:
+    post: { summary: Approve grant, x-audit-event-required: true, responses: { "200": { description: Approved grant } } }
+  /api/grants/{grantId}/revoke:
+    post: { summary: Revoke grant, x-audit-event-required: true, responses: { "200": { description: Revoked grant } } }
+  /api/approvals:
+    get: { summary: List approvals, responses: { "200": { description: Approval list } } }
+    post: { summary: Create approval request, x-audit-event-required: true, responses: { "201": { description: Created approval } } }
+  /api/approvals/{approvalId}/approve:
+    post: { summary: Approve approval request, x-audit-event-required: true, responses: { "200": { description: Approved approval } } }
+  /api/approvals/{approvalId}/reject:
+    post: { summary: Reject approval request, x-audit-event-required: true, responses: { "200": { description: Rejected approval } } }
+  /api/audit-events:
+    get:
+      summary: Search audit events
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: user, in: query, schema: { type: string } }
+        - { name: server, in: query, schema: { type: string } }
+        - { name: tool, in: query, schema: { type: string } }
+        - { name: policy_decision, in: query, schema: { enum: [allow, deny, needs_approval] } }
+      responses:
+        "200": { description: Paginated audit events }
+  /api/audit-events/export:
+    get: { summary: Export audit events, responses: { "200": { description: Audit export } } }
+  /api/audit-events/gateway:
+    post: { summary: Record gateway audit event, x-audit-event-required: true, responses: { "201": { description: Gateway audit event recorded } } }
+  /api/tool-call-events:
+    get: { summary: List tool call events, responses: { "200": { description: Tool call event list } } }
+  /api/server-health:
+    get: { summary: List server health records, responses: { "200": { description: Server health list } } }
+  /api/client-config/generate:
+    post: { summary: Generate client config, responses: { "200": { description: Client config } } }
+  /api/policy/validate:
+    post: { summary: Validate policy, responses: { "200": { description: Policy decision } } }
+  /api/policy/simulate:
+    post: { summary: Simulate policy, responses: { "200": { description: Policy decision } } }
+  /api/policy/test-call:
+    post: { summary: Simulate one policy-protected tool call, responses: { "200": { description: Policy decision } } }
+  /api/admin/emergency-deny:
+    post: { summary: Enable emergency deny, x-audit-event-required: true, responses: { "200": { description: Emergency deny enabled } } }
+  /api/admin/emergency-deny/disable:
+    post: { summary: Disable emergency deny, x-audit-event-required: true, responses: { "200": { description: Emergency deny disabled } } }
+  /api/admin/revoke-server-grants/{serverId}:
+    post: { summary: Revoke all grants for one server, x-audit-event-required: true, responses: { "200": { description: Grants revoked } } }
+components:
+  parameters:
+    serverId:
+      name: serverId
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, traceId]
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }
+        traceId: { type: string }
+    ListResponse:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array }
+        pageInfo:
+          type: object
+          properties:
+            limit: { type: integer, minimum: 1, maximum: 100 }
+            nextCursor: { type: string }
