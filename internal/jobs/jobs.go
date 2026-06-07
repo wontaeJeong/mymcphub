@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mcp-hub/mcp-hub/internal/audit"
 	"github.com/mcp-hub/mcp-hub/internal/db"
 	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
+	"github.com/mcp-hub/mcp-hub/internal/security"
 	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
@@ -35,6 +37,10 @@ var DefaultKinds = []Kind{HealthCheck, ToolScan, ResourceScan, PromptScan, Schem
 type Job struct {
 	Kind             Kind                   `json:"kind"`
 	TargetServerID   string                 `json:"targetServerId"`
+	From             string                 `json:"from,omitempty"`
+	To               string                 `json:"to,omitempty"`
+	Redacted         bool                   `json:"redacted,omitempty"`
+	Signed           bool                   `json:"signed,omitempty"`
 	PreviousSnapshot []ToolSnapshot         `json:"previousSnapshot,omitempty"`
 	CurrentSnapshot  []ToolSnapshot         `json:"currentSnapshot,omitempty"`
 	ManifestPath     string                 `json:"manifestPath,omitempty"`
@@ -110,15 +116,21 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 		return result
 	default:
 	}
+	traceID := telemetry.TraceID(jobCtx)
 
 	switch job.Kind {
 	case HealthCheck:
-		health := r.healthCheck(job.TargetServerID, telemetry.TraceID(jobCtx))
+		health := r.healthCheck(job.TargetServerID, traceID)
 		r.store.UpsertHealth(health)
 		result.Metadata["status"] = health.Status
 		result.Metadata["backoffSeconds"] = health.BackoffSeconds
-	case ToolScan, ResourceScan, PromptScan:
-		r.store.AddAudit(db.AuditEvent{EventType: "scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+	case ToolScan, ResourceScan:
+		r.store.AddAudit(db.AuditEvent{EventType: "scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+	case PromptScan:
+		findings, riskyTools := r.scanPromptMetadata(job.TargetServerID)
+		r.store.AddAudit(db.AuditEvent{EventType: "tool.metadata.scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "findingCount": findings, "quarantineRecommendedTools": riskyTools}})
+		result.Metadata["findingCount"] = findings
+		result.Metadata["quarantineRecommendedTools"] = riskyTools
 	case SchemaSnapshot:
 		snapshot, err := r.store.RecordCurrentSchemaSnapshot(job.TargetServerID, string(job.Kind))
 		if err != nil {
@@ -126,7 +138,7 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 			result.FailureReason = err.Error()
 			break
 		}
-		r.store.AddAudit(db.AuditEvent{EventType: "schema.snapshot.recorded", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "snapshotId": snapshot.ID}})
+		r.store.AddAudit(db.AuditEvent{EventType: "schema.snapshot.recorded", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "snapshotId": snapshot.ID}})
 		result.Metadata["snapshotId"] = snapshot.ID
 	case SchemaDiff:
 		diffs := DiffToolSnapshots(job.PreviousSnapshot, job.CurrentSnapshot)
@@ -148,11 +160,35 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 			result.FailureReason = err.Error()
 			break
 		}
-		r.store.AddAudit(db.AuditEvent{EventType: "schema.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "diffCount": len(diffs), "approvalRequired": approvalRequired(diffs)}})
+		r.store.AddAudit(db.AuditEvent{EventType: "schema.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "diffCount": len(diffs), "approvalRequired": approvalRequired(diffs)}})
 		result.Metadata["diffCount"] = len(diffs)
 		result.Metadata["approvalRequired"] = approvalRequired(diffs)
 		result.Metadata["schemaDiffId"] = recorded.ID
-	case AuditExport, UsageAccountingReport:
+	case AuditExport:
+		filters := map[string]string{"from": job.From, "to": job.To, "server": job.TargetServerID}
+		items := r.store.ExportAuditEvents(1000, filters)
+		export := audit.NewExport(items, filters, true)
+		if job.Signed {
+			key := strings.TrimSpace(os.Getenv("MCP_COMPLIANCE_EXPORT_SIGNING_KEY"))
+			if key == "" {
+				result.Status = "failed"
+				result.FailureReason = "MCP_COMPLIANCE_EXPORT_SIGNING_KEY is required for signed audit export jobs"
+				break
+			}
+			signed, err := audit.SignExport(export, key)
+			if err != nil {
+				result.Status = "failed"
+				result.FailureReason = "audit export signing failed"
+				break
+			}
+			export = signed
+		}
+		result.Metadata["exportId"] = export.ExportID
+		result.Metadata["count"] = export.Count
+		result.Metadata["redacted"] = export.Redacted
+		result.Metadata["signed"] = export.Signed
+		r.store.AddAudit(db.AuditEvent{EventType: "audit.export.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: result.Metadata})
+	case UsageAccountingReport:
 		report := r.store.UsageReport(map[string]string{"period": "daily"})
 		calls := 0
 		for _, item := range report.Items {
@@ -160,16 +196,16 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 		}
 		result.Metadata["reportRows"] = len(report.Items)
 		result.Metadata["calls"] = calls
-		r.store.AddAudit(db.AuditEvent{EventType: "usage.report.generated", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "period": report.Period, "rows": len(report.Items), "calls": calls}})
+		r.store.AddAudit(db.AuditEvent{EventType: "usage.report.generated", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "period": report.Period, "rows": len(report.Items), "calls": calls}})
 	case StaleSessionCleanup, AuditRetentionCleanup:
-		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
 	case RuntimeReconcile:
 		if err := r.reconcileRuntime(job, &result); err != nil {
 			result.Status = "failed"
 			result.FailureReason = err.Error()
 		}
 	case SecretLeaseRenewal:
-		renewed := r.store.RenewExpiringSecretLeases(secretLeaseSeconds(), runtimeAuth(), db.NewID())
+		renewed := r.store.RenewExpiringSecretLeases(secretLeaseSeconds(), runtimeAuth(), traceID)
 		result.Metadata["renewedCount"] = len(renewed)
 	default:
 		result.Status = "failed"
@@ -351,7 +387,6 @@ func index(snapshot []ToolSnapshot) map[string]ToolSnapshot {
 	}
 	return out
 }
-
 func toDBSnapshotItems(snapshot []ToolSnapshot) []db.ToolSchemaSnapshotItem {
 	items := make([]db.ToolSchemaSnapshotItem, 0, len(snapshot))
 	for _, tool := range snapshot {
@@ -366,6 +401,24 @@ func toJobDiffs(changes []db.SchemaChange) []Diff {
 		out = append(out, Diff{Type: change.Type, ToolName: change.ToolName, ApprovalRequired: change.ApprovalRequired, HighRisk: change.ToRiskLevel == db.RiskHigh || change.ToRiskLevel == db.RiskCritical || change.FromRiskLevel == db.RiskHigh || change.FromRiskLevel == db.RiskCritical})
 	}
 	return out
+}
+
+func (r *Registry) scanPromptMetadata(serverID string) (int, []string) {
+	findings := 0
+	riskyTools := []string{}
+	for _, snapshot := range r.store.SnapshotGatewayRegistry() {
+		if serverID != "" && snapshot.Server.ID != serverID {
+			continue
+		}
+		for _, tool := range snapshot.Tools {
+			scan := security.ScanToolMetadata(tool)
+			if scan.QuarantineRecommended {
+				findings += len(scan.Findings)
+				riskyTools = append(riskyTools, tool.Name)
+			}
+		}
+	}
+	return findings, riskyTools
 }
 
 func high(risk db.RiskLevel) bool { return risk == db.RiskHigh || risk == db.RiskCritical }

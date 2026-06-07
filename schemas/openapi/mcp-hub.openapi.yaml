@@ -193,7 +193,25 @@ paths:
         - { name: trace_id, in: query, schema: { type: string } }
       responses: { "200": { description: Paginated audit events with redacted payload only } }
   /api/audit-events/export:
-    get: { summary: Export audit events, responses: { "200": { description: Audit export payload } } }
+    get:
+      summary: Export redacted audit events for compliance review
+      x-audit-event-required: true
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: user, in: query, schema: { type: string } }
+        - { name: team, in: query, schema: { type: string } }
+        - { name: project, in: query, schema: { type: string } }
+        - { name: server, in: query, schema: { type: string } }
+        - { name: tool, in: query, schema: { type: string } }
+        - { name: policy_decision, in: query, schema: { enum: [allow, deny, needs_approval] } }
+        - { name: risk_level, in: query, schema: { enum: [low, medium, high, critical] } }
+        - { name: redacted, in: query, schema: { type: boolean, default: true } }
+        - { name: signed, in: query, schema: { type: boolean, default: false } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
+      responses:
+        "200": { description: Compliance export envelope with redacted audit events }
+        "403": { description: Platform admin required }
     post: { summary: Trigger audit export job, x-audit-event-required: true, responses: { "202": { description: Audit export job queued } } }
   /api/audit-events/export/jobs:
     get: { summary: List audit export jobs, x-audit-event-required: true, responses: { "200": { description: Audit export job list } } }

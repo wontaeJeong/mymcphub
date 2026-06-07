@@ -1,6 +1,6 @@
 module github.com/mcp-hub/mcp-hub
 
-go 1.22
+go 1.26
 
 require (
 	go.opentelemetry.io/otel v1.31.0

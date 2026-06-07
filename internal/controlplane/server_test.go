@@ -351,3 +351,52 @@ func requestJSON(t *testing.T, method, path string, body interface{}) *http.Requ
 	request.Header.Set("content-type", "application/json")
 	return request
 }
+
+func TestControlPlaneComplianceExportRequiresAdminAndRange(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+	req := httptest.NewRequest(http.MethodGet, "/api/audit-events/export?from=2026-06-07T00:00:00Z&to=2026-06-08T00:00:00Z", nil)
+	req.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	req.Header.Set("x-user-id", "reader")
+	req.Header.Set("x-roles", "reader")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", recorder.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/audit-events/export?from=2026-06-07T00:00:00Z&to=2026-06-08T00:00:00Z", nil)
+	req.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	req.Header.Set("x-user-id", "admin")
+	req.Header.Set("x-roles", "platform_admin")
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+	var body map[string]interface{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["redacted"] != true || body["exportId"] == "" {
+		t.Fatalf("expected redacted export envelope, got %#v", body)
+	}
+}
+
+func TestControlPlaneSignedComplianceExportRequiresKey(t *testing.T) {
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+	req := httptest.NewRequest(http.MethodGet, "/api/audit-events/export?from=2026-06-07T00:00:00Z&to=2026-06-08T00:00:00Z&signed=true", nil)
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 without signing key, got %d", recorder.Code)
+	}
+
+	t.Setenv("MCP_COMPLIANCE_EXPORT_SIGNING_KEY", "test-key")
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte("HMAC-SHA256")) {
+		t.Fatalf("expected signed export, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}

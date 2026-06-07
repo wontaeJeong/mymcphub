@@ -77,6 +77,16 @@ helm upgrade --install mcp-hub deploy/helm/mcp-hub \
 
 When a component digest is set, the chart renders `registry.example.com/mcp-hub/<component>@sha256:...` and does not render the tag for that component. This preserves the existing Helm helper behavior and lets each component move to digest promotion at its own pace.
 
+## SBOM And Signing Evidence
+
+Generate SBOMs and cosign evidence for immutable images before promotion:
+
+```sh
+SECURITY_IMAGES=registry.example.com/mcp-hub/api@sha256:<digest> pnpm security:sbom
+```
+
+Use `SECURITY_SIGN_IMAGES=1` to sign images and `SECURITY_ATTEST_SBOM=1` to attach Syft CycloneDX SBOMs as cosign attestations when registry credentials or keyless identity are configured. Keep generated SBOMs with the release record.
+
 ## GitOps Digest Promotion
 
 For Argo CD or Flux, promote by changing the overlay values that feed the Helm chart, then sync the target environment. Keep the same digest values when moving from staging to production unless a new release candidate is approved.

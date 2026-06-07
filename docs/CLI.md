@@ -9,6 +9,7 @@ go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 health
 go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 whoami --output json
 go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 server list
 go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 grant list --output json
+go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 --output json audit export --from 2026-06-07T00:00:00Z --to 2026-06-08T00:00:00Z --signed
 go run ./apps/cli/cmd/mcphubctl version
 ```
 
@@ -17,4 +18,4 @@ Config path: `~/.config/mcphubctl/config.yaml`.
 
 Global flags: `--api-url`, `--profile`, `--output table|json|yaml`, `--dry-run`, and `--yes`.
 
-Commands include login/logout/whoami, server, tool, grant, policy, audit, client config/test, health, doctor, version, and shell completion.
+Commands include login/logout/whoami, server, tool, grant, policy, audit search/export, client config/test, health, doctor, version, and shell completion. `audit export` requires `--from` and `--to`; use `--signed` to request an API-signed compliance envelope.
