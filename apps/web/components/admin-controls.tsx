@@ -27,8 +27,8 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
     <div className="page-stack">
       <div className="form-grid">
         <form className="form-card" action={denyAction}>
-          <h2>Emergency Deny Enable</h2>
-          <p>Enable the Control Plane emergency deny circuit with an audit-ready reason.</p>
+          <h2>Enable emergency deny</h2>
+          <p>Turn on the emergency deny circuit with an audit-ready reason during an active incident.</p>
           <div className="field">
             <label htmlFor="reason">Reason</label>
             <textarea id="reason" name="reason" required placeholder="Incident reference and decision rationale" />
@@ -43,15 +43,15 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
           </div>
         </form>
         <Surface>
-          <h2>Emergency Deny Disable</h2>
-          <p>Unavailable in prompt 05: no existing Control Plane endpoint was provided for disabling emergency deny, so the Web UI does not invent one.</p>
-          <StatusPill tone="warning">Unavailable</StatusPill>
+          <h2>Disable emergency deny</h2>
+          <p>Feature not supported by this backend yet. Use the documented incident recovery path instead of an unverified UI action.</p>
+          <StatusPill tone="warning">Unsupported</StatusPill>
         </Surface>
       </div>
       <div className="form-grid">
         <form className="form-card" action={serverAction}>
-          <h2>Server Disable</h2>
-          <p>Disable a selected registered server through /api/servers/:serverId/disable.</p>
+          <h2>Disable server</h2>
+          <p>Contain one registered server by disabling it for client use.</p>
           {enabledServers.length > 0 ? (
             <>
               <div className="field">
@@ -74,8 +74,8 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
           ) : <EmptyState title="No enabled servers" description="There are no enabled servers available for emergency disable." />}
         </form>
         <form className="form-card" action={toolAction}>
-          <h2>Tool Disable</h2>
-          <p>Disable a selected tool through /api/servers/:serverId/tools/:toolId/disable.</p>
+          <h2>Disable tool</h2>
+          <p>Contain one tool without disabling the whole server.</p>
           {enabledTools.length > 0 ? (
             <>
               <div className="field">
@@ -99,8 +99,8 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
         </form>
       </div>
       <form className="form-card" action={revokeAction}>
-        <h2>Revoke All Grants For Server</h2>
-        <p>Immediately revoke all active grants for one MCP server through /api/admin/revoke-server-grants/:serverId. No global all-server revoke endpoint is used or invented.</p>
+        <h2>Revoke all grants for a server</h2>
+        <p>Immediately revoke active grants for one selected server. This does not revoke grants globally.</p>
         {servers.length > 0 ? (
           <>
             <div className="field">

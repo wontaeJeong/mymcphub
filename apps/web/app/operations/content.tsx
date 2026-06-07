@@ -71,7 +71,7 @@ export async function OperationsPageContent() {
       <PageHero
         eyebrow="Health and operations"
         title="Keep the hub in service."
-        description="Watch server status, denied-call analytics, usage accounting, and health worker output from the Control Plane."
+        description="Watch server status, denied-call trends, usage accounting, rollout state, and health signals."
       />
       <div className="card-grid">
         <Surface>
@@ -116,7 +116,7 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="Denied-call analytics"
-          description="Aggregated policy deny reasons and top denied tools from /api/analytics/denied-calls."
+          description="Aggregated deny reasons and top denied tools for policy tuning."
         />
         {denied.ok && deniedReasons.length > 0 ? (
           <div className="table-wrap">
@@ -159,7 +159,7 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="Rollout and quarantine status"
-          description="Combines /api/servers, /api/servers/:serverId/versions, and /api/server-health so operators can see active versions, rollout freshness, and quarantine state together."
+          description="Active versions, rollout freshness, health, enablement, and quarantine state in one view."
         />
         {servers.ok && rolloutRows.length > 0 ? (
           <RolloutStatusTable rows={rolloutRows} serverBasePath="/admin/servers" />
@@ -175,7 +175,7 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="Usage accounting"
-          description="Daily team/project/user/server/tool aggregation from /api/analytics/usage."
+          description="Daily usage by team, project, user, server, and tool."
         />
         {usage.ok && usageItems.length > 0 ? (
           <div className="table-wrap">
@@ -222,14 +222,14 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="Server health"
-          description="Rows returned by /api/server-health."
+          description="Latest health checks with latency, backoff, error, and trace context."
         />
         {health.ok && healthItems.length > 0 ? (
           <HealthTable checks={healthItems} serverNameById={serverNameById} />
         ) : health.ok ? (
           <EmptyState
             title="No health checks"
-            description="The Control Plane returned no health checks."
+            description="No data yet. Health checks will appear after the worker records server status."
           />
         ) : (
           <ErrorState message={health.error} />
@@ -248,8 +248,8 @@ export async function OperationsPageContent() {
           />
         ) : servers.ok ? (
           <EmptyState
-            title="No servers"
-            description="The Control Plane returned no catalog entries."
+            title="No data yet"
+            description="Register a server before reviewing operational catalog state."
           />
         ) : (
           <ErrorState message={servers.error} />

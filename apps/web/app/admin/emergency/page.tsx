@@ -18,7 +18,7 @@ export default async function EmergencyPage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Admin emergency controls" title="Use the red switches with receipts." description="Emergency deny, server disable, tool disable, and grant revocation call existing Control Plane endpoints where present and label unavailable behavior explicitly." />
+      <PageHero eyebrow="Admin / Emergency" title="Use the red switches with receipts." description="Incident controls are isolated from daily work and require explicit confirmation before destructive containment actions." />
       {servers.ok ? <AdminControls servers={serverItems} tools={tools} /> : <ErrorState message={servers.error} />}
     </div>
   );

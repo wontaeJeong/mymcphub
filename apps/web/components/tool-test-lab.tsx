@@ -20,7 +20,7 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
   return (
     <form className="form-card test-lab" action={formAction}>
       <h2>Dry-run Tool Test Lab</h2>
-      <p>Build a policy-protected `tools/call` payload and submit it to `/api/policy/test-call`. Dry-run mode never calls the upstream MCP server; it returns policy and locally redacted argument detail for review.</p>
+      <p>Build a policy-protected tool-call payload. Dry-run mode never calls the upstream MCP server; it returns the policy decision and locally redacted argument detail for review.</p>
       {options.length > 0 ? (
         <>
           <input type="hidden" name="dryRun" value="true" />
@@ -54,7 +54,7 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
             </div>
           ) : null}
         </>
-      ) : <EmptyState title="No tools available" description="The test lab needs at least one Control Plane tool before it can build a dry-run payload." />}
+      ) : <EmptyState title="No data yet" description="Register a server with at least one tool before running a policy dry-run." />}
     </form>
   );
 }
