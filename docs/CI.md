@@ -18,7 +18,7 @@ pnpm helm:template
 pnpm run ci
 ```
 
-`pnpm test:unit` runs unit suites in shared packages, first-party MCP servers, `apps/stdio-adapter`, and the API audit helper tests. `pnpm test:integration` runs API, Gateway, Worker, and DB repository contract suites. DB integration tests use deterministic repository query fixtures and verify that `TEST_DATABASE_URL` never falls back to or equals `DATABASE_URL`, keeping test and application database configuration separate. `pnpm test:e2e` runs the cross-workspace smoke suite in `@mcp-hub/tests`, which starts the echo MCP server and Gateway in-process, authenticates with `Bearer dev-admin-token`, verifies `tools/list`, allows `echo_message`, denies ungranted and unknown tools, and checks audit events.
+`pnpm test:unit` runs Go unit suites and Web UI unit checks. `pnpm test:integration` runs API, Gateway, Worker, and repository contract suites. `pnpm test:e2e` runs Go e2e and security suites, authenticates with `Bearer dev-admin-token`, verifies `tools/list`, allows granted tools, denies ungranted and unknown tools, and checks audit behavior.
 
 `pnpm helm:template` validates the real chart at `deploy/helm/mcp-hub` with release name `mcp-hub`. It runs `helm lint`, renders the default, dev, staging, and production values, and asserts that the API, Gateway, and Worker resources are present in each output.
 
@@ -26,12 +26,11 @@ pnpm run ci
 
 The workflow in `.github/workflows/ci.yaml` has these jobs:
 
-- `install`: checks out the repository, installs pnpm `10.12.1`, configures Node.js `22` with pnpm cache, and runs `pnpm install --frozen-lockfile`.
-- `lint`: runs `pnpm lint`.
-- `typecheck`: runs `pnpm typecheck`.
-- `test`: runs `pnpm test:unit`, `pnpm test:integration`, and `pnpm test:e2e`.
-- `build`: runs `pnpm build`.
-- `security-smoke`: runs `pnpm security:smoke`, currently the deterministic MCP manifest policy check.
-- `helm-template`: installs Helm with `azure/setup-helm@v5.0.0` and runs `pnpm helm:template`.
+- `go-core`: runs Go fmt, vet, tests, and builds.
+- `web-ui`: installs pnpm dependencies and runs Web UI lint, typecheck, tests, and build.
+- `schemas`: runs OpenAPI, JSON Schema, and MCP manifest drift checks.
+- `helm-gitops`: renders Helm and GitOps overlays.
+- `e2e-security`: runs Go e2e and security negative tests.
+- `docker-build`: builds API, Gateway, Worker, CLI, Web, and k8s images.
 
 Use `pnpm run ci` for the aggregate root script; pnpm `10.12.1` treats bare `pnpm ci` as the clean-install command. The aggregate script runs full-repository lint, typecheck, test, build, security smoke, and Helm template validation.

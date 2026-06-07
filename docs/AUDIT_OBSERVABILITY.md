@@ -135,7 +135,7 @@ Requests may provide `x-trace-id`. If it is missing, the API or Gateway creates 
 Example Gateway request with a trace header:
 
 ```sh
-curl http://localhost:5000/mcp/echo \
+curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -H 'x-trace-id: local-trace-001' \

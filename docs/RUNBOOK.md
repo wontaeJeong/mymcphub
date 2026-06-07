@@ -8,7 +8,7 @@ Start with these checks unless the situation says otherwise:
 curl http://localhost:4000/healthz
 curl http://localhost:4000/readyz
 curl http://localhost:5000/metrics
-curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'
+curl http://localhost:5000/mcp/k8s-readonly -H 'authorization: Bearer dev-admin-token'
 pnpm dev:smoke-test
 ```
 
@@ -29,11 +29,8 @@ Calls to the affected `/mcp/:serverSlug` route and tools from that server. Other
 ```sh
 curl http://localhost:4000/healthz
 curl http://localhost:4000/readyz
-curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'
-curl http://localhost:5100/health
-curl http://localhost:5101/health
 curl http://localhost:5102/health
-curl http://localhost:5103/healthz
+curl http://localhost:5000/mcp/k8s-readonly -H 'authorization: Bearer dev-admin-token'
 ```
 
 Check `/catalog`, `/servers/:serverId`, `/operations`, and `/audit` for disabled state, health records, and recent denies.
@@ -44,7 +41,7 @@ If the server is unsafe or noisy, disable it from `/admin` or call `POST /api/se
 
 ### 근본 원인 확인
 
-Review the upstream process logs, the server manifest, recent version metadata at `GET /api/servers/:serverId/versions`, and recent audit events. For stdio servers, check adapter health and child-process configuration.
+Review the upstream process logs, the server manifest, recent version metadata at `GET /api/servers/:serverId/versions`, and recent audit events.
 
 ### 복구 확인
 
@@ -68,7 +65,7 @@ Clients calling slow tools may see delayed responses or JSON-RPC errors. Tool di
 
 ```sh
 curl http://localhost:5000/metrics
-curl http://localhost:5000/mcp/echo \
+curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -366,7 +363,7 @@ Clients using changed tools may fail or send invalid arguments. High-risk tools 
 ```sh
 curl http://localhost:4000/api/servers/:serverId/versions
 curl http://localhost:4000/api/servers/:serverId/schema-diff
-curl http://localhost:5000/mcp/echo \
+curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

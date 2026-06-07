@@ -29,23 +29,23 @@ Or call the API directly:
 ```sh
 curl -X POST http://localhost:4000/api/client-config/generate \
   -H 'content-type: application/json' \
-  -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000100"}'
+  -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000102"}'
 ```
 
-Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded echo server, generated snippets use the catalog upstream URL `http://localhost:5100/mcp`. Use the Gateway checks below to verify the policy and audit path at `http://localhost:5000/mcp/echo` before handing off client instructions.
+Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded k8s server, generated snippets use the catalog upstream URL `http://localhost:5102/mcp`. Use the Gateway checks below to verify the policy and audit path at `http://localhost:5000/mcp/k8s-readonly` before handing off client instructions.
 
 ## Generic Remote MCP Client
 
-The generic generator currently returns this shape for the seeded echo server:
+The generic generator currently returns this shape for the seeded k8s server:
 
 ```json
 {
   "transport": "streamable_http",
-  "url": "http://localhost:5100/mcp"
+  "url": "http://localhost:5102/mcp"
 }
 ```
 
-If your client stores headers separately, configure the generated URL and put the required bearer token in the client authentication field. For local Gateway validation, use `http://localhost:5000/mcp/echo` with `Bearer dev-admin-token`.
+If your client stores headers separately, configure the generated URL and put the required bearer token in the client authentication field. For local Gateway validation, use `http://localhost:5000/mcp/k8s-readonly` with `Bearer dev-admin-token`.
 
 ## opencode
 
@@ -54,9 +54,9 @@ The API generator returns this non-placeholder shape for opencode:
 ```json
 {
   "mcp": {
-    "echo": {
+    "k8s-readonly": {
       "type": "remote",
-      "url": "http://localhost:5100/mcp"
+      "url": "http://localhost:5102/mcp"
     }
   }
 }
@@ -65,7 +65,7 @@ The API generator returns this non-placeholder shape for opencode:
 Add the bearer token according to the auth field supported by your opencode version, or use the `/client-config` page to copy the latest generated snippet. For local manual testing, this Gateway request should work before connecting a client:
 
 ```sh
-curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'
+curl http://localhost:5000/mcp/k8s-readonly -H 'authorization: Bearer dev-admin-token'
 ```
 
 ## Claude Code Style Config
@@ -75,8 +75,8 @@ The current API marks this as a placeholder because remote MCP client formats ca
 ```json
 {
   "mcpServers": {
-    "echo": {
-      "url": "http://localhost:5100/mcp",
+    "k8s-readonly": {
+      "url": "http://localhost:5102/mcp",
       "note": "Placeholder format until Claude Code remote MCP config is finalized."
     }
   }
@@ -92,8 +92,8 @@ The current API returns a placeholder for Codex style config:
 ```json
 {
   "mcpServers": {
-    "echo": {
-      "url": "http://localhost:5100/mcp",
+    "k8s-readonly": {
+      "url": "http://localhost:5102/mcp",
       "note": "Codex MCP remote config placeholder."
     }
   }
@@ -109,8 +109,8 @@ The current API returns a placeholder for VS Code style config:
 ```json
 {
   "servers": {
-    "echo": {
-      "url": "http://localhost:5100/mcp",
+    "k8s-readonly": {
+      "url": "http://localhost:5102/mcp",
       "note": "VS Code MCP config placeholder."
     }
   }
@@ -132,13 +132,13 @@ curl http://localhost:5000/metrics
 2. Confirm the target server is reachable through the Gateway:
 
 ```sh
-curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'
+curl http://localhost:5000/mcp/k8s-readonly -H 'authorization: Bearer dev-admin-token'
 ```
 
 3. Confirm tool discovery works:
 
 ```sh
-curl http://localhost:5000/mcp/echo \
+curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
