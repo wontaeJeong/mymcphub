@@ -2,7 +2,7 @@
 
 ## Changed Files
 
-- `internal/db/types.go`, `internal/db/lane_b_types.go`, `internal/db/lane_b_store.go`, `internal/db/store.go`
+- `internal/db/types.go`, `internal/db/control_plane_types.go`, `internal/db/control_plane_store.go`, `internal/db/store.go`
 - `internal/controlplane/server.go`, `internal/controlplane/server_test.go`
 - `schemas/openapi/mcp-hub.openapi.yaml`, `schemas/openapi/control-plane.openapi.json`
 - `docs/API.md`, `docs/DATA_MODEL.md`
