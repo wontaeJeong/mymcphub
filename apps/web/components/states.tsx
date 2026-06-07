@@ -5,7 +5,7 @@ export type ErrorStateProps = Readonly<{
   message: string;
 }>;
 
-export function ErrorState({ title = "Control Plane unavailable", message }: ErrorStateProps) {
+export function ErrorState({ title = "Backend unavailable", message }: ErrorStateProps) {
   return (
     <section className="error-state" role="status">
       <strong>{title}</strong>
@@ -27,7 +27,7 @@ export function LoadingPanel() {
   return (
     <section className="loading-state" role="status">
       <strong>Loading MCP Hub operations...</strong>
-      <p>Contacting the Control Plane API and preparing live operations state.</p>
+      <p>Loading live operations state.</p>
     </section>
   );
 }
