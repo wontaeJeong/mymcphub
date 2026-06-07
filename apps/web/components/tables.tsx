@@ -25,6 +25,7 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
             <th>Risk</th>
             <th>Health</th>
             <th>Enabled</th>
+            <th>Operations</th>
             <th>Updated</th>
           </tr>
         </thead>
@@ -44,6 +45,12 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
                 <td><StatusPill tone={riskTone(server.riskLevel)}>{server.riskLevel}</StatusPill></td>
                 <td>{health ? <StatusPill tone={healthTone(health.status)}>{health.status}</StatusPill> : <StatusPill>unavailable</StatusPill>}</td>
                 <td><StatusPill tone={enabledTone(server.enabled)}>{server.enabled ? "enabled" : "disabled"}</StatusPill></td>
+                <td>
+                  <div className="actions">
+                    <StatusPill tone={server.published ? "success" : server.published === false ? "warning" : "neutral"}>{server.published ? "published" : server.published === false ? "unpublished" : "publication n/a"}</StatusPill>
+                    <StatusPill tone={server.quarantined ? "danger" : "neutral"}>{server.quarantined ? "quarantined" : "not quarantined"}</StatusPill>
+                  </div>
+                </td>
                 <td>{formatDate(server.updatedAt)}</td>
               </tr>
             );
@@ -132,6 +139,52 @@ export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServ
               </td>
               <td>{formatDate(version.createdAt)}</td>
               <td>{formatDate(version.activatedAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export type RolloutStatusRow = Readonly<{
+  server: ApiMcpServer;
+  activeVersion?: ApiMcpServerVersion;
+  latestVersion?: ApiMcpServerVersion;
+  health?: ApiServerHealth;
+}>;
+
+export function RolloutStatusTable({ rows }: Readonly<{ rows: RolloutStatusRow[] }>) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Server</th>
+            <th>Active version</th>
+            <th>Latest rollout</th>
+            <th>Health</th>
+            <th>Quarantine</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.server.id}>
+              <td>
+                <Link href={`/servers/${row.server.id}`}>{row.server.displayName}</Link>
+                <p className="muted">{row.server.slug} · {row.server.environment}</p>
+              </td>
+              <td>{row.activeVersion ? <StatusPill tone="success">{row.activeVersion.version}</StatusPill> : <span className="muted">No active version</span>}</td>
+              <td>{row.latestVersion ? <StatusPill tone={serverVersionTone(row.latestVersion.status)}>{row.latestVersion.status}</StatusPill> : <span className="muted">No rollout record</span>}</td>
+              <td>{row.health ? <StatusPill tone={healthTone(row.health.status)}>{row.health.status}</StatusPill> : <StatusPill>health unavailable</StatusPill>}</td>
+              <td>
+                <div className="actions">
+                  <StatusPill tone={enabledTone(row.server.enabled)}>{row.server.enabled ? "enabled" : "disabled"}</StatusPill>
+                  <StatusPill tone={row.server.quarantined ? "danger" : "neutral"}>{row.server.quarantined ? "quarantined" : "not quarantined"}</StatusPill>
+                </div>
+              </td>
+              <td>{formatDate(row.server.updatedAt)}</td>
             </tr>
           ))}
         </tbody>
@@ -316,7 +369,10 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
               <td>{event.userId ?? event.clientId ?? "unknown"}</td>
               <td><AuditExecution event={event} /></td>
               <td>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">Not recorded</span>}</td>
-              <td><CopyButton value={event.traceId} label="Copy trace" /></td>
+              <td>
+                <CopyButton value={event.traceId} label="Copy trace" />
+                <Link className="button button--ghost" href={`/audit?trace_id=${encodeURIComponent(event.traceId)}`}>Trace link</Link>
+              </td>
               <td>
                 <RedactedJsonDetails summary="View redacted arguments" value={event.argumentRedactedJson} emptyText="No redacted arguments returned" />
                 <RedactedJsonDetails summary="View redacted metadata" value={event.metadataJson} emptyText="No metadata returned" />

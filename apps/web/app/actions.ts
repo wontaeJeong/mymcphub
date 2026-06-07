@@ -18,11 +18,13 @@ import {
   rejectApproval,
   revokeGrant,
   revokeServerGrants,
+  testPolicyCall,
   type ClientConfigKind,
   type Environment,
   type RiskLevel,
   type ServerTransport
 } from "../lib/api";
+import { buildPolicyTestCallInput, buildPolicyTestDisplayPayload, parseToolTestRef } from "../lib/policy-test";
 
 export async function approveApprovalAction(formData: FormData) {
   const approvalId = readRequired(formData, "approvalId");
@@ -226,8 +228,9 @@ export async function adminDisableToolAction(_previousState: FormActionState, fo
 export async function generateClientConfigAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
   const serverId = readRequired(formData, "serverId");
   const client = readClientConfigKind(formData);
+  const profile = readOptional(formData, "profile") ?? "local";
   try {
-    const result = await generateClientConfig(serverId, client);
+    const result = await generateClientConfig(serverId, client, profile);
     const gatewayUrl = result.gatewayUrl ?? extractGatewayUrl(result.config);
     return {
       status: "success",
@@ -235,6 +238,7 @@ export async function generateClientConfigAction(_previousState: FormActionState
       payload: JSON.stringify(result.config, null, 2),
       selectedServerId: serverId,
       selectedClient: client,
+      selectedProfile: profile,
       gatewayUrl
     };
   } catch (error) {
@@ -242,7 +246,33 @@ export async function generateClientConfigAction(_previousState: FormActionState
       status: "error",
       message: formatApiError(error),
       selectedServerId: serverId,
-      selectedClient: client
+      selectedClient: client,
+      selectedProfile: profile
+    };
+  }
+}
+
+export async function testPolicyCallAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  const toolTestRef = readRequired(formData, "toolTestRef");
+  try {
+    const ref = parseToolTestRef(toolTestRef);
+    const args = readJsonRecord(formData, "argumentsJson");
+    const input = buildPolicyTestCallInput(ref, args, readBoolean(formData, "stepUp"));
+    const decision = await testPolicyCall(input);
+    const payload = buildPolicyTestDisplayPayload(input, decision);
+
+    return {
+      status: "success",
+      message: `${decision.reasonCode}: ${decision.reason}`,
+      payload: JSON.stringify(payload, null, 2),
+      selectedToolRef: toolTestRef,
+      policyEffect: decision.effect
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: formatApiError(error),
+      selectedToolRef: toolTestRef
     };
   }
 }

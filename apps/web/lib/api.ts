@@ -218,9 +218,39 @@ export type ClientConfigKind = "generic" | "opencode" | "claude-code" | "codex" 
 
 export type ClientConfigResult = {
   client: ClientConfigKind;
+  profile?: string;
   placeholder: boolean;
   gatewayUrl?: string;
   config: Record<string, unknown>;
+};
+
+export type ApiPolicyDecision = {
+  effect: PolicyEffect;
+  allowed: boolean;
+  reason: string;
+  reasonCode: string;
+  matchedGrantIds: string[];
+  requiresApproval: boolean;
+  requiresStepUp: boolean;
+  discoverableToolNames?: string[];
+};
+
+export type PolicyTestCallInput = {
+  serverId: string;
+  serverSlug: string;
+  toolName: string;
+  dryRun: true;
+  stepUp: boolean;
+  arguments: Record<string, unknown>;
+  mcpRequest: {
+    jsonrpc: "2.0";
+    id: string;
+    method: "tools/call";
+    params: {
+      name: string;
+      arguments: Record<string, unknown>;
+    };
+  };
 };
 
 export type EmergencyDenyResult = {
@@ -312,6 +342,14 @@ export async function listApprovals() {
 }
 
 export function buildAuditEventsPath(options: ListAuditEventsOptions = {}) {
+  return buildAuditPath("/api/audit-events", options);
+}
+
+export function buildAuditExportPath(options: ListAuditEventsOptions = {}) {
+  return buildAuditPath("/api/audit-events/export", options);
+}
+
+function buildAuditPath(basePath: string, options: ListAuditEventsOptions = {}) {
   const params = new URLSearchParams();
   appendSearchParam(params, "limit", options.limit);
   appendSearchParam(params, "cursor", options.cursor);
@@ -328,7 +366,7 @@ export function buildAuditEventsPath(options: ListAuditEventsOptions = {}) {
   appendSearchParam(params, "trace_id", options.trace_id);
 
   const query = params.toString();
-  return query ? `/api/audit-events?${query}` : "/api/audit-events";
+  return query ? `${basePath}?${query}` : basePath;
 }
 
 export async function listAuditEvents(options: ListAuditEventsOptions = {}) {
@@ -417,10 +455,17 @@ export async function createGrant(input: CreateGrantInput) {
   });
 }
 
-export async function generateClientConfig(serverId: string, client: ClientConfigKind) {
+export async function generateClientConfig(serverId: string, client: ClientConfigKind, profile?: string) {
   return apiRequest<ClientConfigResult>("/api/client-config/generate", {
     method: "POST",
-    body: JSON.stringify({ serverId, client })
+    body: JSON.stringify({ serverId, client, profile })
+  });
+}
+
+export async function testPolicyCall(input: PolicyTestCallInput) {
+  return apiRequest<ApiPolicyDecision>("/api/policy/test-call", {
+    method: "POST",
+    body: JSON.stringify(input)
   });
 }
 

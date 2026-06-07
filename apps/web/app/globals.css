@@ -522,6 +522,7 @@ textarea:focus {
 .copy-control,
 .config-summary,
 .decision-inputs,
+.capability-tabs,
 .danger-confirm {
   display: grid;
   gap: var(--space-2);
@@ -558,6 +559,43 @@ textarea:focus {
 .decision-inputs form {
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-faint);
+}
+
+.capability-tabs {
+  grid-template-columns: repeat(3, max-content);
+  margin-bottom: var(--space-4);
+}
+
+.capability-tab {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.capability-tab:hover,
+.capability-tab:focus-visible,
+.capability-tab[aria-selected="true"] {
+  color: var(--color-ink);
+  border-color: var(--color-accent-strong);
+  background: rgba(216, 178, 92, 0.12);
+  outline: none;
+}
+
+.capability-panels {
+  gap: var(--space-5);
+}
+
+.test-lab {
+  box-shadow: var(--shadow-panel), 0 0 3rem rgba(121, 189, 212, 0.12);
+}
+
+.test-lab__step-up {
+  margin-top: 0;
 }
 
 .danger-confirm {
@@ -602,8 +640,13 @@ input[type="checkbox"] {
 
 @media (max-width: 42rem) {
   .nav,
+  .capability-tabs,
   .section-header {
     display: grid;
+  }
+
+  .capability-tabs {
+    grid-template-columns: 1fr;
   }
 
   .content,

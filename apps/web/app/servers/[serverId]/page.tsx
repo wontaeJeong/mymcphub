@@ -7,8 +7,9 @@ import { enabledTone, formatDate, healthTone, riskTone } from "../../../componen
 import { ErrorState } from "../../../components/states";
 import { AuditTable, ServerVersionTable, ToolTable } from "../../../components/tables";
 import type { ApiMcpServerVersion, ApiMcpTool } from "../../../lib/api";
-import { getServer, listAuditEvents, listServerHealth, listServerVersions, listTools } from "../../../lib/api";
+import { getServer, listAuditEvents, listGrants, listServerHealth, listServerVersions, listTools } from "../../../lib/api";
 import { loadResult } from "../../../lib/result";
+import { buildGrantStatus } from "../../tools/page-helpers";
 import { selectActiveServerVersion, selectRecentServerAuditEvents, selectServerHealth } from "./page-helpers";
 
 type ServerDetailPageProps = Readonly<{
@@ -22,7 +23,8 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   const healthPromise = loadResult(listServerHealth());
   const auditPromise = loadResult(listAuditEvents({ limit: 50, server: serverId }));
   const versionsPromise = loadResult(listServerVersions(serverId));
-  const [server, tools, health, audit, versions] = await Promise.all([serverPromise, toolsPromise, healthPromise, auditPromise, versionsPromise]);
+  const grantsPromise = loadResult(listGrants());
+  const [server, tools, health, audit, versions, grants] = await Promise.all([serverPromise, toolsPromise, healthPromise, auditPromise, versionsPromise, grantsPromise]);
 
   if (!server.ok) {
     return (
@@ -38,6 +40,8 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   const recentAudit = audit.ok ? selectRecentServerAuditEvents(audit.data.items) : [];
   const versionItems = versions.ok ? versions.data.items : [];
   const activeVersion = versions.ok ? selectActiveServerVersion(versionItems) : undefined;
+  const toolItems = tools.ok ? tools.data.items : [];
+  const grantStatusByToolKey = buildGrantStatus(toolItems, grants.ok ? grants.data.items : []);
 
   return (
     <div className="page-stack">
@@ -91,9 +95,34 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
         <SectionHeader title="Recent audit event" description="Most recent event for this server from /api/audit-events." />
         {audit.ok && recentAudit.length > 0 ? <AuditTable events={recentAudit} /> : audit.ok ? <EmptyState title="No server audit event" description="No audit event in the fetched window references this server." /> : <ErrorState message={audit.error} />}
       </section>
-      <section>
-        <SectionHeader title="Server tools" description="Tools discovered for this server via /api/servers/:serverId/tools, including schema visibility and tool enablement controls." />
-        {tools.ok && tools.data.items.length > 0 ? <ToolTable tools={tools.data.items} showSchema actionSlot={ToolControls} /> : tools.ok ? <EmptyState title="No tools discovered" description="The server exists, but no tools were returned by the Control Plane." /> : <ErrorState message={tools.error} />}
+      {!grants.ok ? <ErrorState title="Grant status unavailable" message={grants.error} /> : null}
+      <section className="capability-section">
+        <SectionHeader title="Tools, resources, and prompts" description="Control Plane capability tabs show the live tools contract and explicitly mark resources/prompts when no Go API endpoint exposes them yet." />
+        <div className="capability-tabs" role="tablist" aria-label="Server capabilities">
+          <a className="capability-tab" href="#server-tools" role="tab" aria-selected="true">Tools</a>
+          <a className="capability-tab" href="#server-resources" role="tab" aria-selected="false">Resources</a>
+          <a className="capability-tab" href="#server-prompts" role="tab" aria-selected="false">Prompts</a>
+        </div>
+        <div className="grid capability-panels">
+          <div id="server-tools">
+          <Surface className="capability-panel">
+            <SectionHeader title="Server tools" description="Tools discovered for this server via /api/servers/:serverId/tools, including schema visibility, grant status, and tool enablement controls." />
+            {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess actionSlot={ToolControls} /> : tools.ok ? <EmptyState title="No tools discovered" description="The server exists, but no tools were returned by the Control Plane." /> : <ErrorState message={tools.error} />}
+          </Surface>
+          </div>
+          <div id="server-resources">
+          <Surface className="capability-panel">
+            <SectionHeader title="Resources" description="Gateway initialize advertises resource capability, but this Go Control Plane contract does not yet expose /resources list/read endpoints." />
+            <EmptyState title="Resources endpoint not exposed" description="No resources are rendered from mock data. Add a Control Plane resources contract before listing resource rows in Web." />
+          </Surface>
+          </div>
+          <div id="server-prompts">
+          <Surface className="capability-panel">
+            <SectionHeader title="Prompts" description="Gateway initialize advertises prompt capability, but this Go Control Plane contract does not yet expose /prompts list/get endpoints." />
+            <EmptyState title="Prompts endpoint not exposed" description="No prompts are rendered from mock data. Add a Control Plane prompts contract before listing prompt rows in Web." />
+          </Surface>
+          </div>
+        </div>
       </section>
     </div>
   );
