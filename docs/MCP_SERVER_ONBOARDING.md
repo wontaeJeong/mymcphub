@@ -4,19 +4,19 @@ Use this lifecycle when adding or promoting an MCP server through MCP Hub. The c
 
 ## Lifecycle Checklist
 
-| Step | Operator action | Current skeleton truth |
-| --- | --- | --- |
-| manifest 작성 | Create or update `servers/<name>/mcp-server.manifest.json` with slug, owner team, transport, upstream URL, risk level, and tool schemas. | `pnpm security:mcp-manifests` validates first-party manifests. |
-| owner team 지정 | Assign `ownerTeam` and `ownerTeamId` to the team accountable for tools, incidents, and approvals. | Seed data uses the platform team for first-party servers. |
-| transport 선택 | Choose `streamable_http` for direct HTTP MCP servers. | Gateway proxies HTTP JSON-RPC upstream URLs. |
-| local test | Start the upstream and call its `/health`, then call through the Gateway. | The seeded first-party server uses port `5102`. |
-| tools/list scan | Capture expected `tools/list` output and compare schemas with the manifest. | Worker has schema diff helpers; server smoke tests cover first-party tool descriptors. |
-| risk review | Review server and tool risk levels, closed schemas, dangerous names, and high or critical tool descriptions. | `pnpm security:mcp-manifests` warns on dangerous keywords and fails missing required risk/schema fields. |
-| secret binding | Bind any required secrets through approved secret references or deployment environment. | Do not put secret values in manifests, docs, Helm values, or committed files. |
-| dev 등록 | Register the server in dev catalog data and verify Web `/catalog`, `/servers/:serverId`, and Gateway routing. | API catalog state is in memory unless represented by seed or current process state. |
-| stg promotion | Promote the same manifest and image digest to staging after local and dev checks pass. | Use release docs for Helm values and digest promotion. |
-| prod approval | Get owner and platform approval before production grants or high-risk tools are enabled. | High and critical tool grants require explicit approval in policy. |
-| monitoring 확인 | Confirm metrics, audit events, health status, and runbook coverage. | API/Gateway metrics exist. Audit and health are in-memory skeletons. |
+| Step            | Operator action                                                                                                                          | Current skeleton truth                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| manifest 작성   | Create or update `servers/<name>/mcp-server.manifest.json` with slug, owner team, transport, upstream URL, risk level, and tool schemas. | `pnpm security:mcp-manifests` validates first-party manifests.                                           |
+| owner team 지정 | Assign `ownerTeam` and `ownerTeamId` to the team accountable for tools, incidents, and approvals.                                        | Seed data uses the platform team for first-party servers.                                                |
+| transport 선택  | Choose `streamable_http` for direct HTTP MCP servers.                                                                                    | Gateway proxies HTTP JSON-RPC upstream URLs.                                                             |
+| local test      | Start the upstream and call its `/health`, then call through the Gateway.                                                                | The seeded first-party server uses port `5102`.                                                          |
+| tools/list scan | Capture expected `tools/list` output and compare schemas with the manifest.                                                              | Worker has schema diff helpers; server smoke tests cover first-party tool descriptors.                   |
+| risk review     | Review server and tool risk levels, closed schemas, dangerous names, and high or critical tool descriptions.                             | `pnpm security:mcp-manifests` warns on dangerous keywords and fails missing required risk/schema fields. |
+| secret binding  | Bind any required secrets through approved secret references or deployment environment.                                                  | Do not put secret values in manifests, docs, Helm values, or committed files.                            |
+| dev 등록        | Register the server in dev catalog data and verify Web `/catalog`, `/servers/:serverId`, and Gateway routing.                            | API catalog state is in memory unless represented by seed or current process state.                      |
+| stg promotion   | Promote the same manifest and image digest to staging after local and dev checks pass.                                                   | Use release docs for Helm values and digest promotion.                                                   |
+| prod approval   | Get owner and platform approval before production grants or high-risk tools are enabled.                                                 | High and critical tool grants require explicit approval in policy.                                       |
+| monitoring 확인 | Confirm metrics, audit events, health status, and runbook coverage.                                                                      | API/Gateway metrics exist. Audit and health are in-memory skeletons.                                     |
 
 ## Manifest 작성
 
