@@ -1,0 +1,512 @@
+package controlplane
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/mcp-hub/mcp-hub/internal/auth"
+	"github.com/mcp-hub/mcp-hub/internal/config"
+	"github.com/mcp-hub/mcp-hub/internal/db"
+	"github.com/mcp-hub/mcp-hub/internal/httpx"
+	"github.com/mcp-hub/mcp-hub/internal/logger"
+	"github.com/mcp-hub/mcp-hub/internal/policy"
+)
+
+type Server struct {
+	store *db.Store
+	log   logger.Logger
+	cfg   config.Config
+}
+
+func NewServer(store *db.Store, cfg config.Config) *Server {
+	if store == nil {
+		store = db.NewSeedStore()
+	}
+	return &Server{store: store, cfg: cfg, log: logger.New("api")}
+}
+func (s *Server) Store() *db.Store { return s.store }
+
+func (s *Server) Handler() http.Handler { return http.HandlerFunc(s.handle) }
+
+func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	s.store.Refresh()
+	if r.Method != http.MethodGet {
+		defer s.store.Save()
+	}
+	traceID := auth.TraceID(r)
+	w.Header().Set("x-trace-id", traceID)
+	principal := auth.ContextFromHeaders(r)
+	s.log.Info("api.request", map[string]interface{}{"traceId": traceID, "method": r.Method, "path": r.URL.Path})
+
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/healthz":
+		httpx.WriteJSON(w, 200, map[string]interface{}{"service": "api", "status": "ok"})
+	case r.Method == http.MethodGet && r.URL.Path == "/readyz":
+		httpx.WriteJSON(w, 200, map[string]interface{}{"service": "api", "status": "ready", "dependencies": map[string]string{"store": "ready"}})
+	case r.Method == http.MethodGet && r.URL.Path == "/metrics":
+		httpx.WriteText(w, 200, "text/plain; version=0.0.4", "mcp_api_request_info{service=\"api\"} 1\n")
+	case r.Method == http.MethodGet && (r.URL.Path == "/openapi.json" || r.URL.Path == "/api/openapi.json"):
+		httpx.WriteJSON(w, 200, openAPIDocument())
+	case r.Method == http.MethodGet && r.URL.Path == "/api/me":
+		httpx.WriteJSON(w, 200, map[string]interface{}{"auth": principal})
+	case strings.HasPrefix(r.URL.Path, "/api/servers"):
+		s.handleServers(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/grants"):
+		s.handleGrants(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/approvals"):
+		s.handleApprovals(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/audit-events"):
+		s.handleAudit(w, r, principal, traceID)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/tool-call-events":
+		httpx.WriteJSON(w, 200, s.store.ListToolCallEvents())
+	case r.Method == http.MethodGet && r.URL.Path == "/api/server-health":
+		httpx.WriteJSON(w, 200, s.store.ListHealth())
+	case r.Method == http.MethodPost && r.URL.Path == "/api/client-config/generate":
+		s.handleClientConfig(w, r, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/policy"):
+		s.handlePolicy(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/admin"):
+		s.handleAdmin(w, r, principal, traceID)
+	default:
+		httpx.WriteError(w, 404, "NOT_FOUND", "Route not found", traceID, nil)
+	}
+}
+
+func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	parts := pathParts(r.URL.Path, "/api/servers")
+	if len(parts) == 0 {
+		if r.Method == http.MethodGet {
+			httpx.WriteJSON(w, 200, s.store.ListServers())
+			return
+		}
+		if r.Method == http.MethodPost {
+			if !auth.RequirePlatformAdmin(principal) {
+				httpx.WriteError(w, 403, "AUTHORIZATION_DENIED", "Platform admin role is required for this action.", traceID, nil)
+				return
+			}
+			s.createServer(w, r, principal, traceID)
+			return
+		}
+	}
+	serverID := parts[0]
+	if len(parts) == 1 {
+		switch r.Method {
+		case http.MethodGet:
+			value, err := s.store.GetServer(serverID)
+			respond(w, traceID, value, err)
+		case http.MethodPatch:
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			var patch map[string]interface{}
+			if decode(w, r, traceID, &patch) {
+				value, err := s.store.PatchServer(serverID, patch, principal, traceID)
+				respond(w, traceID, value, err)
+			}
+		default:
+			httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+		}
+		return
+	}
+	switch parts[1] {
+	case "versions":
+		s.handleVersions(w, r, principal, traceID, serverID, parts[2:])
+	case "schema-diff":
+		if r.Method == http.MethodGet {
+			value, err := s.store.SchemaDiff(serverID)
+			respond(w, traceID, value, err)
+			return
+		}
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+	case "tools":
+		s.handleTools(w, r, principal, traceID, serverID, parts[2:])
+	case "enable", "disable", "publish", "unpublish", "quarantine":
+		if r.Method != http.MethodPost {
+			httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+			return
+		}
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		value, err := s.store.SetServerState(serverID, parts[1], principal, traceID)
+		respond(w, traceID, value, err)
+	default:
+		httpx.WriteError(w, 404, "NOT_FOUND", "Server route not found", traceID, nil)
+	}
+}
+
+func (s *Server) createServer(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	var input struct {
+		db.MCPServer
+		Tools []db.MCPTool `json:"tools"`
+	}
+	if !decode(w, r, traceID, &input) {
+		return
+	}
+	server, err := s.store.CreateServer(input.MCPServer, input.Tools, principal, traceID, input)
+	respondStatus(w, traceID, 201, server, err)
+}
+
+func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID, serverID string, parts []string) {
+	if len(parts) == 0 {
+		if r.Method == http.MethodGet {
+			value, err := s.store.ListVersions(serverID)
+			respond(w, traceID, value, err)
+			return
+		}
+		if r.Method == http.MethodPost {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			var input db.MCPServerVersion
+			if decode(w, r, traceID, &input) {
+				value, err := s.store.CreateVersion(serverID, input, principal, traceID, input)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+	}
+	if len(parts) == 2 && r.Method == http.MethodPost && (parts[1] == "activate" || parts[1] == "rollback") {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		value, err := s.store.ActivateVersion(serverID, parts[0], parts[1] == "rollback", principal, traceID)
+		respond(w, traceID, value, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Version route not found", traceID, nil)
+}
+
+func (s *Server) handleTools(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID, serverID string, parts []string) {
+	if len(parts) == 0 && r.Method == http.MethodGet {
+		value, err := s.store.ListTools(serverID)
+		respond(w, traceID, value, err)
+		return
+	}
+	if len(parts) >= 1 {
+		toolID := parts[0]
+		if len(parts) == 1 && r.Method == http.MethodPatch {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			var patch map[string]interface{}
+			if decode(w, r, traceID, &patch) {
+				value, err := s.store.PatchTool(serverID, toolID, patch, principal, traceID)
+				respond(w, traceID, value, err)
+			}
+			return
+		}
+		if len(parts) == 2 && r.Method == http.MethodPost && (parts[1] == "enable" || parts[1] == "disable") {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			value, err := s.store.SetToolEnabled(serverID, toolID, parts[1] == "enable", principal, traceID)
+			respond(w, traceID, value, err)
+			return
+		}
+		if len(parts) == 2 && r.Method == http.MethodGet && parts[1] == "schema" {
+			list, err := s.store.ListTools(serverID)
+			if err != nil {
+				writeStoreError(w, traceID, err)
+				return
+			}
+			for _, tool := range list.Items {
+				if tool.ID == toolID || tool.Name == toolID {
+					httpx.WriteJSON(w, 200, map[string]interface{}{"serverId": serverID, "toolId": tool.ID, "name": tool.Name, "inputSchema": tool.InputSchema})
+					return
+				}
+			}
+			writeStoreError(w, traceID, db.ErrNotFound)
+			return
+		}
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Tool route not found", traceID, nil)
+}
+
+func (s *Server) handleGrants(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	parts := pathParts(r.URL.Path, "/api/grants")
+	if len(parts) == 0 {
+		if r.Method == http.MethodGet {
+			httpx.WriteJSON(w, 200, s.store.ListGrants())
+			return
+		}
+		if r.Method == http.MethodPost {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			var input db.Grant
+			if decode(w, r, traceID, &input) {
+				value, err := s.store.CreateGrant(input, principal, traceID, input)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+	}
+	if len(parts) == 1 && r.Method == http.MethodPatch {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		var patch map[string]interface{}
+		if decode(w, r, traceID, &patch) {
+			value, err := s.store.PatchGrant(parts[0], patch, principal, traceID)
+			respond(w, traceID, value, err)
+		}
+		return
+	}
+	if len(parts) == 2 && r.Method == http.MethodPost && (parts[1] == "revoke" || parts[1] == "approve") {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		value, err := s.store.SetGrantEnabled(parts[0], parts[1] == "approve", principal, traceID)
+		respond(w, traceID, value, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Grant route not found", traceID, nil)
+}
+
+func (s *Server) handleApprovals(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	parts := pathParts(r.URL.Path, "/api/approvals")
+	if len(parts) == 0 {
+		if r.Method == http.MethodGet {
+			httpx.WriteJSON(w, 200, s.store.ListApprovals())
+			return
+		}
+		if r.Method == http.MethodPost {
+			var input db.Approval
+			if decode(w, r, traceID, &input) {
+				value, err := s.store.CreateApproval(input, principal, traceID, input)
+				respondStatus(w, traceID, 201, value, err)
+			}
+			return
+		}
+	}
+	if len(parts) == 2 && r.Method == http.MethodPost && (parts[1] == "approve" || parts[1] == "reject") {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		var patch map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&patch)
+		decision := "rejected"
+		if parts[1] == "approve" {
+			decision = "approved"
+		}
+		value, err := s.store.DecideApproval(parts[0], decision, patch, principal, traceID)
+		respond(w, traceID, value, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Approval route not found", traceID, nil)
+}
+
+func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if r.Method == http.MethodGet && (r.URL.Path == "/api/audit-events" || r.URL.Path == "/api/audit-events/export") {
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		filters := map[string]string{}
+		for _, key := range []string{"from", "to", "user", "team", "project", "server", "tool", "event_type", "policy_decision", "risk_level", "trace_id"} {
+			filters[key] = r.URL.Query().Get(key)
+		}
+		httpx.WriteJSON(w, 200, s.store.ListAuditEvents(limit, r.URL.Query().Get("cursor"), filters))
+		return
+	}
+	if r.Method == http.MethodPost && r.URL.Path == "/api/audit-events/gateway" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		var event db.AuditEvent
+		if decode(w, r, traceID, &event) {
+			respondStatus(w, traceID, 201, s.store.RecordGatewayAudit(event), nil)
+		}
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Audit route not found", traceID, nil)
+}
+
+func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request, traceID string) {
+	var input struct {
+		Client   string `json:"client"`
+		ServerID string `json:"serverId"`
+		Profile  string `json:"profile"`
+	}
+	if !decode(w, r, traceID, &input) {
+		return
+	}
+	server, err := s.store.GetServer(input.ServerID)
+	if err != nil {
+		writeStoreError(w, traceID, err)
+		return
+	}
+	url := s.cfg.GatewayURL + "/mcp/" + server.Slug
+	if server.UpstreamURL != "" {
+		url = server.UpstreamURL
+	}
+	client := input.Client
+	if client == "" {
+		client = "generic"
+	}
+	config := map[string]interface{}{"transport": "streamable_http", "url": url}
+	placeholder := false
+	switch client {
+	case "opencode":
+		config = map[string]interface{}{"mcp": map[string]interface{}{server.Slug: map[string]interface{}{"type": "remote", "url": url}}}
+	case "claude-code", "codex", "vscode":
+		placeholder = true
+		config = map[string]interface{}{"mcpServers": map[string]interface{}{server.Slug: map[string]interface{}{"url": url, "note": "Placeholder remote MCP client format."}}}
+	case "generic":
+	default:
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", "Unsupported client config kind", traceID, map[string]interface{}{"supportedClients": []string{"generic", "opencode", "claude-code", "codex", "vscode"}})
+		return
+	}
+	httpx.WriteJSON(w, 200, map[string]interface{}{"client": client, "placeholder": placeholder, "gatewayUrl": url, "config": config})
+}
+
+func (s *Server) handlePolicy(w http.ResponseWriter, r *http.Request, _ db.AuthContext, traceID string) {
+	if r.Method != http.MethodPost {
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+		return
+	}
+	var input map[string]interface{}
+	if !decode(w, r, traceID, &input) {
+		return
+	}
+	result := policy.Allow("Policy document is syntactically valid for the Go control plane.", []string{})
+	if strings.HasSuffix(r.URL.Path, "/simulate") || strings.HasSuffix(r.URL.Path, "/test-call") {
+		result = policy.Deny("DENY_BY_DEFAULT", "Simulation requires a matching grant in the runtime store.")
+	}
+	httpx.WriteJSON(w, 200, result)
+}
+
+func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	if r.Method == http.MethodPost && r.URL.Path == "/api/admin/emergency-deny" {
+		var input db.EmergencyDeny
+		if decode(w, r, traceID, &input) {
+			httpx.WriteJSON(w, 200, s.store.SetEmergencyDeny(input, principal, traceID))
+		}
+		return
+	}
+	if r.Method == http.MethodPost && r.URL.Path == "/api/admin/emergency-deny/disable" {
+		httpx.WriteJSON(w, 200, s.store.DisableEmergencyDeny(principal, traceID))
+		return
+	}
+	parts := pathParts(r.URL.Path, "/api/admin/revoke-server-grants")
+	if r.Method == http.MethodPost && len(parts) == 1 {
+		value, err := s.store.RevokeServerGrants(parts[0], principal, traceID)
+		respond(w, traceID, value, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Admin route not found", traceID, nil)
+}
+
+func requireAdmin(w http.ResponseWriter, principal db.AuthContext, traceID string) bool {
+	if auth.RequirePlatformAdmin(principal) {
+		return true
+	}
+	httpx.WriteError(w, 403, "AUTHORIZATION_DENIED", "Platform admin role is required for this action.", traceID, nil)
+	return false
+}
+
+func respond[T any](w http.ResponseWriter, traceID string, value T, err error) {
+	respondStatus(w, traceID, 200, value, err)
+}
+func respondStatus[T any](w http.ResponseWriter, traceID string, status int, value T, err error) {
+	if err != nil {
+		writeStoreError(w, traceID, err)
+		return
+	}
+	httpx.WriteJSON(w, status, value)
+}
+func decode(w http.ResponseWriter, r *http.Request, traceID string, target interface{}) bool {
+	if err := httpx.DecodeJSON(r, target); err != nil {
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", "Request body must be valid JSON", traceID, map[string]interface{}{"error": err.Error()})
+		return false
+	}
+	return true
+}
+
+func writeStoreError(w http.ResponseWriter, traceID string, err error) {
+	switch {
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, 404, "NOT_FOUND", "Resource not found", traceID, nil)
+	case errors.Is(err, db.ErrUnauthorized):
+		httpx.WriteError(w, 403, "AUTHORIZATION_DENIED", "Authorization denied", traceID, nil)
+	case errors.Is(err, db.ErrValidation):
+		httpx.WriteError(w, 400, "VALIDATION_ERROR", strings.TrimPrefix(err.Error(), db.ErrValidation.Error()+": "), traceID, nil)
+	default:
+		httpx.WriteError(w, 500, "INTERNAL_SERVER_ERROR", err.Error(), traceID, nil)
+	}
+}
+
+func pathParts(path, prefix string) []string {
+	rest := strings.Trim(strings.TrimPrefix(path, prefix), "/")
+	if rest == "" {
+		return nil
+	}
+	return strings.Split(rest, "/")
+}
+
+func openAPIDocument() map[string]interface{} {
+	return map[string]interface{}{
+		"openapi": "3.1.0",
+		"info":    map[string]interface{}{"title": "MCP Hub Control Plane API", "version": "0.1.0"},
+		"paths": map[string]interface{}{
+			"/healthz":                           map[string]interface{}{"get": operation("Health check", false)},
+			"/readyz":                            map[string]interface{}{"get": operation("Readiness check", false)},
+			"/metrics":                           map[string]interface{}{"get": operation("Prometheus metrics", false)},
+			"/api/me":                            map[string]interface{}{"get": operation("Current auth context", false)},
+			"/api/servers":                       map[string]interface{}{"get": operation("List MCP servers", false), "post": operation("Register MCP server", true)},
+			"/api/servers/{serverId}":            map[string]interface{}{"get": operation("Get MCP server", false), "patch": operation("Patch MCP server", true)},
+			"/api/servers/{serverId}/publish":    map[string]interface{}{"post": operation("Publish server", true)},
+			"/api/servers/{serverId}/unpublish":  map[string]interface{}{"post": operation("Unpublish server", true)},
+			"/api/servers/{serverId}/disable":    map[string]interface{}{"post": operation("Disable server", true)},
+			"/api/servers/{serverId}/enable":     map[string]interface{}{"post": operation("Enable server", true)},
+			"/api/servers/{serverId}/quarantine": map[string]interface{}{"post": operation("Quarantine server", true)},
+			"/api/servers/{serverId}/versions":   map[string]interface{}{"get": operation("List server versions", false), "post": operation("Create server version", true)},
+			"/api/servers/{serverId}/versions/{versionId}/activate": map[string]interface{}{"post": operation("Activate server version", true)},
+			"/api/servers/{serverId}/versions/{versionId}/rollback": map[string]interface{}{"post": operation("Roll back server version", true)},
+			"/api/servers/{serverId}/schema-diff":                   map[string]interface{}{"get": operation("Get server schema diff", false)},
+			"/api/servers/{serverId}/tools":                         map[string]interface{}{"get": operation("List server tools", false)},
+			"/api/servers/{serverId}/tools/{toolId}":                map[string]interface{}{"patch": operation("Patch server tool", true)},
+			"/api/servers/{serverId}/tools/{toolId}/enable":         map[string]interface{}{"post": operation("Enable server tool", true)},
+			"/api/servers/{serverId}/tools/{toolId}/disable":        map[string]interface{}{"post": operation("Disable server tool", true)},
+			"/api/servers/{serverId}/tools/{toolId}/schema":         map[string]interface{}{"get": operation("Get tool schema", false)},
+			"/api/grants":                                map[string]interface{}{"get": operation("List grants", false), "post": operation("Create grant request", true)},
+			"/api/grants/{grantId}":                      map[string]interface{}{"patch": operation("Patch grant", true)},
+			"/api/grants/{grantId}/approve":              map[string]interface{}{"post": operation("Approve grant", true)},
+			"/api/grants/{grantId}/revoke":               map[string]interface{}{"post": operation("Revoke grant", true)},
+			"/api/approvals":                             map[string]interface{}{"get": operation("List approvals", false), "post": operation("Create approval request", true)},
+			"/api/approvals/{approvalId}/approve":        map[string]interface{}{"post": operation("Approve approval request", true)},
+			"/api/approvals/{approvalId}/reject":         map[string]interface{}{"post": operation("Reject approval request", true)},
+			"/api/audit-events":                          map[string]interface{}{"get": operation("Search audit events", false)},
+			"/api/audit-events/export":                   map[string]interface{}{"get": operation("Export audit events", false)},
+			"/api/audit-events/gateway":                  map[string]interface{}{"post": operation("Record gateway audit event", true)},
+			"/api/tool-call-events":                      map[string]interface{}{"get": operation("List tool call events", false)},
+			"/api/server-health":                         map[string]interface{}{"get": operation("List server health records", false)},
+			"/api/client-config/generate":                map[string]interface{}{"post": operation("Generate client config", false)},
+			"/api/policy/validate":                       map[string]interface{}{"post": operation("Validate policy", false)},
+			"/api/policy/simulate":                       map[string]interface{}{"post": operation("Simulate policy", false)},
+			"/api/policy/test-call":                      map[string]interface{}{"post": operation("Simulate one policy-protected tool call", false)},
+			"/api/admin/emergency-deny":                  map[string]interface{}{"post": operation("Enable emergency deny", true)},
+			"/api/admin/emergency-deny/disable":          map[string]interface{}{"post": operation("Disable emergency deny", true)},
+			"/api/admin/revoke-server-grants/{serverId}": map[string]interface{}{"post": operation("Revoke all grants for one server", true)},
+		},
+		"components": map[string]interface{}{"schemas": map[string]interface{}{"ErrorResponse": map[string]interface{}{"type": "object", "required": []string{"error", "traceId"}}}},
+	}
+}
+
+func operation(summary string, audit bool) map[string]interface{} {
+	out := map[string]interface{}{"summary": summary, "responses": map[string]interface{}{"200": map[string]interface{}{"description": summary}}}
+	if audit {
+		out["x-audit-event-required"] = true
+	}
+	return out
+}
+
+func ListenAndServe(store *db.Store, cfg config.Config) error {
+	address := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	return http.ListenAndServe(address, NewServer(store, cfg).Handler())
+}

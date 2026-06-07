@@ -1,0 +1,70 @@
+package cli
+
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestCLIVersionAndHealth(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer api.Close()
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--api-url", api.URL, "--output", "json", "health"}, Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 || !strings.Contains(out.String(), "ok") {
+		t.Fatalf("health failed code=%d out=%s", code, out.String())
+	}
+
+	out.Reset()
+	code = Run(Options{Args: []string{"version"}, Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 || !strings.Contains(out.String(), "mcphubctl") {
+		t.Fatalf("version failed code=%d out=%s", code, out.String())
+	}
+}
+
+func TestCLIUsesStoredBearerToken(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("authorization"); got != "Bearer stored-token" {
+			t.Fatalf("expected bearer token, got %q", got)
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer api.Close()
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(configPath, []byte("token: stored-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--api-url", api.URL, "health"}, ConfigPath: configPath, Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 {
+		t.Fatalf("health failed code=%d out=%s", code, out.String())
+	}
+}
+
+func TestCLILoginStoresTokenWithoutPrintingIt(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--api-url", "http://api.local", "login", "--token", "secret-token"}, ConfigPath: configPath, Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 {
+		t.Fatalf("login failed code=%d", code)
+	}
+	if strings.Contains(out.String(), "secret-token") {
+		t.Fatalf("login output leaked token: %s", out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "token: secret-token") {
+		t.Fatalf("config did not store token: %s", string(data))
+	}
+}
