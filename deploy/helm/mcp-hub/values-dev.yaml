@@ -15,6 +15,8 @@ auth:
   mode: mock
   oidcIssuerUrl: https://issuer-dev.example.com
   audience: mcp-hub-dev
+  trustedHeaderToken:
+    secretName: ""
 
 web:
   replicas: 1
@@ -27,6 +29,8 @@ gateway:
 
 worker:
   replicas: 1
+  jobToken:
+    secretName: ""
 
 ingress:
   hosts:

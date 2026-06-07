@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mcp-hub/mcp-hub/internal/redaction"
+	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
 )
 
 const (
@@ -50,6 +51,8 @@ type Store struct {
 	toolCallEvents  []ToolCallEvent
 	rateLimits      []RateLimitBucket
 	health          []ServerHealth
+	runtimeStatus   []RuntimeStatus
+	secretLeases    []SecretLease
 	emergencyDeny   *EmergencyDeny
 	secretBindings  []SecretBinding
 	schemaSnapshots []ToolSchemaSnapshot
@@ -73,6 +76,8 @@ type snapshot struct {
 	ToolCallEvents  []ToolCallEvent      `json:"toolCallEvents"`
 	RateLimits      []RateLimitBucket    `json:"rateLimits"`
 	Health          []ServerHealth       `json:"health"`
+	RuntimeStatus   []RuntimeStatus      `json:"runtimeStatus"`
+	SecretLeases    []SecretLease        `json:"secretLeases"`
 	EmergencyDeny   *EmergencyDeny       `json:"emergencyDeny,omitempty"`
 	SecretBindings  []SecretBinding      `json:"secretBindings"`
 	SchemaSnapshots []ToolSchemaSnapshot `json:"schemaSnapshots"`
@@ -202,6 +207,8 @@ func (s *Store) loadSnapshotLocked() error {
 	s.toolCallEvents = cloneSlice(state.ToolCallEvents)
 	s.rateLimits = cloneSlice(state.RateLimits)
 	s.health = cloneSlice(state.Health)
+	s.runtimeStatus = cloneSlice(state.RuntimeStatus)
+	s.secretLeases = cloneSlice(state.SecretLeases)
 	s.emergencyDeny = state.EmergencyDeny
 	s.secretBindings = cloneSlice(state.SecretBindings)
 	s.schemaSnapshots = cloneSlice(state.SchemaSnapshots)
@@ -232,7 +239,7 @@ func (s *Store) saveLocked() error {
 }
 
 func snapshotFromStoreLocked(s *Store) snapshot {
-	return snapshot{Users: s.users, Teams: s.teams, TeamMembers: s.teamMembers, Projects: s.projects, ProjectMembers: s.projectMembers, Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, OAuthClients: s.oauthClients, AuditEvents: s.auditEvents, AuditExports: s.auditExports, ToolCallEvents: s.toolCallEvents, RateLimits: s.rateLimits, Health: s.health, EmergencyDeny: s.emergencyDeny, SecretBindings: s.secretBindings, SchemaSnapshots: s.schemaSnapshots, SchemaDiffs: s.schemaDiffs}
+	return snapshot{Users: s.users, Teams: s.teams, TeamMembers: s.teamMembers, Projects: s.projects, ProjectMembers: s.projectMembers, Servers: s.servers, Tools: s.tools, Versions: s.versions, Grants: s.grants, Approvals: s.approvals, OAuthClients: s.oauthClients, AuditEvents: s.auditEvents, AuditExports: s.auditExports, ToolCallEvents: s.toolCallEvents, RateLimits: s.rateLimits, Health: s.health, RuntimeStatus: s.runtimeStatus, SecretLeases: s.secretLeases, EmergencyDeny: s.emergencyDeny, SecretBindings: s.secretBindings, SchemaSnapshots: s.schemaSnapshots, SchemaDiffs: s.schemaDiffs}
 }
 
 func (s *Store) saveSnapshotLocked(state snapshot) error {
@@ -492,6 +499,11 @@ func (s *Store) CreateVersion(serverID string, input MCPServerVersion, auth Auth
 	}
 	if input.Version == "" {
 		return MCPServerVersion{}, fmt.Errorf("%w: version is required", ErrValidation)
+	}
+	if len(input.ManifestJSON) > 0 {
+		if _, err := mcruntime.ManifestFromMap(input.ManifestJSON); err != nil {
+			return MCPServerVersion{}, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+		}
 	}
 	now := Now()
 	input.ID = NewID()
@@ -805,6 +817,131 @@ func (s *Store) ListHealth() ListResponse[ServerHealth] {
 	return ListResponse[ServerHealth]{Items: cloneSlice(s.health)}
 }
 
+func (s *Store) ListRuntimeStatus() ListResponse[RuntimeStatus] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return ListResponse[RuntimeStatus]{Items: cloneSlice(s.runtimeStatus)}
+}
+
+func (s *Store) GetRuntimeStatus(serverID string) (RuntimeStatus, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, status := range s.runtimeStatus {
+		if status.ServerID == serverID || status.ServerSlug == serverID {
+			return status, nil
+		}
+	}
+	return RuntimeStatus{}, ErrNotFound
+}
+
+func (s *Store) UpsertRuntimeStatus(status RuntimeStatus, auth AuthContext, traceID string, argument interface{}) RuntimeStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := Now()
+	if status.ID == "" {
+		status.ID = NewID()
+	}
+	if status.UpdatedAt == "" {
+		status.UpdatedAt = now
+	}
+	if status.LastReconciledAt == "" {
+		status.LastReconciledAt = now
+	}
+	for i := range s.runtimeStatus {
+		if s.runtimeStatus[i].ServerSlug == status.ServerSlug {
+			status.ID = s.runtimeStatus[i].ID
+			s.runtimeStatus[i] = status
+			s.recordAuditLocked(auth, traceID, "runtime.reconciled", status.ServerID, "", PolicyAllow, RiskLow, argument)
+			return status
+		}
+	}
+	s.runtimeStatus = append([]RuntimeStatus{status}, s.runtimeStatus...)
+	s.recordAuditLocked(auth, traceID, "runtime.reconciled", status.ServerID, "", PolicyAllow, RiskLow, argument)
+	return status
+}
+
+func (s *Store) ListSecretLeases(includeRevoked bool) ListResponse[SecretLease] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []SecretLease{}
+	for _, lease := range s.secretLeases {
+		if includeRevoked || lease.Status != "revoked" {
+			out = append(out, lease)
+		}
+	}
+	return ListResponse[SecretLease]{Items: out}
+}
+
+func (s *Store) UpsertSecretLeases(leases []SecretLease, auth AuthContext, traceID string, argument interface{}) []SecretLease {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []SecretLease{}
+	for _, lease := range leases {
+		if lease.ID == "" {
+			lease.ID = NewID()
+		}
+		if lease.Status == "" {
+			lease.Status = "active"
+		}
+		idx := s.secretLeaseIndexLocked(lease.ID)
+		if idx >= 0 {
+			if s.secretLeases[idx].RevokedAt != "" {
+				lease.RevokedAt = s.secretLeases[idx].RevokedAt
+				lease.Status = s.secretLeases[idx].Status
+			}
+			s.secretLeases[idx] = lease
+		} else {
+			s.secretLeases = append([]SecretLease{lease}, s.secretLeases...)
+		}
+		out = append(out, lease)
+	}
+	if len(out) > 0 {
+		s.recordAuditLocked(auth, traceID, "secret_lease.issued", out[0].ServerID, "", PolicyAllow, RiskLow, argument)
+	}
+	return out
+}
+
+func (s *Store) RevokeSecretLease(id string, auth AuthContext, traceID string) (SecretLease, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx := s.secretLeaseIndexLocked(id)
+	if idx < 0 {
+		return SecretLease{}, ErrNotFound
+	}
+	s.secretLeases[idx].Status = "revoked"
+	s.secretLeases[idx].RevokedAt = Now()
+	s.recordAuditLocked(auth, traceID, "secret_lease.revoked", s.secretLeases[idx].ServerID, "", PolicyDeny, RiskLow, map[string]interface{}{"leaseId": id})
+	return s.secretLeases[idx], nil
+}
+
+func (s *Store) RenewExpiringSecretLeases(durationSeconds int, auth AuthContext, traceID string) []SecretLease {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if durationSeconds <= 0 {
+		durationSeconds = 1800
+	}
+	now := time.Now().UTC()
+	threshold := now.Add(15 * time.Minute)
+	out := []SecretLease{}
+	for i := range s.secretLeases {
+		lease := &s.secretLeases[i]
+		if lease.Status != "active" {
+			continue
+		}
+		expiresAt, err := time.Parse(time.RFC3339Nano, lease.ExpiresAt)
+		if err != nil || expiresAt.After(threshold) {
+			continue
+		}
+		lease.ExpiresAt = now.Add(time.Duration(durationSeconds) * time.Second).Format(time.RFC3339Nano)
+		lease.LeaseDurationSeconds = durationSeconds
+		out = append(out, *lease)
+	}
+	if len(out) > 0 {
+		s.recordAuditLocked(auth, traceID, "secret_lease.renewed", out[0].ServerID, "", PolicyAllow, RiskLow, map[string]interface{}{"renewed": len(out)})
+	}
+	return out
+}
+
 func (s *Store) SetEmergencyDeny(input EmergencyDeny, auth AuthContext, traceID string) EmergencyDeny {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1075,6 +1212,14 @@ func (s *Store) grantIndexLocked(id string) int {
 }
 func (s *Store) approvalIndexLocked(id string) int {
 	for i, item := range s.approvals {
+		if item.ID == id {
+			return i
+		}
+	}
+	return -1
+}
+func (s *Store) secretLeaseIndexLocked(id string) int {
+	for i, item := range s.secretLeases {
 		if item.ID == id {
 			return i
 		}

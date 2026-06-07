@@ -41,7 +41,7 @@ If the server is unsafe or noisy, disable it from `/admin` or call `POST /api/se
 
 ### 근본 원인 확인
 
-Review the upstream process logs, the server manifest, recent version metadata at `GET /api/servers/:serverId/versions`, and recent audit events.
+Review the upstream process logs, the server manifest, recent platform-admin version metadata at `GET /api/servers/:serverId/versions`, and recent audit events.
 
 ### 복구 확인
 
@@ -361,7 +361,10 @@ Clients using changed tools may fail or send invalid arguments. High-risk tools 
 ### 즉시 확인할 것
 
 ```sh
-curl http://localhost:4000/api/servers/:serverId/versions
+curl http://localhost:4000/api/servers/:serverId/versions \
+  -H 'x-auth-proxy-token: <trusted-proxy-token>' \
+  -H 'x-user-id: admin@example.com' \
+  -H 'x-roles: platform_admin'
 curl http://localhost:4000/api/servers/:serverId/schema-diff
 curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \

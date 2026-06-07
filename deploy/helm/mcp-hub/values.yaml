@@ -38,12 +38,15 @@ config:
   storePath: /tmp/mcp-hub/store.json
 
 auth:
-  mode: mock
+  mode: oidc
   oidcIssuerUrl: ""
   audience: mcp-hub
   oidcClientSecret:
     secretName: mcp-hub-oidc
     secretKey: clientSecret
+  trustedHeaderToken:
+    secretName: mcp-hub-auth-proxy
+    secretKey: token
 
 postgres:
   external:
@@ -162,6 +165,9 @@ worker:
   replicas: 1
   port: 4100
   serviceAccountName: ""
+  jobToken:
+    secretName: mcp-hub-worker-job
+    secretKey: token
   image:
     repository: worker
     # Set to sha256:<digest> to render registry.example.com/mcp-hub/worker@sha256:...
@@ -218,6 +224,18 @@ networkPolicy:
   enabled: true
   allowExternalEgress: true
   ingressNamespaceSelector: {}
+
+managedRuntime:
+  namespace: mcp-runtime
+  controller:
+    mode: render
+    reconcileInterval: 60s
+    rbac:
+      enabled: true
+  defaults:
+    secretLeaseSeconds: 1800
+    sandboxProfile: restricted
+    imagePullPolicy: IfNotPresent
 
 serviceMonitor:
   enabled: false

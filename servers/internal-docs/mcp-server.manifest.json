@@ -1,0 +1,52 @@
+{
+  "version": "v1",
+  "slug": "internal-docs-readonly",
+  "displayName": "Internal Docs Readonly MCP Server",
+  "description": "First-party Go internal documentation MCP server with read-only search resources, prompt templates, and DLP redaction hooks.",
+  "environment": "dev",
+  "transport": "streamable_http",
+  "upstreamUrl": "http://localhost:5113/mcp",
+  "riskLevel": "low",
+  "ownerTeam": "Platform Team",
+  "ownerTeamId": "00000000-0000-4000-8000-000000000010",
+  "implementationLanguage": "go",
+  "policyTags": ["internal-docs", "readonly", "dlp"],
+  "runtime": {
+    "image": "registry.example.com/mcp-hub/internal-docs:latest",
+    "imagePullPolicy": "IfNotPresent",
+    "port": 5113,
+    "replicas": 1,
+    "path": "/mcp"
+  },
+  "egress": {
+    "denyByDefault": true,
+    "allow": []
+  },
+  "sandbox": {
+    "profile": "restricted",
+    "runAsNonRoot": true,
+    "runAsUser": 10001,
+    "readOnlyRootFilesystem": true,
+    "allowPrivilegeEscalation": false,
+    "seccompProfileType": "RuntimeDefault",
+    "resources": {
+      "requests": { "cpu": "25m", "memory": "64Mi" },
+      "limits": { "cpu": "250m", "memory": "256Mi" }
+    }
+  },
+  "tools": [
+    {
+      "name": "search_docs",
+      "description": "Search read-only internal documentation with DLP redaction applied to snippets.",
+      "riskLevel": "low",
+      "readOnly": true,
+      "policyTags": ["internal-docs", "readonly", "dlp"],
+      "inputSchema": {
+        "type": "object",
+        "properties": { "query": { "type": "string" } },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

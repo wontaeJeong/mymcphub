@@ -9,10 +9,10 @@ Local development uses mock auth:
 - `dev-admin-token` maps to a platform-admin principal for Gateway requests.
 - `dev-readonly-token` maps to a non-admin principal.
 - The API builds a mock admin context unless `MCP_AUTH_MODE=oidc` is set.
-- With `MCP_AUTH_MODE=oidc` and `MCP_TRUSTED_AUTH_HEADERS=true`, the API reads trusted ingress headers such as `x-user-id`, `x-team-ids`, `x-groups`, and `x-roles`.
+- With `MCP_AUTH_MODE=oidc`, the API can read trusted ingress headers such as `x-user-id`, `x-team-ids`, `x-groups`, and `x-roles` when `MCP_TRUSTED_AUTH_HEADERS=true` or when the request carries `x-auth-proxy-token` matching `MCP_TRUSTED_AUTH_HEADER_TOKEN`.
 - With `MCP_AUTH_MODE=oidc`, the Gateway validates bearer JWTs as an OAuth/OIDC resource server. It checks issuer, audience, expiry/not-before, required scope, and either HS256 test secret or RS256 JWKS keys with cache.
 
-Set `OIDC_ISSUER_URL`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_SCOPE`, and either `OIDC_HS256_SECRET` for local tests or `OIDC_JWKS_URL` for RS256 JWT verification. `MCP_ALLOW_MOCK_TOKENS=true` allows local mock bearer tokens even in OIDC mode. `MCP_ALLOW_DYNAMIC_CLIENTS=false` enforces the seeded/local OAuth client registry and returns `CLIENT_NOT_REGISTERED` for unknown Gateway clients.
+Set `OIDC_ISSUER_URL`, `OIDC_AUDIENCE`, `OIDC_REQUIRED_SCOPE`, and either `OIDC_HS256_SECRET` for local tests or `OIDC_JWKS_URL` for RS256 JWT verification. `MCP_ALLOW_MOCK_TOKENS=true` allows local mock bearer tokens even in OIDC mode. `MCP_ALLOW_DYNAMIC_CLIENTS=false` enforces the seeded/local OAuth client registry and returns `CLIENT_NOT_REGISTERED` for unknown Gateway clients. Shared deployments should put API/Gateway behind a trusted auth proxy or ingress that strips caller-supplied identity headers and injects the trusted proxy token.
 
 ## Rules
 

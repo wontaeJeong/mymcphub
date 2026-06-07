@@ -29,4 +29,4 @@ curl -X POST http://localhost:4000/api/client-config/generate \
 - Admin: emergency deny, kill switch, and revoke server grants.
 - Health/readiness/metrics/OpenAPI.
 
-Mutations require a platform-admin auth context and write audit events.
+Mutations require a platform-admin auth context and write audit events. Version metadata and runtime render endpoints are also platform-admin only because they can include manifest or rendered secret-reference metadata.

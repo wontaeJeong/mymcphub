@@ -214,6 +214,34 @@ type ServerHealth struct {
 	CheckedAt    string `json:"checkedAt"`
 }
 
+type RuntimeStatus struct {
+	ID               string                   `json:"id"`
+	ServerID         string                   `json:"serverId,omitempty"`
+	ServerSlug       string                   `json:"serverSlug"`
+	ManifestHash     string                   `json:"manifestHash"`
+	Phase            string                   `json:"phase"`
+	Namespace        string                   `json:"namespace"`
+	ResourceKinds    []string                 `json:"resourceKinds"`
+	ResourceCount    int                      `json:"resourceCount"`
+	RenderedObjects  []map[string]interface{} `json:"renderedObjects"`
+	Warnings         []string                 `json:"warnings,omitempty"`
+	LastReconciledAt string                   `json:"lastReconciledAt"`
+	UpdatedAt        string                   `json:"updatedAt"`
+}
+
+type SecretLease struct {
+	ID                   string `json:"id"`
+	ServerID             string `json:"serverId,omitempty"`
+	ServerSlug           string `json:"serverSlug"`
+	SecretRef            string `json:"secretRef"`
+	TargetEnv            string `json:"targetEnv"`
+	Status               string `json:"status"`
+	IssuedAt             string `json:"issuedAt"`
+	ExpiresAt            string `json:"expiresAt"`
+	RevokedAt            string `json:"revokedAt,omitempty"`
+	LeaseDurationSeconds int    `json:"leaseDurationSeconds"`
+}
+
 type EmergencyDeny struct {
 	Enabled      bool     `json:"enabled"`
 	Reason       string   `json:"reason"`

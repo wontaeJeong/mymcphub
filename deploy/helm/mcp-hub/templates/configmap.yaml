@@ -17,3 +17,6 @@ data:
   NEXT_PUBLIC_MCP_API_URL: {{ .Values.config.apiUrl | quote }}
   MCP_GATEWAY_URL: {{ .Values.config.gatewayUrl | quote }}
   MCP_STORE_PATH: {{ .Values.config.storePath | quote }}
+  MCP_RUNTIME_NAMESPACE: {{ .Values.managedRuntime.namespace | quote }}
+  MCP_RUNTIME_CONTROLLER_MODE: {{ .Values.managedRuntime.controller.mode | quote }}
+  MCP_SECRET_LEASE_SECONDS: {{ .Values.managedRuntime.defaults.secretLeaseSeconds | quote }}

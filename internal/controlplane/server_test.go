@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mcp-hub/mcp-hub/internal/auth"
 	"github.com/mcp-hub/mcp-hub/internal/config"
 	"github.com/mcp-hub/mcp-hub/internal/db"
 )
@@ -160,6 +161,117 @@ func TestOpenAPIDocumentUsesMutationResponseStatuses(t *testing.T) {
 	auditExportResponses := auditExportPost["responses"].(map[string]interface{})
 	if _, ok := auditExportResponses["202"]; !ok {
 		t.Fatalf("expected audit export response status 202, got %#v", auditExportResponses)
+	}
+}
+
+func TestControlPlaneRuntimeStatusAndLeaseRevocation(t *testing.T) {
+	store := db.NewSeedStore()
+	server := NewServer(store, config.Load(4000))
+	principal := auth.MockAdmin()
+	store.UpsertRuntimeStatus(db.RuntimeStatus{ServerID: db.K8sReadonlyID, ServerSlug: "k8s-readonly", ManifestHash: "hash", Phase: "rendered", Namespace: "mcp-runtime", ResourceKinds: []string{"Deployment"}, ResourceCount: 1, LastReconciledAt: db.Now(), UpdatedAt: db.Now()}, principal, "trace", nil)
+	store.UpsertSecretLeases([]db.SecretLease{{ID: "lease-1", ServerID: db.K8sReadonlyID, ServerSlug: "k8s-readonly", SecretRef: "kubeconfig", TargetEnv: "KUBECONFIG", Status: "active", IssuedAt: db.Now(), ExpiresAt: db.Now(), LeaseDurationSeconds: 600}}, principal, "trace", nil)
+
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/runtime/status", nil))
+	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte("k8s-readonly")) {
+		t.Fatalf("expected runtime status response, got %d %s", recorder.Code, recorder.Body.String())
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/runtime/secret-leases/lease-1/revoke", nil))
+	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte("revoked")) {
+		t.Fatalf("expected revoked lease response, got %d %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestControlPlaneRuntimeSecretLeaseListRequiresAdmin(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
+	store := db.NewSeedStore()
+	server := NewServer(store, config.Load(4000))
+	principal := auth.MockAdmin()
+	store.UpsertRuntimeStatus(db.RuntimeStatus{ServerID: db.K8sReadonlyID, ServerSlug: "k8s-readonly", ManifestHash: "hash", Phase: "rendered", Namespace: "mcp-runtime", ResourceKinds: []string{"Deployment"}, ResourceCount: 1, LastReconciledAt: db.Now(), UpdatedAt: db.Now()}, principal, "trace", nil)
+	store.UpsertSecretLeases([]db.SecretLease{{ID: "lease-1", ServerID: db.K8sReadonlyID, ServerSlug: "k8s-readonly", SecretRef: "kubeconfig", TargetEnv: "KUBECONFIG", Status: "active", IssuedAt: db.Now(), ExpiresAt: db.Now(), LeaseDurationSeconds: 600}}, principal, "trace", nil)
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/runtime/status", nil)
+	statusReq.Header.Set("x-user-id", "reader@example.com")
+	statusReq.Header.Set("x-roles", "reader")
+	statusReq.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	statusRecorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(statusRecorder, statusReq)
+	if statusRecorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for reader runtime status, got %d %s", statusRecorder.Code, statusRecorder.Body.String())
+	}
+
+	readerReq := httptest.NewRequest(http.MethodGet, "/api/runtime/secret-leases", nil)
+	readerReq.Header.Set("x-user-id", "reader@example.com")
+	readerReq.Header.Set("x-roles", "reader")
+	readerReq.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	readerRecorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(readerRecorder, readerReq)
+	if readerRecorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for reader lease list, got %d %s", readerRecorder.Code, readerRecorder.Body.String())
+	}
+
+	adminReq := httptest.NewRequest(http.MethodGet, "/api/runtime/secret-leases", nil)
+	adminReq.Header.Set("x-user-id", "admin@example.com")
+	adminReq.Header.Set("x-roles", "platform_admin")
+	adminReq.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	adminRecorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(adminRecorder, adminReq)
+	if adminRecorder.Code != http.StatusOK || !bytes.Contains(adminRecorder.Body.Bytes(), []byte("lease-1")) {
+		t.Fatalf("expected admin lease list response, got %d %s", adminRecorder.Code, adminRecorder.Body.String())
+	}
+}
+
+func TestControlPlaneVersionListRequiresAdmin(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+
+	readerReq := httptest.NewRequest(http.MethodGet, "/api/servers/"+db.K8sReadonlyID+"/versions", nil)
+	readerReq.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	readerReq.Header.Set("x-user-id", "reader@example.com")
+	readerReq.Header.Set("x-roles", "reader")
+	readerRecorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(readerRecorder, readerReq)
+	if readerRecorder.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for reader version list, got %d %s", readerRecorder.Code, readerRecorder.Body.String())
+	}
+
+	adminReq := httptest.NewRequest(http.MethodGet, "/api/servers/"+db.K8sReadonlyID+"/versions", nil)
+	adminReq.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	adminReq.Header.Set("x-user-id", "admin@example.com")
+	adminReq.Header.Set("x-roles", "platform_admin")
+	adminRecorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(adminRecorder, adminReq)
+	if adminRecorder.Code != http.StatusOK {
+		t.Fatalf("expected 200 for admin version list, got %d %s", adminRecorder.Code, adminRecorder.Body.String())
+	}
+}
+
+func TestControlPlaneVersionManifestRejectsRawSecret(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "mock")
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+	body := map[string]interface{}{
+		"version": "v2",
+		"manifestJson": map[string]interface{}{
+			"slug":                   "bad-secret",
+			"displayName":            "Bad Secret",
+			"ownerTeamId":            db.PlatformTeamID,
+			"environment":            "dev",
+			"transport":              "streamable_http",
+			"riskLevel":              "low",
+			"implementationLanguage": "go",
+			"secrets":                []interface{}{map[string]interface{}{"ref": "provider", "targetEnv": "PROVIDER_TOKEN", "secretName": "provider", "secretKey": "token", "apiKey": "raw-secret"}},
+			"tools":                  []interface{}{map[string]interface{}{"name": "probe", "riskLevel": "low", "readOnly": true, "inputSchema": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}, "additionalProperties": false}}},
+		},
+	}
+	encoded, _ := json.Marshal(body)
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/servers/"+db.K8sReadonlyID+"/versions", bytes.NewReader(encoded)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for raw manifest secret, got %d %s", recorder.Code, recorder.Body.String())
 	}
 }
 

@@ -1,6 +1,9 @@
 package redaction
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestRedactCoversDocumentedSensitiveKeyVariants(t *testing.T) {
 	input := map[string]interface{}{
@@ -46,5 +49,20 @@ func TestRedactCoversDocumentedSensitiveKeyVariants(t *testing.T) {
 	header := headerVariants[0].(map[string]interface{})
 	if header["x-api-key"] != "[REDACTED]" || header["safe"] != "kept" {
 		t.Fatalf("expected header variant redaction, got %#v", header)
+	}
+}
+
+func TestRedactCredentialKeyVariants(t *testing.T) {
+	redacted := Redact(map[string]interface{}{
+		"apiKey":        "raw-api-key",
+		"api_key":       "raw-api-key",
+		"authorization": "Bearer raw-token",
+		"privateKey":    "raw-private-key",
+		"cookie":        "raw-cookie",
+		"nested":        map[string]interface{}{"access-key": "raw-access-key"},
+	})
+	encoded, _ := json.Marshal(redacted)
+	if string(encoded) != `{"apiKey":"[REDACTED]","api_key":"[REDACTED]","authorization":"[REDACTED]","cookie":"[REDACTED]","nested":{"access-key":"[REDACTED]"},"privateKey":"[REDACTED]"}` {
+		t.Fatalf("unexpected redaction: %s", encoded)
 	}
 }

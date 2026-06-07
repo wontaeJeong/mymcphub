@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -27,6 +28,11 @@ type Config struct {
 	GatewayCircuitOpenSec      int
 	GatewayAllowDynamicClients bool
 	TrustedAuthHeaders         bool
+	RuntimeNamespace           string
+	RuntimeControllerMode      string
+	SecretLeaseSeconds         int
+	RuntimeReconcileInterval   time.Duration
+	WorkerJobToken             string
 }
 
 func Load(defaultPort int) Config {
@@ -51,6 +57,11 @@ func Load(defaultPort int) Config {
 		GatewayCircuitOpenSec:      getenvInt("MCP_GATEWAY_CIRCUIT_OPEN_SECONDS", 30),
 		GatewayAllowDynamicClients: getenvBool("MCP_ALLOW_DYNAMIC_CLIENTS", false),
 		TrustedAuthHeaders:         getenvBool("MCP_TRUSTED_AUTH_HEADERS", false),
+		RuntimeNamespace:           getenv("MCP_RUNTIME_NAMESPACE", "mcp-runtime"),
+		RuntimeControllerMode:      getenv("MCP_RUNTIME_CONTROLLER_MODE", "render"),
+		SecretLeaseSeconds:         getenvInt("MCP_SECRET_LEASE_SECONDS", 1800),
+		RuntimeReconcileInterval:   getenvDuration("MCP_RUNTIME_RECONCILE_INTERVAL", time.Minute),
+		WorkerJobToken:             os.Getenv("MCP_WORKER_JOB_TOKEN"),
 	}
 }
 
@@ -111,6 +122,15 @@ func getenvBool(key string, fallback bool) bool {
 			return true
 		case "0", "false", "no", "off":
 			return false
+		}
+	}
+	return fallback
+}
+
+func getenvDuration(key string, fallback time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := time.ParseDuration(value); err == nil && parsed > 0 {
+			return parsed
 		}
 	}
 	return fallback

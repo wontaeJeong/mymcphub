@@ -98,8 +98,7 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 	}
 
 	requireNonEmptyString(manifest["slug"], label, "missing slug", findings)
-	requireNonEmptyString(manifest["ownerTeam"], label, "missing ownerTeam", findings)
-	requireNonEmptyString(manifest["ownerTeamId"], label, "missing ownerTeamId", findings)
+	requireUUIDString(manifest["ownerTeamId"], label, "missing ownerTeamId", "invalid ownerTeamId UUID", findings)
 	requireRiskLevel(manifest["riskLevel"], label, "missing manifest riskLevel", "invalid manifest riskLevel", findings)
 
 	tools, ok := manifest["tools"].([]interface{})
@@ -107,6 +106,10 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 		addError(findings, label, "tools must be an array")
 		return
 	}
+	if len(tools) == 0 {
+		addError(findings, label, "tools must include at least one tool")
+	}
+	checkSecretBindings(manifest["secrets"], label, findings)
 	for index, rawTool := range tools {
 		tool, ok := rawTool.(map[string]interface{})
 		toolLabel := fmt.Sprintf("%s tools[%d]", label, index)
@@ -148,6 +151,39 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 	}
 }
 
+func checkSecretBindings(value interface{}, label string, findings *[]finding) {
+	if value == nil {
+		return
+	}
+	secrets, ok := value.([]interface{})
+	if !ok {
+		addError(findings, label, "secrets must be an array when present")
+		return
+	}
+	for index, rawSecret := range secrets {
+		secret, ok := rawSecret.(map[string]interface{})
+		secretLabel := fmt.Sprintf("%s secrets[%d]", label, index)
+		if !ok {
+			addError(findings, secretLabel, "secret binding must be an object")
+			continue
+		}
+		for _, required := range []string{"ref", "targetEnv", "secretName", "secretKey"} {
+			requireNonEmptyString(secret[required], secretLabel, "missing "+required, findings)
+		}
+		allowedFields := map[string]bool{"ref": true, "targetEnv": true, "secretName": true, "secretKey": true, "leaseDurationSeconds": true}
+		for _, forbidden := range []string{"value", "token", "password", "credential", "clientSecret"} {
+			if _, exists := secret[forbidden]; exists {
+				addError(findings, secretLabel, "secret bindings must reference external secrets and must not include "+forbidden)
+			}
+		}
+		for field := range secret {
+			if !allowedFields[field] {
+				addError(findings, secretLabel, "unsupported secret binding field "+field)
+			}
+		}
+	}
+}
+
 func readJSON(file, label string, findings *[]finding) (map[string]interface{}, bool) {
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -167,6 +203,36 @@ func requireNonEmptyString(value interface{}, file string, message string, findi
 	if !ok || strings.TrimSpace(text) == "" {
 		addError(findings, file, message)
 	}
+}
+
+func requireUUIDString(value interface{}, file, missingMessage, invalidMessage string, findings *[]finding) {
+	text, ok := value.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		addError(findings, file, missingMessage)
+		return
+	}
+	if !looksLikeUUID(text) {
+		addError(findings, file, invalidMessage)
+	}
+}
+
+func looksLikeUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for index, r := range value {
+		switch index {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if !((r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') || (r >= '0' && r <= '9')) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func requireRiskLevel(value interface{}, file, missingMessage, invalidMessage string, findings *[]finding) string {
