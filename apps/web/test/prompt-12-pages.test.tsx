@@ -204,9 +204,9 @@ describe("prompt-12 required web pages", () => {
     expect(html).toContain("Production Docs");
     expect(html).toContain("prod-docs");
     expect(html).toContain("team-platform");
-    expect(html).toContain("streamable_http");
-    expect(html).toContain("degraded");
-    expect(html).toContain("enabled");
+    expect(html).toContain("스트리밍 HTTP");
+    expect(html).toContain("저하");
+    expect(html).toContain("활성");
   });
 
   it("covers server detail health, recent audit, and tool schema behavior", () => {
@@ -222,8 +222,8 @@ describe("prompt-12 required web pages", () => {
 
     expect(toolsHtml).toContain("docs.search");
     expect(toolsHtml).toContain("Search internal documentation");
-    expect(toolsHtml).toContain("View schema");
-    expect(toolsHtml).toContain("disabled");
+    expect(toolsHtml).toContain("스키마 보기");
+    expect(toolsHtml).toContain("비활성");
     expect(auditHtml).toContain("trace-latest");
     expect(auditHtml).not.toContain("trace-older");
   });
@@ -233,19 +233,22 @@ describe("prompt-12 required web pages", () => {
     const activeVersion = buildServerVersion({ id: "version-active", version: "2026.06.1", status: "active", createdAt: "2026-06-07T09:00:00.000Z" });
     const newerPendingVersion = buildServerVersion({ id: "version-pending", version: "2026.06.2", status: "pending", createdAt: "2026-06-07T11:00:00.000Z" });
     const newestFallbackVersion = buildServerVersion({ id: "version-draft", version: "2026.06.3", status: "draft", createdAt: "2026-06-07T12:00:00.000Z", imageRef: undefined, imageRepository: "ghcr.io/example/prod-docs", imageTag: "2026.06.3" });
+    const rolledBackVersion = buildServerVersion({ id: "version-rolled-back", version: "2026.05.1", status: "rolled_back" });
 
     expect(selectActiveServerVersion([newerPendingVersion, activeVersion])).toEqual(activeVersion);
     expect(selectActiveServerVersion([newerPendingVersion, newestFallbackVersion])).toEqual(newestFallbackVersion);
 
-    const html = renderToStaticMarkup(<ServerVersionTable versions={[activeVersion, newestFallbackVersion]} />);
+    const html = renderToStaticMarkup(<ServerVersionTable versions={[activeVersion, newestFallbackVersion, rolledBackVersion]} />);
 
     expect(html).toContain("2026.06.1");
-    expect(html).toContain("active");
+    expect(html).toContain("활성");
     expect(html).toContain("ghcr.io/example/prod-docs:2026.06.1");
     expect(html).toContain("sha256:config");
     expect(html).toContain("sha256:schema");
     expect(html).toContain("2026.06.3");
     expect(html).toContain("ghcr.io/example/prod-docs");
+    expect(html).toContain("2026.05.1");
+    expect(html).toContain("롤백됨");
   });
 
   it("renders server detail versions plus empty and error fallbacks without blocking the page", async () => {
@@ -253,27 +256,27 @@ describe("prompt-12 required web pages", () => {
     const versionPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
     const versionHtml = renderToStaticMarkup(versionPage);
 
-    expect(versionHtml).toContain("Active version");
+    expect(versionHtml).toContain("활성 버전");
     expect(versionHtml).toContain("2026.06.1");
     expect(versionHtml).toContain("2026.06.2");
-    expect(versionHtml).toContain("Server tools");
+    expect(versionHtml).toContain("서버 도구");
 
     stubServerDetailFetch({ type: "items", items: [] });
     const emptyPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
     const emptyHtml = renderToStaticMarkup(emptyPage);
 
     expect(emptyHtml).toContain("Production Docs");
-    expect(emptyHtml).toContain("No server versions");
-    expect(emptyHtml).toContain("No tools discovered");
+    expect(emptyHtml).toContain("서버 버전 없음");
+    expect(emptyHtml).toContain("발견된 도구 없음");
 
     stubServerDetailFetch({ type: "error" });
     const errorPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
     const errorHtml = renderToStaticMarkup(errorPage);
 
     expect(errorHtml).toContain("Production Docs");
-    expect(errorHtml).toContain("Server versions unavailable");
+    expect(errorHtml).toContain("서버 버전 사용 불가");
     expect(errorHtml).toContain("Versions endpoint unavailable (503)");
-    expect(errorHtml).toContain("No tools discovered");
+    expect(errorHtml).toContain("발견된 도구 없음");
   });
 
   it("covers approval queue partitioning and decision rendering", () => {
@@ -287,10 +290,10 @@ describe("prompt-12 required web pages", () => {
     const pendingHtml = renderToStaticMarkup(<ApprovalTable approvals={queue.pending} actionSlot={(approval) => <strong>Review {approval.id}</strong>} />);
     const decidedHtml = renderToStaticMarkup(<ApprovalTable approvals={queue.decided} />);
 
-    expect(pendingHtml).toContain("user: user-alice");
+    expect(pendingHtml).toContain("사용자: user-alice");
     expect(pendingHtml).toContain("docs.search");
     expect(pendingHtml).toContain("Review approval-1");
-    expect(decidedHtml).toContain("Reviewer reviewer-1");
+    expect(decidedHtml).toContain("검토자 reviewer-1");
     expect(decidedHtml).toContain("Approved for incident response");
   });
 
@@ -328,10 +331,10 @@ describe("prompt-12 required web pages", () => {
     const auditHtml = renderToStaticMarkup(<AuditTable events={[buildAuditEvent()]} />);
     const callsHtml = renderToStaticMarkup(<ToolCallTable events={filteredCalls} serverNameById={new Map([["server-prod-docs", "Production Docs"]])} />);
 
-    expect(auditHtml).toContain("needs_approval");
+    expect(auditHtml).toContain("승인 필요");
     expect(auditHtml).toContain("trace-prod-docs");
     expect(callsHtml).toContain("Production Docs");
-    expect(callsHtml).toContain("failed");
+    expect(callsHtml).toContain("실패");
     expect(callsHtml).toContain("87 ms");
   });
 });
