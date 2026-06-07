@@ -78,7 +78,10 @@ func defaultManifestFiles(rootDir string) []string {
 	files := []string{}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			files = append(files, filepath.Join(serversDir, entry.Name(), "mcp-server.manifest.json"))
+			manifestPath := filepath.Join(serversDir, entry.Name(), "mcp-server.manifest.json")
+			if _, err := os.Stat(manifestPath); err == nil {
+				files = append(files, manifestPath)
+			}
 		}
 	}
 	return files
