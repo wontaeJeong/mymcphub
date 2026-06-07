@@ -268,7 +268,8 @@ export type RolloutStatusRow = Readonly<{
 
 export function RolloutStatusTable({
   rows,
-}: Readonly<{ rows: RolloutStatusRow[] }>) {
+  serverBasePath = "/servers",
+}: Readonly<{ rows: RolloutStatusRow[]; serverBasePath?: string }>) {
   return (
     <div className="table-wrap">
       <table>
@@ -286,7 +287,7 @@ export function RolloutStatusTable({
           {rows.map((row) => (
             <tr key={row.server.id}>
               <td>
-                <Link href={`/servers/${row.server.id}`}>
+                <Link href={`${serverBasePath}/${row.server.id}`}>
                   {row.server.displayName}
                 </Link>
                 <p className="muted">
