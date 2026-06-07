@@ -17,28 +17,28 @@ export default async function UserHomePage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="User workspace" title="Find tools you can actually use." description="Browse MCP servers, request missing access, and generate client configuration without exposing admin-only operations." />
+      <PageHero eyebrow="사용자 워크스페이스" title="실제로 사용할 수 있는 도구를 찾으세요." description="관리자 전용 작업을 노출하지 않고 MCP 서버를 탐색하고, 필요한 접근을 요청하고, 클라이언트 설정을 생성합니다." />
       <div className="card-grid">
-        <Surface><SectionHeader title="Enabled servers" /><p>{serverItems.length}</p></Surface>
-        <Surface><SectionHeader title="Visible grants" /><p>{userGrants.length}</p></Surface>
-        <Surface><SectionHeader title="Admin access" /><p>{session?.principal.isPlatformAdmin ? "Available" : "Not granted"}</p></Surface>
+        <Surface><SectionHeader title="활성 서버" /><p>{serverItems.length}</p></Surface>
+        <Surface><SectionHeader title="표시 가능한 권한" /><p>{userGrants.length}</p></Surface>
+        <Surface><SectionHeader title="관리자 접근" /><p>{session?.principal.isPlatformAdmin ? "사용 가능" : "부여되지 않음"}</p></Surface>
       </div>
       {!servers.ok ? <ErrorState message={servers.error} /> : null}
       <section>
-        <SectionHeader title="User actions" description="Self-service pages are separated from the admin console." />
+        <SectionHeader title="사용자 작업" description="셀프서비스 페이지는 관리자 콘솔과 분리되어 있습니다." />
         <div className="card-grid">
-          <UserLink href="/user/catalog" title="Browse catalog" description="Inspect servers and tools exposed by the hub." />
-          <UserLink href="/user/access" title="Request access" description="Submit approval requests and review your current grants." />
-          <UserLink href="/user/client-config" title="Client config" description="Generate MCP client snippets for enabled servers." />
+          <UserLink href="/user/catalog" title="카탈로그 탐색" description="허브가 노출하는 서버와 도구를 확인합니다." />
+          <UserLink href="/user/access" title="접근 요청" description="승인 요청을 제출하고 현재 권한을 검토합니다." />
+          <UserLink href="/user/client-config" title="클라이언트 설정" description="활성 서버에 대한 MCP 클라이언트 snippet을 생성합니다." />
         </div>
       </section>
       <section>
-        <SectionHeader title="Enabled catalog preview" description="Server links stay in the user route tree." action={<Link className="button" href="/user/catalog">Open catalog</Link>} />
-        {servers.ok && serverItems.length > 0 ? <ServerTable servers={serverItems.slice(0, 5)} serverBasePath="/user/servers" /> : servers.ok ? <EmptyState title="No enabled servers" description="No enabled servers were returned by the Control Plane." /> : null}
+        <SectionHeader title="활성 카탈로그 미리보기" description="서버 링크는 사용자 route 트리에 유지됩니다." action={<Link className="button" href="/user/catalog">카탈로그 열기</Link>} />
+        {servers.ok && serverItems.length > 0 ? <ServerTable servers={serverItems.slice(0, 5)} serverBasePath="/user/servers" /> : servers.ok ? <EmptyState title="활성 서버 없음" description="제어 플레인이 활성 서버를 반환하지 않았습니다." /> : null}
       </section>
       <section>
-        <SectionHeader title="Your visible grants" description="Filtered to the current user or team identifiers available in the Web session." action={<Link className="button" href="/user/access">Open access</Link>} />
-        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} /> : grants.ok ? <EmptyState title="No visible grants" description="Request access when a required tool is missing." /> : <ErrorState message={grants.error} />}
+        <SectionHeader title="내 표시 권한" description="Web 세션의 현재 사용자 또는 팀 식별자와 일치하는 권한만 표시합니다." action={<Link className="button" href="/user/access">접근 권한 열기</Link>} />
+        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} /> : grants.ok ? <EmptyState title="표시 가능한 권한 없음" description="필요한 도구가 없다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
       </section>
     </div>
   );
