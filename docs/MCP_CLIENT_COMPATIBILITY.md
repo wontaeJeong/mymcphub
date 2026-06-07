@@ -2,13 +2,13 @@
 
 The Go Gateway currently supports authenticated Streamable HTTP at `/mcp/{serverSlug}`. Local compatibility checks use the seeded `k8s-readonly` server and mock bearer token `dev-admin-token`.
 
-| Client | Generated profile | Transport | Auth | Status | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Generic remote MCP | `generic` | Streamable HTTP URL | Client-managed bearer token | Supported | Use the generated URL and configure auth in the client. |
-| opencode | `opencode` | Remote MCP URL | Client version dependent bearer config | Supported | API returns a non-placeholder `mcp` object. Validate with `curl` before handoff. |
-| Claude Code | `claude-code` | Remote MCP URL placeholder | Client version dependent | Placeholder | API marks this profile as placeholder until exact remote config is confirmed. |
-| Codex | `codex` | Remote MCP URL placeholder | Client version dependent | Placeholder | API marks this profile as placeholder until exact remote config is confirmed. |
-| Cursor / VS Code | `vscode` | Remote MCP URL placeholder | Extension/workspace dependent | Placeholder | API marks this profile as placeholder until the target extension format is confirmed. |
+| Client             | Generated profile | Transport                  | Auth                                   | Status      | Notes                                                                                 |
+| ------------------ | ----------------- | -------------------------- | -------------------------------------- | ----------- | ------------------------------------------------------------------------------------- |
+| Generic remote MCP | `generic`         | Streamable HTTP URL        | Client-managed bearer token            | Supported   | Use the generated URL and configure auth in the client.                               |
+| opencode           | `opencode`        | Remote MCP URL             | Client version dependent bearer config | Supported   | API returns a non-placeholder `mcp` object. Validate with `curl` before handoff.      |
+| Claude Code        | `claude-code`     | Remote MCP URL placeholder | Client version dependent               | Placeholder | API marks this profile as placeholder until exact remote config is confirmed.         |
+| Codex              | `codex`           | Remote MCP URL placeholder | Client version dependent               | Placeholder | API marks this profile as placeholder until exact remote config is confirmed.         |
+| Cursor / VS Code   | `vscode`          | Remote MCP URL placeholder | Extension/workspace dependent          | Placeholder | API marks this profile as placeholder until the target extension format is confirmed. |
 
 ## Compatibility Test Coverage
 
