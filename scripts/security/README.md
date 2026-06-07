@@ -1,6 +1,6 @@
 # Security Scripts
 
-Run prompt-11 security checks from the repository root:
+Run security checks from the repository root:
 
 ```sh
 pnpm security:deps
@@ -13,7 +13,7 @@ pnpm security:mcp-manifests
 pnpm security:check
 ```
 
-Missing external tools print `SKIP: <tool> not found` and exit successfully in normal mode. Set `SECURITY_STRICT=1` to make missing tools and review findings fail the shell scanners.
+Missing external tools print `SKIP: <tool> not found` and exit successfully in normal mode. Set `SECURITY_STRICT=1` to make missing tools and review findings fail the shell scanners. The lightweight committed-secret pattern review scans tracked files only so ignored local files such as `.env` are not printed.
 
 Useful optional inputs:
 
