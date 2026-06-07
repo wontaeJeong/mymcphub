@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: dev build lint test ci fmt schema gen-openapi gen-schemas
+.PHONY: dev build lint test ci fmt schema security gen-openapi gen-schemas
 
 dev:
 	./scripts/dev/run-go-core.sh
@@ -23,6 +23,7 @@ ci:
 	./scripts/ci/web.sh
 	./scripts/ci/schemas.sh
 	./scripts/ci/helm.sh
+	./scripts/security/check-all.sh
 
 fmt:
 	gofmt -w internal apps/api apps/gateway apps/worker apps/cli servers tests
@@ -35,3 +36,6 @@ gen-schemas:
 	./scripts/gen/schemas.sh
 
 schema: gen-openapi gen-schemas
+
+security:
+	./scripts/security/check-all.sh

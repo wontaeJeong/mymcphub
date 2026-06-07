@@ -32,3 +32,11 @@ curl -X POST http://localhost:4100/jobs/run \
 Each job records a result. Job failures are returned as failed job results and do not kill the Worker process.
 
 `schema-snapshot` records the current Store-backed tool schemas for the target server. `schema-diff` compares supplied previous/current snapshots when present, stores added/removed/changed/risk-change metadata, and marks approval-required diffs for API history lookup.
+
+Audit export jobs accept `from`, `to`, `redacted`, and `signed` fields. They record `audit.export.completed` with export id, count, redaction status, and signing status. Signed worker exports require the same `MCP_COMPLIANCE_EXPORT_SIGNING_KEY` used by the API.
+
+```sh
+curl -X POST http://localhost:4100/jobs/run   -H 'content-type: application/json'   -d '[{"kind":"audit-export","targetServerId":"00000000-0000-4000-8000-000000000102","from":"2026-06-07T00:00:00Z","to":"2026-06-08T00:00:00Z"}]'
+```
+
+Prompt scan jobs now inspect tool metadata for prompt-injection phrases and record quarantine recommendations.

@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   go-core:
@@ -17,7 +18,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: "1.22"
+          go-version: "1.26.4"
           cache: true
       - run: scripts/ci/go.sh
 
@@ -44,12 +45,33 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: "1.22"
+          go-version: "1.26.4"
           cache: true
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
       - run: scripts/ci/schemas.sh
+
+  security-scan:
+    name: Security supply-chain scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: scripts/security/scan-supply-chain.sh
 
   helm-gitops:
     name: Helm and GitOps render
@@ -69,7 +91,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
-          go-version: "1.22"
+          go-version: "1.26.4"
           cache: true
       - run: go test ./tests/e2e ./tests/security
 
@@ -91,3 +113,9 @@ jobs:
       - run: docker build -f servers/github/Dockerfile -t mcp-hub/github-readonly:${{ github.sha }} .
       - run: docker build -f servers/gitlab/Dockerfile -t mcp-hub/gitlab-readonly:${{ github.sha }} .
       - run: docker build -f servers/internal-docs/Dockerfile -t mcp-hub/internal-docs-readonly:${{ github.sha }} .
+      - run: scripts/security/scan-images.sh
+        env:
+          SECURITY_IMAGES: mcp-hub/api:${{ github.sha }},mcp-hub/gateway:${{ github.sha }},mcp-hub/worker:${{ github.sha }},mcp-hub/mcphubctl:${{ github.sha }},mcp-hub/web:${{ github.sha }},mcp-hub/k8s-readonly:${{ github.sha }},mcp-hub/runtime-adapter:${{ github.sha }},mcp-hub/github-readonly:${{ github.sha }},mcp-hub/gitlab-readonly:${{ github.sha }},mcp-hub/internal-docs-readonly:${{ github.sha }}
+      - run: scripts/security/sbom-sign-images.sh
+        env:
+          SECURITY_IMAGES: mcp-hub/api:${{ github.sha }},mcp-hub/gateway:${{ github.sha }},mcp-hub/worker:${{ github.sha }},mcp-hub/mcphubctl:${{ github.sha }},mcp-hub/web:${{ github.sha }},mcp-hub/k8s-readonly:${{ github.sha }},mcp-hub/runtime-adapter:${{ github.sha }},mcp-hub/github-readonly:${{ github.sha }},mcp-hub/gitlab-readonly:${{ github.sha }},mcp-hub/internal-docs-readonly:${{ github.sha }}

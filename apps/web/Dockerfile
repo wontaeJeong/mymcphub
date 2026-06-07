@@ -14,6 +14,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
+RUN adduser -D -u 10001 appuser
 COPY --from=build /app ./
+USER appuser
 EXPOSE 3000
 CMD ["pnpm", "--filter", "@mcp-hub/web", "start"]

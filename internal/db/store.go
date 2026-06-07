@@ -987,6 +987,24 @@ func (s *Store) DeniedCallAnalytics(filters map[string]string) DeniedCallAnalyti
 	return DeniedCallAnalytics{From: filters["from"], To: filters["to"], TotalDenied: total, ByReason: byReason, TopTools: topTools, TopServers: topServers, PolicyTuning: policyTuning(byReason)}
 }
 
+func (s *Store) ExportAuditEvents(limit int, filters map[string]string) []AuditEvent {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
+	}
+	out := make([]AuditEvent, 0, limit)
+	for _, event := range s.auditEvents {
+		if auditMatches(event, filters) {
+			out = append(out, sanitizeAuditEvent(event))
+			if len(out) == limit {
+				break
+			}
+		}
+	}
+	return out
+}
+
 func (s *Store) RecordGatewayAudit(event AuditEvent) AuditEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1483,9 +1501,11 @@ func (s *Store) recordAuditLocked(auth AuthContext, traceID, eventType, serverID
 }
 
 func sanitizeAuditEvent(event AuditEvent) AuditEvent {
-	event.ArgumentRedactedJSON = redaction.Redact(event.ArgumentRedactedJSON)
-	if event.ArgumentRedactedJSON != nil && event.ArgumentHash == "" {
-		event.ArgumentHash = redaction.Hash(event.ArgumentRedactedJSON)
+	if event.ArgumentRedactedJSON != nil {
+		if event.ArgumentHash == "" {
+			event.ArgumentHash = redaction.Hash(event.ArgumentRedactedJSON)
+		}
+		event.ArgumentRedactedJSON = redaction.Redact(event.ArgumentRedactedJSON)
 	}
 	if event.MetadataJSON == nil {
 		event.MetadataJSON = map[string]interface{}{}

@@ -1,6 +1,7 @@
 package redaction
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -64,5 +65,35 @@ func TestRedactCredentialKeyVariants(t *testing.T) {
 	encoded, _ := json.Marshal(redacted)
 	if string(encoded) != `{"apiKey":"[REDACTED]","api_key":"[REDACTED]","authorization":"[REDACTED]","cookie":"[REDACTED]","nested":{"access-key":"[REDACTED]"},"privateKey":"[REDACTED]"}` {
 		t.Fatalf("unexpected redaction: %s", encoded)
+	}
+}
+
+func TestRedactCoversSensitiveKeysAndStringPatterns(t *testing.T) {
+	input := map[string]interface{}{
+		"authorization": "Bearer secret-token-value",
+		"message":       "call with Bearer abcdefghijklmnopqrstuvwxyz.abcdefghijklmnopqrstuv.abcdefghijklmnopqrstuv",
+		"nested": map[string]interface{}{
+			"apiKey": "plaintext",
+		},
+	}
+
+	encoded, _ := json.Marshal(Redact(input))
+	if bytes.Contains(encoded, []byte("secret-token-value")) || bytes.Contains(encoded, []byte("plaintext")) {
+		t.Fatalf("redacted payload leaked secret material: %s", string(encoded))
+	}
+	if !bytes.Contains(encoded, []byte("[REDACTED]")) {
+		t.Fatalf("expected redaction marker in %s", string(encoded))
+	}
+}
+
+func TestScanBlocksPrivateKeyAndKubeconfigContent(t *testing.T) {
+	result := Scan(map[string]interface{}{"payload": "-----BEGIN RSA PRIVATE KEY-----\nsecret\n-----END RSA PRIVATE KEY-----"})
+	if result.Action != ActionBlock {
+		t.Fatalf("expected block action for private key, got %#v", result)
+	}
+
+	result = Scan(map[string]interface{}{"payload": "apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n"})
+	if result.Action != ActionBlock {
+		t.Fatalf("expected block action for kubeconfig, got %#v", result)
 	}
 }

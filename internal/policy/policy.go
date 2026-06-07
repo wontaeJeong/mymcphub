@@ -171,3 +171,122 @@ func containsString(values []string, target string) bool {
 	}
 	return false
 }
+
+func ValidateDocument(input map[string]interface{}) Decision {
+	rules, ok := input["rules"].([]interface{})
+	if !ok || len(rules) == 0 {
+		return Deny("POLICY_VALIDATION_FAILED", "Policy document requires a non-empty rules array.")
+	}
+	for _, rawRule := range rules {
+		rule, ok := rawRule.(map[string]interface{})
+		if !ok {
+			return Deny("POLICY_VALIDATION_FAILED", "Each policy rule must be an object.")
+		}
+		effect, _ := rule["effect"].(string)
+		if effect != string(db.PolicyAllow) && effect != string(db.PolicyDeny) && effect != string(db.PolicyNeedsApproval) {
+			return Deny("POLICY_VALIDATION_FAILED", "Policy rule effect must be allow, deny, or needs_approval.")
+		}
+		if reasonCode, _ := rule["reasonCode"].(string); strings.TrimSpace(reasonCode) == "" {
+			return Deny("POLICY_VALIDATION_FAILED", "Policy rule reasonCode is required.")
+		}
+		if !ruleHasSelector(rule) {
+			return Deny("POLICY_VALIDATION_FAILED", "Policy rule must select at least one server, tool, subject, client, environment, or risk level.")
+		}
+		if effect == string(db.PolicyAllow) && ruleSelectsHighRisk(rule) && rule["requiresApproval"] != true {
+			return Deny("POLICY_VALIDATION_FAILED", "Allow rules for high or critical risk levels must set requiresApproval true.")
+		}
+	}
+	return Allow("Policy document is syntactically valid for the Go control plane.", []string{})
+}
+
+func SimulateDocument(input map[string]interface{}) Decision {
+	if validation := ValidateDocument(input); !validation.Allowed {
+		return validation
+	}
+	context, _ := input["context"].(map[string]interface{})
+	rules, _ := input["rules"].([]interface{})
+	for _, rawRule := range rules {
+		rule, _ := rawRule.(map[string]interface{})
+		if ruleMatches(rule, context) {
+			reasonCode, _ := rule["reasonCode"].(string)
+			reason, _ := rule["reason"].(string)
+			if strings.TrimSpace(reason) == "" {
+				reason = "Policy-as-code rule matched the simulation context."
+			}
+			switch rule["effect"] {
+			case string(db.PolicyAllow):
+				return Allow(reason, []string{})
+			case string(db.PolicyNeedsApproval):
+				return Decision{Effect: db.PolicyNeedsApproval, Allowed: false, Reason: reason, ReasonCode: reasonCode, MatchedGrantIDs: []string{}, RequiresApproval: true}
+			default:
+				return Deny(reasonCode, reason)
+			}
+		}
+	}
+	return Deny("DENY_BY_DEFAULT", "No policy-as-code rule matched the simulation context.")
+}
+
+func ruleHasSelector(rule map[string]interface{}) bool {
+	for _, key := range []string{"serverIds", "serverSlugs", "toolNames", "subjectIds", "clientIds", "environments", "riskLevels"} {
+		if values, ok := policyStringSlice(rule[key]); ok && len(values) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func ruleSelectsHighRisk(rule map[string]interface{}) bool {
+	values, ok := policyStringSlice(rule["riskLevels"])
+	if !ok {
+		return false
+	}
+	return containsString(values, string(db.RiskHigh)) || containsString(values, string(db.RiskCritical))
+}
+
+func ruleMatches(rule, context map[string]interface{}) bool {
+	checks := map[string]string{
+		"serverIds":    textValue(context["serverId"]),
+		"serverSlugs":  textValue(context["serverSlug"]),
+		"toolNames":    textValue(context["toolName"]),
+		"subjectIds":   textValue(context["subjectId"]),
+		"clientIds":    textValue(context["clientId"]),
+		"environments": textValue(context["environment"]),
+		"riskLevels":   textValue(context["riskLevel"]),
+	}
+	matchedAny := false
+	for key, actual := range checks {
+		values, ok := policyStringSlice(rule[key])
+		if !ok || len(values) == 0 {
+			continue
+		}
+		matchedAny = true
+		if !containsString(values, actual) {
+			return false
+		}
+	}
+	return matchedAny
+}
+
+func policyStringSlice(value interface{}) ([]string, bool) {
+	switch typed := value.(type) {
+	case []string:
+		return typed, true
+	case []interface{}:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil, false
+			}
+			out = append(out, text)
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func textValue(value interface{}) string {
+	text, _ := value.(string)
+	return text
+}

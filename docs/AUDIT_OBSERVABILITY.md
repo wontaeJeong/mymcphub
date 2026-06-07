@@ -14,6 +14,7 @@ Redaction and hashing are separate steps.
 
 - Redaction replaces sensitive values in stored argument snapshots with `[REDACTED]`.
 - Hashing computes a stable SHA-256 hash from the redacted argument snapshot so operators can compare repeated inputs without storing raw sensitive values.
+- DLP scanning blocks private key and kubeconfig payloads before Gateway upstream calls.
 
 The sensitive key set is case-insensitive and includes:
 
@@ -89,6 +90,16 @@ Example audit query:
 ```sh
 curl 'http://localhost:4000/api/audit-events?from=2026-06-07T00:00:00Z&to=2026-06-07T23:59:59Z&policy_decision=deny&risk_level=high&limit=25'
 ```
+
+## Compliance Export
+
+The Control Plane API exposes redacted compliance export at:
+
+```txt
+GET /api/audit-events/export
+```
+
+`from` and `to` are required and platform-admin access is enforced. `signed=true` adds an HMAC-SHA256 signature when `MCP_COMPLIANCE_EXPORT_SIGNING_KEY` is configured. Raw, unredacted export is not supported.
 
 ## Metrics
 
