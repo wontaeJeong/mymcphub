@@ -35,11 +35,7 @@ else
 fi
 
 echo "==> lightweight committed-secret pattern review"
-if grep -RInE '(AWS_SECRET_ACCESS_KEY|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|PRIVATE_KEY=|SECRET=|TOKEN=|PASSWORD=)' \
-  --exclude-dir=.git \
-  --exclude-dir=node_modules \
-  --exclude='scan-secrets.sh' \
-  "${ROOT_DIR}"; then
+if git grep -nE '(AWS_SECRET_ACCESS_KEY|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|PRIVATE_KEY=|SECRET=|TOKEN=|PASSWORD=)' -- . ':!scripts/security/scan-secrets.sh'; then
   echo "REVIEW: potential secret-like strings found; confirm they are not plaintext secrets"
   if [ "${STRICT}" = "1" ]; then
     STATUS=1
