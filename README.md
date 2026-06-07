@@ -42,6 +42,26 @@ tests/          Cross-workspace smoke tests
 
 See [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) for the complete local infra, database, mock token, smoke-test, and troubleshooting guide.
 
+## Operator Documentation
+
+Use these docs when running, debugging, or onboarding MCP Hub:
+
+| Doc | Use |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Control Plane, Data Plane, Runtime Plane, and current skeleton limits. |
+| [Local Development](docs/LOCAL_DEV.md) | Local infra, ports, mock tokens, smoke tests, and troubleshooting. |
+| [Data Model](docs/DATA_MODEL.md) | Planned database boundaries and current in-memory runtime state. |
+| [Control Plane API](docs/API.md) | API routes, local curl checks, auth boundary, and admin operations. |
+| [Gateway](docs/GATEWAY.md) | Gateway routes, mock tokens, first-party upstreams, policy flow, and metrics. |
+| [Policy](docs/POLICY.md) | Auth, grants, approvals, emergency deny, and Gateway enforcement. |
+| [Audit and Observability](docs/AUDIT_OBSERVABILITY.md) | Audit search, metrics, redaction, trace ids, and current observability limits. |
+| [Security](docs/SECURITY.md) | Security scan commands, manifest review, hardening, and kill-switch endpoints. |
+| [Deployment](docs/DEPLOYMENT.md) | Helm, GitOps, secret expectations, auth boundary, and rollback. |
+| [Release](docs/RELEASE.md) | Promotion, digest usage, schema diff scope, canary placeholder, and rollback. |
+| [Runbook](docs/RUNBOOK.md) | Operator response steps for common incidents and outages. |
+| [Client Setup](docs/CLIENT_SETUP.md) | Remote MCP client setup examples and config generator usage. |
+| [MCP Server Onboarding](docs/MCP_SERVER_ONBOARDING.md) | Manifest, owner, transport, review, promotion, and monitoring lifecycle. |
+
 ## Policy Model
 
 MCP Hub uses mock local auth by default, normalizes principals for the API and Gateway, and evaluates shared policy decisions for connect, tool discovery, tool calls, approvals, and emergency deny scopes. The current skeleton keeps API and Gateway state in memory, while `@mcp-hub/auth` provides package-level OIDC JWT verifier support that is not wired into API or Gateway runtime handling.
