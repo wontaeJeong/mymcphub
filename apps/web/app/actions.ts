@@ -104,7 +104,7 @@ export async function createServerAction(_previousState: FormActionState, formDa
     revalidatePath("/");
     return {
       status: "success",
-      message: `Registered ${server.displayName} through /api/servers.`
+      message: `${server.displayName} 서버를 /api/servers로 등록했습니다.`
     };
   } catch (error) {
     return {
@@ -197,7 +197,7 @@ export async function adminDisableServerAction(_previousState: FormActionState, 
     revalidateServerSurfaces(serverId);
     return {
       status: "success",
-      message: `Server ${serverId} disabled through the Control Plane API.`
+      message: `${serverId} 서버를 제어 플레인 API로 비활성화했습니다.`
     };
   } catch (error) {
     return {
@@ -215,7 +215,7 @@ export async function adminDisableToolAction(_previousState: FormActionState, fo
     revalidateToolSurfaces(serverId);
     return {
       status: "success",
-      message: `Tool ${toolId} disabled on server ${serverId}.`
+      message: `${serverId} 서버의 ${toolId} 도구를 비활성화했습니다.`
     };
   } catch (error) {
     return {
@@ -234,7 +234,7 @@ export async function generateClientConfigAction(_previousState: FormActionState
     const gatewayUrl = result.gatewayUrl ?? extractGatewayUrl(result.config);
     return {
       status: "success",
-      message: result.placeholder ? "Generated placeholder client config from the Control Plane API." : "Generated client config from the Control Plane API.",
+      message: result.placeholder ? "제어 플레인 API에서 플레이스홀더 클라이언트 설정을 생성했습니다." : "제어 플레인 API에서 클라이언트 설정을 생성했습니다.",
       payload: JSON.stringify(result.config, null, 2),
       selectedServerId: serverId,
       selectedClient: client,
@@ -285,7 +285,7 @@ export async function emergencyDenyAction(_previousState: FormActionState, formD
     revalidatePath("/audit");
     return {
       status: "success",
-      message: `Emergency deny enabled at ${result.createdAt}: ${result.reason}`
+      message: `긴급 거부가 ${result.createdAt}에 활성화되었습니다: ${result.reason}`
     };
   } catch (error) {
     return {
@@ -303,7 +303,7 @@ export async function revokeServerGrantsAction(_previousState: FormActionState, 
     revalidatePath("/access");
     return {
       status: "success",
-      message: `Revoked ${result.revoked} grant(s) for server ${result.serverId}.`
+      message: `${result.serverId} 서버의 권한 ${result.revoked}개를 회수했습니다.`
     };
   } catch (error) {
     return {
@@ -320,7 +320,7 @@ function readBoolean(formData: FormData, name: string) {
 function readRequired(formData: FormData, name: string) {
   const value = readOptional(formData, name);
   if (!value) {
-    throw new Error(`${name} is required`);
+    throw new Error(`${name}은(는) 필수입니다`);
   }
 
   return value;
@@ -363,7 +363,7 @@ function readEnvironment(formData: FormData): Environment {
     return value;
   }
 
-  throw new Error("environment is invalid");
+  throw new Error("environment가 올바르지 않습니다");
 }
 
 
@@ -373,7 +373,7 @@ function readTransport(formData: FormData): ServerTransport {
     return value;
   }
 
-  throw new Error("transport is invalid");
+  throw new Error("transport가 올바르지 않습니다");
 }
 
 function readRiskLevel(formData: FormData, name: string): RiskLevel {
@@ -382,7 +382,7 @@ function readRiskLevel(formData: FormData, name: string): RiskLevel {
     return value;
   }
 
-  throw new Error(`${name} is invalid`);
+  throw new Error(`${name}이(가) 올바르지 않습니다`);
 }
 
 function readJsonRecord(formData: FormData, name: string): Record<string, unknown> {
@@ -391,12 +391,12 @@ function readJsonRecord(formData: FormData, name: string): Record<string, unknow
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "Invalid JSON";
-    throw new Error(`${name} must be valid JSON: ${detail}`);
+    const detail = error instanceof Error ? error.message : "잘못된 JSON";
+    throw new Error(`${name}은(는) 유효한 JSON이어야 합니다: ${detail}`);
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${name} must be a JSON object`);
+    throw new Error(`${name}은(는) JSON 객체여야 합니다`);
   }
 
   return parsed as Record<string, unknown>;
@@ -408,7 +408,7 @@ function readSubjectType(formData: FormData) {
     return value;
   }
 
-  throw new Error("subjectType is invalid");
+  throw new Error("subjectType이 올바르지 않습니다");
 }
 
 function readClientConfigKind(formData: FormData): ClientConfigKind {
@@ -417,12 +417,12 @@ function readClientConfigKind(formData: FormData): ClientConfigKind {
     return value;
   }
 
-  throw new Error("client is invalid");
+  throw new Error("client가 올바르지 않습니다");
 }
 
 function requireConfirmation(formData: FormData, name: string) {
   if (formData.get(name) !== "on") {
-    throw new Error("Confirmation is required before running this dangerous action.");
+    throw new Error("위험한 작업을 실행하기 전에 확인이 필요합니다.");
   }
 }
 
@@ -430,7 +430,7 @@ function readToolRef(formData: FormData): [string, string] {
   const value = readRequired(formData, "toolRef");
   const [serverId, toolId] = value.split("::");
   if (!serverId || !toolId) {
-    throw new Error("toolRef is invalid");
+    throw new Error("toolRef가 올바르지 않습니다");
   }
 
   return [serverId, toolId];

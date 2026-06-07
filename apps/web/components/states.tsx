@@ -5,7 +5,7 @@ export type ErrorStateProps = Readonly<{
   message: string;
 }>;
 
-export function ErrorState({ title = "Control Plane unavailable", message }: ErrorStateProps) {
+export function ErrorState({ title = "제어 플레인에 연결할 수 없음", message }: ErrorStateProps) {
   return (
     <section className="error-state" role="status">
       <strong>{title}</strong>
@@ -26,8 +26,8 @@ export function EmptyList({ title, description }: EmptyListProps) {
 export function LoadingPanel() {
   return (
     <section className="loading-state" role="status">
-      <strong>Loading MCP Hub operations...</strong>
-      <p>Contacting the Control Plane API and preparing live operations state.</p>
+      <strong>MCP Hub 운영 정보를 불러오는 중...</strong>
+      <p>제어 플레인 API에 연결하고 실시간 운영 상태를 준비하고 있습니다.</p>
     </section>
   );
 }

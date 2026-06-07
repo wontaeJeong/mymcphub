@@ -18,7 +18,7 @@ export default async function AdminPage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Admin emergency controls" title="Use the red switches with receipts." description="Emergency deny, server disable, tool disable, and grant revocation call existing Control Plane endpoints where present and label unavailable behavior explicitly." />
+      <PageHero eyebrow="관리자 긴급 제어" title="근거를 남기고 긴급 제어를 실행하세요." description="긴급 거부, 서버 비활성화, 도구 비활성화, 권한 회수는 존재하는 제어 플레인 엔드포인트만 호출하며 사용할 수 없는 동작은 명확히 표시합니다." />
       {servers.ok ? <AdminControls servers={serverItems} tools={tools} /> : <ErrorState message={servers.error} />}
     </div>
   );
