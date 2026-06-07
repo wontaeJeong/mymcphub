@@ -71,7 +71,7 @@ curl http://localhost:5000/mcp/k8s-readonly \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-Check `mcp_gateway_request_duration_ms`, `mcp_gateway_tool_call_duration_ms`, and `mcp_gateway_upstream_errors_total`. Review `/audit` for trace ids and upstream status.
+Check `mcp_gateway_http_request_duration_seconds_bucket`, `mcp_gateway_tool_call_duration_seconds_bucket`, and `mcp_gateway_upstream_errors_total`. Review `/audit` for trace ids and upstream status.
 
 ### 완화 조치
 
@@ -104,6 +104,7 @@ Affected users, teams, clients, projects, servers, or tools may lose access. The
 ```sh
 curl http://localhost:5000/metrics
 curl 'http://localhost:4000/api/audit-events?policy_decision=deny&limit=25'
+curl http://localhost:4000/api/analytics/denied-calls -H 'authorization: Bearer dev-admin-token'
 ```
 
 Check `/audit`, `/access`, `/servers/:serverId`, and `/admin` for revoked grants, disabled tools, disabled servers, and emergency deny state.
@@ -123,6 +124,34 @@ Run a targeted `tools/list` and allowed `tools/call` with `dev-admin-token`, the
 ### 사후 조치
 
 Record the deny reason code, changed grant ids, affected tools, and whether policy docs need clarification.
+
+## observability alert triage (Observability Alert Triage)
+
+### 증상
+
+Prometheus fires `MCPHubGatewayErrorRateHigh`, `MCPHubAuthFailuresHigh`, `MCPHubUpstreamFailuresHigh`, or `MCPHubWorkerLagHigh` from the Helm chart alert rules.
+
+### 즉시 확인할 것
+
+```sh
+curl http://localhost:4000/metrics
+curl http://localhost:5000/metrics
+curl http://localhost:4100/metrics
+curl http://localhost:4000/api/analytics/denied-calls -H 'authorization: Bearer dev-admin-token'
+curl 'http://localhost:4000/api/analytics/usage?period=daily' -H 'authorization: Bearer dev-admin-token'
+```
+
+### 완화 조치
+
+For Gateway error or upstream failure alerts, inspect the affected upstream and disable only the failing server or tool when user impact requires it. For auth-failure alerts, verify issuer/proxy behavior before changing emergency policy. For Worker lag, trigger `POST /jobs/run` on the Worker and check whether health or schema jobs are blocked.
+
+### 복구 확인
+
+The alert expression returns below threshold, `/operations` shows fresh health rows, `/audit` has correlated trace ids, and a representative Gateway `tools/list` plus `tools/call` succeeds.
+
+### 사후 조치
+
+Record the alert name, trace ids, affected servers/tools, threshold, owner action, and whether dashboard or runbook thresholds need adjustment.
 
 ## audit log 적재 실패 (Audit Log Ingestion Failure)
 
@@ -177,7 +206,7 @@ pnpm db:migrate
 docker compose logs postgres
 ```
 
-Confirm `DATABASE_URL` points at the intended database. Local default is `postgres://mcp:mcp@localhost:5432/mcp_hub`.
+Confirm `DATABASE_URL` points at the intended database. Local default is `postgres://mcp:mcp@localhost:5432/mcp_hub`. In the current file-backed skeleton store, request load/mutate/save cycles are serialized locally, but this is not a substitute for durable database-backed audit persistence.
 
 ### 완화 조치
 
@@ -213,7 +242,7 @@ curl http://localhost:8080/realms/mcp-hub/.well-known/openid-configuration
 curl http://localhost:4000/api/me
 ```
 
-Check `/admin` only if trusted admin identity is still available through the auth boundary.
+Check `/admin` only if trusted admin identity is still available through the auth boundary. In `MCP_AUTH_MODE=oidc`, the API trusts `x-user-id` and role headers only when the trusted auth proxy adds the configured `MCP_TRUSTED_PROXY_HEADER` value matching `MCP_TRUSTED_PROXY_SECRET`.
 
 ### 완화 조치
 

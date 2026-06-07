@@ -104,6 +104,11 @@ capabilities:
     secretKeyRef:
       name: {{ .Values.auth.oidcClientSecret.secretName }}
       key: {{ .Values.auth.oidcClientSecret.secretKey }}
+- name: MCP_TRUSTED_PROXY_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.auth.trustedProxy.secretName }}
+      key: {{ .Values.auth.trustedProxy.secretKey }}
 {{- end -}}
 
 {{- define "mcp-hub.httpProbe" -}}

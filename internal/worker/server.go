@@ -16,6 +16,7 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/httpx"
 	"github.com/mcp-hub/mcp-hub/internal/jobs"
 	"github.com/mcp-hub/mcp-hub/internal/logger"
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 type Server struct {
@@ -30,25 +31,17 @@ func NewServer(store *db.Store, cfg config.Config) *Server {
 }
 
 func (s *Server) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := s.registry.Store().Refresh(); err != nil {
-			httpx.WriteJSON(w, 503, map[string]string{"error": "store_refresh_failed"})
-			return
-		}
-		if r.Method == http.MethodPost {
-			defer func() {
-				if err := s.registry.Store().Save(); err != nil {
-					s.log.Error("worker.store.save.failed", map[string]interface{}{"error": err.Error()})
-				}
-			}()
-		}
+	return telemetry.Handler("worker", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		finish := s.registry.Store().BeginRequest(r.Method == http.MethodPost)
+		defer finish()
+		s.log.InfoContext(r.Context(), "worker.request", map[string]interface{}{"method": r.Method, "path": r.URL.Path})
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/healthz":
 			httpx.WriteJSON(w, 200, map[string]string{"service": "worker", "status": "ok"})
 		case r.Method == http.MethodGet && r.URL.Path == "/readyz":
 			httpx.WriteJSON(w, 200, map[string]interface{}{"service": "worker", "status": "ready", "supportedJobs": jobs.DefaultKinds})
 		case r.Method == http.MethodGet && r.URL.Path == "/metrics":
-			httpx.WriteText(w, 200, "text/plain; version=0.0.4", fmt.Sprintf("mcp_worker_last_run_jobs_total %d\n", len(s.last)))
+			httpx.WriteText(w, 200, "text/plain; version=0.0.4", telemetry.MetricsText("worker"))
 		case r.Method == http.MethodPost && r.URL.Path == "/jobs/run":
 			if !s.authorizeJobRun(w, r) {
 				return
@@ -67,12 +60,13 @@ func (s *Server) Handler() http.Handler {
 				httpx.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body must be a JSON job array.", auth.TraceID(r), nil)
 				return
 			}
-			s.last = s.registry.RunOnce(r.Context(), input)
+			s.last = s.registry.RunOnce(telemetry.ContextWithNewCorrelation(r.Context()), input)
+			telemetry.SetWorkerLastRun("worker", len(s.last))
 			httpx.WriteJSON(w, 202, map[string]interface{}{"results": s.last})
 		default:
 			httpx.WriteJSON(w, 404, map[string]string{"error": "not_found"})
 		}
-	})
+	}))
 }
 
 func rejectTrailingJSON(decoder *json.Decoder) error {
@@ -111,6 +105,9 @@ func bearerToken(r *http.Request) string {
 
 func (s *Server) RunLoop(ctx context.Context) {
 	interval := s.cfg.RuntimeReconcileInterval
+	if interval <= 0 && s.cfg.WorkerIntervalSeconds > 0 {
+		interval = time.Duration(s.cfg.WorkerIntervalSeconds) * time.Second
+	}
 	if interval <= 0 {
 		interval = time.Minute
 	}
@@ -128,17 +125,18 @@ func (s *Server) RunLoop(ctx context.Context) {
 }
 
 func (s *Server) runOnce(ctx context.Context) {
-	if err := s.registry.Store().Refresh(); err != nil {
-		s.log.Error("worker.store.refresh.failed", map[string]interface{}{"error": err.Error()})
-		return
-	}
-	s.last = s.registry.RunOnce(ctx, nil)
-	if err := s.registry.Store().Save(); err != nil {
-		s.log.Error("worker.store.save.failed", map[string]interface{}{"error": err.Error()})
-	}
+	finish := s.registry.Store().BeginRequest(true)
+	defer finish()
+	s.last = s.registry.RunOnce(telemetry.ContextWithNewCorrelation(ctx), nil)
+	telemetry.SetWorkerLastRun("worker", len(s.last))
 }
 
 func ListenAndServe(store *db.Store, cfg config.Config) error {
+	shutdown, err := telemetry.Init(context.Background(), "worker")
+	if err != nil {
+		return err
+	}
+	defer shutdown(context.Background())
 	server := NewServer(store, cfg)
 	go server.RunLoop(context.Background())
 	address := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)

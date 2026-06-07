@@ -32,6 +32,12 @@ worker:
   jobToken:
     secretName: ""
 
+serviceMonitor:
+  enabled: true
+
+grafanaDashboards:
+  enabled: true
+
 ingress:
   hosts:
     - host: mcp-hub-dev.example.com

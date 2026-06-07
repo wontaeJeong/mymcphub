@@ -34,6 +34,15 @@ worker:
     secretName: mcp-hub-worker-job-stg
     secretKey: token
 
+serviceMonitor:
+  enabled: true
+
+prometheusRule:
+  enabled: true
+
+grafanaDashboards:
+  enabled: true
+
 ingress:
   hosts:
     - host: mcp-hub-stg.example.com

@@ -34,6 +34,10 @@ helmCharts:
         replicas: 1
         jobToken:
           secretName: ""
+      serviceMonitor:
+        enabled: true
+      grafanaDashboards:
+        enabled: true
       cli:
         image:
           repository: mcphubctl

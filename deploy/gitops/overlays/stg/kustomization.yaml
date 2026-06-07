@@ -34,6 +34,12 @@ helmCharts:
         jobToken:
           secretName: mcp-hub-worker-job-stg
           secretKey: token
+      serviceMonitor:
+        enabled: true
+      prometheusRule:
+        enabled: true
+      grafanaDashboards:
+        enabled: true
       cli:
         image:
           repository: mcphubctl

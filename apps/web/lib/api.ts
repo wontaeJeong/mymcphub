@@ -2,13 +2,22 @@ import {
   GeneratedApiClientError,
   formatGeneratedApiError,
   generatedApiRequest,
-  getGeneratedApiBaseUrl
+  getGeneratedApiBaseUrl,
 } from "./generated/mcp-hub-client";
 
 export type Environment = "dev" | "stg" | "prod" | "shared";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
-export type ServerTransport = "streamable_http" | "sse_legacy" | "stdio_adapter" | "external";
-export type ServerVersionStatus = "draft" | "pending" | "active" | "deprecated" | "rolled_back";
+export type ServerTransport =
+  | "streamable_http"
+  | "sse_legacy"
+  | "stdio_adapter"
+  | "external";
+export type ServerVersionStatus =
+  | "draft"
+  | "pending"
+  | "active"
+  | "deprecated"
+  | "rolled_back";
 export type PolicyEffect = "allow" | "deny" | "needs_approval";
 export type GrantSubjectType = "user" | "team" | "service_account";
 
@@ -47,7 +56,6 @@ export type ApiMcpServer = {
   createdAt: string;
   updatedAt: string;
 };
-
 
 export type CreateServerToolInput = {
   name: string;
@@ -202,6 +210,44 @@ export type ApiServerHealth = {
   latencyMs?: number;
   errorMessage?: string;
   checkedAt: string;
+  traceId?: string;
+  attempt?: number;
+  backoffSeconds?: number;
+};
+
+export type ApiUsageReportItem = {
+  period: string;
+  teamId?: string;
+  projectId?: string;
+  userId?: string;
+  clientId?: string;
+  serverId?: string;
+  toolName?: string;
+  calls: number;
+  succeeded: number;
+  failed: number;
+  denied: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+};
+
+export type ApiUsageReport = {
+  from?: string;
+  to?: string;
+  period: "daily" | "monthly";
+  groupBy: string[];
+  items: ApiUsageReportItem[];
+};
+
+export type ApiDeniedCallAnalytics = {
+  from?: string;
+  to?: string;
+  totalDenied: number;
+  byReason: { reason: string; count: number }[];
+  topTools: { serverId?: string; toolName?: string; count: number }[];
+  topServers: { serverId?: string; count: number }[];
+  policyTuning: { reason: string; message: string; count: number }[];
 };
 
 export type PageInfo = {
@@ -214,7 +260,12 @@ export type ListResponse<Item> = {
   pageInfo?: PageInfo;
 };
 
-export type ClientConfigKind = "generic" | "opencode" | "claude-code" | "codex" | "vscode";
+export type ClientConfigKind =
+  | "generic"
+  | "opencode"
+  | "claude-code"
+  | "codex"
+  | "vscode";
 
 export type ClientConfigResult = {
   client: ClientConfigKind;
@@ -282,7 +333,10 @@ export function formatApiError(error: unknown) {
   return formatGeneratedApiError(error);
 }
 
-export async function apiRequest<Result>(path: string, init: RequestInit = {}): Promise<Result> {
+export async function apiRequest<Result>(
+  path: string,
+  init: RequestInit = {},
+): Promise<Result> {
   return generatedApiRequest<Result>(path, init);
 }
 
@@ -295,38 +349,56 @@ export async function listServers() {
 }
 
 export async function getServer(serverId: string) {
-  return apiRequest<ApiMcpServer>(`/api/servers/${encodeURIComponent(serverId)}`);
+  return apiRequest<ApiMcpServer>(
+    `/api/servers/${encodeURIComponent(serverId)}`,
+  );
 }
 
 export async function createServer(input: CreateServerInput) {
   return apiRequest<ApiMcpServer>("/api/servers", {
     method: "POST",
-    body: JSON.stringify(input)
+    body: JSON.stringify(input),
   });
 }
 
 export async function enableServer(serverId: string) {
-  return apiRequest<ApiMcpServer>(`/api/servers/${encodeURIComponent(serverId)}/enable`, { method: "POST" });
+  return apiRequest<ApiMcpServer>(
+    `/api/servers/${encodeURIComponent(serverId)}/enable`,
+    { method: "POST" },
+  );
 }
 
 export async function disableServer(serverId: string) {
-  return apiRequest<ApiMcpServer>(`/api/servers/${encodeURIComponent(serverId)}/disable`, { method: "POST" });
+  return apiRequest<ApiMcpServer>(
+    `/api/servers/${encodeURIComponent(serverId)}/disable`,
+    { method: "POST" },
+  );
 }
 
 export async function listTools(serverId: string) {
-  return apiRequest<ListResponse<ApiMcpTool>>(`/api/servers/${encodeURIComponent(serverId)}/tools`);
+  return apiRequest<ListResponse<ApiMcpTool>>(
+    `/api/servers/${encodeURIComponent(serverId)}/tools`,
+  );
 }
 
 export async function listServerVersions(serverId: string) {
-  return apiRequest<ListResponse<ApiMcpServerVersion>>(`/api/servers/${encodeURIComponent(serverId)}/versions`);
+  return apiRequest<ListResponse<ApiMcpServerVersion>>(
+    `/api/servers/${encodeURIComponent(serverId)}/versions`,
+  );
 }
 
 export async function enableTool(serverId: string, toolId: string) {
-  return apiRequest<ApiMcpTool>(`/api/servers/${encodeURIComponent(serverId)}/tools/${encodeURIComponent(toolId)}/enable`, { method: "POST" });
+  return apiRequest<ApiMcpTool>(
+    `/api/servers/${encodeURIComponent(serverId)}/tools/${encodeURIComponent(toolId)}/enable`,
+    { method: "POST" },
+  );
 }
 
 export async function disableTool(serverId: string, toolId: string) {
-  return apiRequest<ApiMcpTool>(`/api/servers/${encodeURIComponent(serverId)}/tools/${encodeURIComponent(toolId)}/disable`, { method: "POST" });
+  return apiRequest<ApiMcpTool>(
+    `/api/servers/${encodeURIComponent(serverId)}/tools/${encodeURIComponent(toolId)}/disable`,
+    { method: "POST" },
+  );
 }
 
 export async function listGrants() {
@@ -334,7 +406,10 @@ export async function listGrants() {
 }
 
 export async function revokeGrant(grantId: string) {
-  return apiRequest<ApiGrant>(`/api/grants/${encodeURIComponent(grantId)}/revoke`, { method: "POST" });
+  return apiRequest<ApiGrant>(
+    `/api/grants/${encodeURIComponent(grantId)}/revoke`,
+    { method: "POST" },
+  );
 }
 
 export async function listApprovals() {
@@ -373,7 +448,11 @@ export async function listAuditEvents(options: ListAuditEventsOptions = {}) {
   return apiRequest<ListResponse<ApiAuditEvent>>(buildAuditEventsPath(options));
 }
 
-function appendSearchParam(params: URLSearchParams, key: string, value: number | string | undefined) {
+function appendSearchParam(
+  params: URLSearchParams,
+  key: string,
+  value: number | string | undefined,
+) {
   if (value === undefined || value === "") {
     return;
   }
@@ -389,6 +468,16 @@ export async function listServerHealth() {
   return apiRequest<ListResponse<ApiServerHealth>>("/api/server-health");
 }
 
+export async function listUsageReport(period: "daily" | "monthly" = "daily") {
+  return apiRequest<ApiUsageReport>(
+    `/api/analytics/usage?period=${encodeURIComponent(period)}`,
+  );
+}
+
+export async function listDeniedCallAnalytics() {
+  return apiRequest<ApiDeniedCallAnalytics>("/api/analytics/denied-calls");
+}
+
 export type ApproveApprovalInput = {
   allowedTools?: string[];
   expiresAt?: string;
@@ -397,22 +486,34 @@ export type ApproveApprovalInput = {
   reviewComment?: string;
 };
 
-export async function approveApproval(approvalId: string, input: ApproveApprovalInput = {}) {
-  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/approve`, {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
+export async function approveApproval(
+  approvalId: string,
+  input: ApproveApprovalInput = {},
+) {
+  return apiRequest<ApiApproval>(
+    `/api/approvals/${encodeURIComponent(approvalId)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export type RejectApprovalInput = {
   reviewComment?: string;
 };
 
-export async function rejectApproval(approvalId: string, input: RejectApprovalInput = {}) {
-  return apiRequest<ApiApproval>(`/api/approvals/${encodeURIComponent(approvalId)}/reject`, {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
+export async function rejectApproval(
+  approvalId: string,
+  input: RejectApprovalInput = {},
+) {
+  return apiRequest<ApiApproval>(
+    `/api/approvals/${encodeURIComponent(approvalId)}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export type CreateApprovalInput = {
@@ -431,7 +532,7 @@ export type CreateApprovalInput = {
 export async function createApproval(input: CreateApprovalInput) {
   return apiRequest<ApiApproval>("/api/approvals", {
     method: "POST",
-    body: JSON.stringify(input)
+    body: JSON.stringify(input),
   });
 }
 
@@ -451,33 +552,40 @@ export type CreateGrantInput = {
 export async function createGrant(input: CreateGrantInput) {
   return apiRequest<ApiGrant>("/api/grants", {
     method: "POST",
-    body: JSON.stringify(input)
+    body: JSON.stringify(input),
   });
 }
 
-export async function generateClientConfig(serverId: string, client: ClientConfigKind, profile?: string) {
+export async function generateClientConfig(
+  serverId: string,
+  client: ClientConfigKind,
+  profile?: string,
+) {
   return apiRequest<ClientConfigResult>("/api/client-config/generate", {
     method: "POST",
-    body: JSON.stringify({ serverId, client, profile })
+    body: JSON.stringify({ serverId, client, profile }),
   });
 }
 
 export async function testPolicyCall(input: PolicyTestCallInput) {
   return apiRequest<ApiPolicyDecision>("/api/policy/test-call", {
     method: "POST",
-    body: JSON.stringify(input)
+    body: JSON.stringify(input),
   });
 }
 
 export async function enableEmergencyDeny(reason: string) {
   return apiRequest<EmergencyDenyResult>("/api/admin/emergency-deny", {
     method: "POST",
-    body: JSON.stringify({ reason })
+    body: JSON.stringify({ reason }),
   });
 }
 
 export async function revokeServerGrants(serverId: string) {
-  return apiRequest<RevokeServerGrantsResult>(`/api/admin/revoke-server-grants/${encodeURIComponent(serverId)}`, {
-    method: "POST"
-  });
+  return apiRequest<RevokeServerGrantsResult>(
+    `/api/admin/revoke-server-grants/${encodeURIComponent(serverId)}`,
+    {
+      method: "POST",
+    },
+  );
 }

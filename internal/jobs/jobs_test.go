@@ -67,3 +67,39 @@ func TestRuntimeReconcileJobPersistsStatusAndSecretLease(t *testing.T) {
 		t.Fatalf("expected active secret lease, got %#v", leases)
 	}
 }
+
+func TestHealthCheckRecordsStatusHistoryBackoffAndTrace(t *testing.T) {
+	store := db.NewSeedStore()
+	server, err := store.SetServerState(db.K8sReadonlyID, "disable", db.AuthContext{UserID: db.AdminUserID, TeamIDs: []string{db.PlatformTeamID}, ProjectID: db.SampleProjectID, IsPlatformAdmin: true}, "trace-admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry(store)
+	ctx := context.Background()
+	results := registry.RunOnce(ctx, []Job{{Kind: HealthCheck, TargetServerID: server.ID}, {Kind: HealthCheck, TargetServerID: server.ID}})
+	if len(results) != 2 || results[0].Status != "success" || results[1].Status != "success" {
+		t.Fatalf("unexpected health results: %#v", results)
+	}
+	health := store.ListHealth().Items
+	if len(health) == 0 || health[0].Status != "unhealthy" || health[0].BackoffSeconds == 0 || health[0].TraceID == "" {
+		t.Fatalf("expected unhealthy health history with backoff and trace, got %#v", health)
+	}
+	audit := store.ListAuditEvents(10, "", map[string]string{"event_type": "health.alert"})
+	if len(audit.Items) == 0 || audit.Items[0].TraceID == "" {
+		t.Fatalf("expected health alert audit with trace, got %#v", audit.Items)
+	}
+}
+
+func TestUsageAccountingReportJobRecordsReportMetadata(t *testing.T) {
+	store := db.NewSeedStore()
+	store.AddAudit(db.AuditEvent{Timestamp: "2026-06-07T10:00:00Z", ServerID: db.K8sReadonlyID, ToolName: "list_pods", EventType: "tool.call.succeeded", RiskLevel: db.RiskMedium, PolicyDecision: db.PolicyAllow, TraceID: "trace-usage", LatencyMS: 20})
+	registry := NewRegistry(store)
+	results := registry.RunOnce(context.Background(), []Job{{Kind: UsageAccountingReport, TargetServerID: db.K8sReadonlyID}})
+	if len(results) != 1 || results[0].Status != "success" || results[0].Metadata["reportRows"] == 0 {
+		t.Fatalf("expected usage report job metadata, got %#v", results)
+	}
+	audit := store.ListAuditEvents(10, "", map[string]string{"event_type": "usage.report.generated"})
+	if len(audit.Items) != 1 || audit.Items[0].TraceID == "" {
+		t.Fatalf("expected usage report audit event with trace, got %#v", audit.Items)
+	}
+}
