@@ -31,28 +31,34 @@ tests/          Go e2e/security tests and TS contract smoke tests
 
 Use `go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 health` to check the local API through the CLI.
 
+## MVP Demo
+
+Use [MVP Demo](docs/MVP_DEMO.md) for the end-to-end local demo order, expected Web screens, Gateway/CLI checks, fallback steps, and `make demo-check` validation target.
+
 ## Operator Documentation
 
 Use these docs when running or extending MCP Hub:
 
-| Doc | Use |
-| --- | --- |
-| [Architecture](docs/ARCHITECTURE.md) | Go core, Web UI, schemas, and runtime planes. |
-| [Contracts](docs/CONTRACTS.md) | OpenAPI, JSON Schema, generated Web client, and error envelope. |
-| [Control Plane API](docs/API.md) | Go API routes and local curl checks. |
-| [Gateway](docs/GATEWAY.md) | Go MCP Gateway auth, policy, redaction, and proxy behavior. |
-| [Worker](docs/WORKER.md) | Go worker jobs and manual trigger endpoint. |
-| [CLI](docs/CLI.md) | `mcphubctl` command guide. |
-| [Local Development](docs/LOCAL_DEV.md) | Local stack, seed data, MCP Inspector, and reset flow. |
-| [Operations](docs/OPERATIONS.md) | Day-2 operating model. |
-| [Runbooks](docs/RUNBOOKS.md) | Gateway, upstream, auth, policy, schema drift, and quarantine response. |
-| [Testing](docs/TESTING.md) | Go, TS, e2e, security, schema, and Helm validation. |
-| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Go core coding conventions, fixtures, and validation surfaces. |
-| [MCP Client Compatibility](docs/MCP_CLIENT_COMPATIBILITY.md) | Client profile support matrix and Gateway compatibility checks. |
-| [Deployment](docs/DEPLOYMENT.md) | Helm/GitOps deployment for Go images. |
-| [Rollback](docs/ROLLBACK.md) | Roll back to previous Go image tags. |
-| [MCP Server Matrix](docs/MCP_SERVER_LANGUAGE_MATRIX.md) | First-party server language decisions. |
-| [Worktree Merge Guide](docs/WORKTREE_MERGE_GUIDE.md) | Parallel lane merge order, conflict handling, and test checklist. |
+| Doc                                                          | Use                                                                     |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [Documentation Index](docs/README.md)                        | MVP-first document map.                                                 |
+| [MVP Demo](docs/MVP_DEMO.md)                                 | End-to-end local demo flow and demo check target.                       |
+| [Architecture](docs/ARCHITECTURE.md)                         | Go core, Web UI, schemas, and runtime planes.                           |
+| [Contracts](docs/CONTRACTS.md)                               | OpenAPI, JSON Schema, generated Web client, and error envelope.         |
+| [Control Plane API](docs/API.md)                             | Go API routes and local curl checks.                                    |
+| [Gateway](docs/GATEWAY.md)                                   | Go MCP Gateway auth, policy, redaction, and proxy behavior.             |
+| [Worker](docs/WORKER.md)                                     | Go worker jobs and manual trigger endpoint.                             |
+| [CLI](docs/CLI.md)                                           | `mcphubctl` command guide.                                              |
+| [Local Development](docs/LOCAL_DEV.md)                       | Local stack, seed data, MCP Inspector, and reset flow.                  |
+| [Operations](docs/OPERATIONS.md)                             | Day-2 operating model.                                                  |
+| [Runbooks](docs/RUNBOOKS.md)                                 | Gateway, upstream, auth, policy, schema drift, and quarantine response. |
+| [Testing](docs/TESTING.md)                                   | Go, TS, e2e, security, schema, and Helm validation.                     |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md)                   | Go core coding conventions, fixtures, and validation surfaces.          |
+| [MCP Client Compatibility](docs/MCP_CLIENT_COMPATIBILITY.md) | Client profile support matrix and Gateway compatibility checks.         |
+| [Deployment](docs/DEPLOYMENT.md)                             | Helm/GitOps deployment for Go images.                                   |
+| [Rollback](docs/ROLLBACK.md)                                 | Roll back to previous Go image tags.                                    |
+| [MCP Server Matrix](docs/MCP_SERVER_LANGUAGE_MATRIX.md)      | First-party server language decisions.                                  |
+| [Worktree Merge Guide](docs/WORKTREE_MERGE_GUIDE.md)         | Parallel lane merge order, conflict handling, and test checklist.       |
 
 ## Contracts
 
