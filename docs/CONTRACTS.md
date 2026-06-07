@@ -7,6 +7,7 @@
 - `schemas/jsonschema/mcp-server.schema.json` validates first-party server manifests.
 - `schemas/catalog/mcp-server-manifest.schema.json` mirrors the runtime manifest shape used by first-party catalog entries.
 - `schemas/jsonschema/policy.schema.json` validates policy decisions.
+- `schemas/jsonschema/policy-as-code.schema.json` validates policy-as-code rules.
 - `schemas/jsonschema/audit-event.schema.json` validates audit events.
 - `schemas/jsonschema/grant-request.schema.json` validates grant request payloads.
 - `schemas/jsonschema/client-profile.schema.json` validates generated client profile output.
