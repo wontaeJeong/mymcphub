@@ -4,6 +4,7 @@ import {
   generatedApiRequest,
   getGeneratedApiBaseUrl,
 } from "./generated/mcp-hub-client";
+import { trustedIdentityHeaders } from "./auth/session";
 
 export type Environment = "dev" | "stg" | "prod" | "shared";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
@@ -35,8 +36,9 @@ export type AuthContext = {
   audience: string;
   isAdmin: boolean;
   isPlatformAdmin: boolean;
-  authSource: "mock" | "oidc" | "service_account";
+  authSource: "mock" | "local" | "oidc" | "service_account";
   tokenIssuer: string;
+  projectId: string;
 };
 
 export type ApiMcpServer = {
@@ -337,7 +339,13 @@ export async function apiRequest<Result>(
   path: string,
   init: RequestInit = {},
 ): Promise<Result> {
-  return generatedApiRequest<Result>(path, init);
+  const headers = new Headers(init.headers);
+  for (const [key, value] of await trustedIdentityHeaders()) {
+    if (!headers.has(key)) {
+      headers.set(key, value);
+    }
+  }
+  return generatedApiRequest<Result>(path, { ...init, headers });
 }
 
 export async function getMe() {
