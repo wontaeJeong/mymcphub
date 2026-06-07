@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mcp-hub/mcp-hub/internal/db"
 )
 
 type Options struct {
@@ -264,7 +266,7 @@ func clientCommand(client Client, args []string) (int, error) {
 			body["client"] = "opencode"
 		}
 		if body["serverId"] == "" {
-			body["serverId"] = "00000000-0000-4000-8000-000000000100"
+			body["serverId"] = db.K8sReadonlyID
 		}
 		return client.post("/api/client-config/generate", body)
 	case "test":

@@ -32,7 +32,7 @@ curl -X POST http://localhost:4000/api/client-config/generate \
   -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000102"}'
 ```
 
-Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded k8s server, generated snippets use `http://localhost:5000/mcp/k8s-readonly` and include a bearer token header placeholder sourced from `MCPHUB_TOKEN`.
+Supported client values are `generic`, `opencode`, `claude-code`, `codex`, and `vscode`. The current API returns placeholders for Claude Code style, Codex style, and VS Code style configs when exact remote MCP formats are uncertain. For the seeded k8s server, generated snippets use `http://localhost:5000/mcp/k8s-readonly` and include a bearer token header placeholder sourced from `MCPHUB_TOKEN`, so clients do not bypass Gateway auth, policy, rate limiting, or audit. The support matrix lives in [MCP Client Compatibility](MCP_CLIENT_COMPATIBILITY.md).
 
 ## Generic Remote MCP Client
 
