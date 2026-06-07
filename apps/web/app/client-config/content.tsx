@@ -12,8 +12,8 @@ export async function ClientConfigPageContent() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Client config generator" title="Turn approved servers into client-ready snippets." description="Submit real /api/client-config/generate requests for opencode, Claude Code, Codex, VS Code, or generic remote MCP clients." />
-      {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} /> : servers.ok ? <EmptyState title="No enabled servers" description="Client configs can only be generated for enabled servers." /> : <ErrorState message={servers.error} />}
+      <PageHero eyebrow="Client Setup" title="Turn approved servers into client-ready snippets." description="Generate setup for opencode, Claude Code, Codex, VS Code, or generic remote MCP clients after access is ready." />
+      {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} /> : servers.ok ? <EmptyState title="No data yet" description="Enable a registered server before generating client setup." /> : <ErrorState message={servers.error} />}
     </div>
   );
 }

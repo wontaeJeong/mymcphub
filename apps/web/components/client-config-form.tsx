@@ -15,8 +15,8 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
 
   return (
     <form className="form-card" action={formAction}>
-      <h2>Generate Client Config</h2>
-      <p>Create a config snippet directly from the Control Plane API for a selected enabled server.</p>
+      <h2>Generate client setup</h2>
+      <p>Create a client-ready snippet after the server is enabled and the operator has the right access grant.</p>
       <div className="form-grid">
         <div className="field">
           <label htmlFor="serverId">MCP server</label>
@@ -25,6 +25,7 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
               <option value={server.id} key={server.id}>{server.displayName}</option>
             ))}
           </select>
+          <p className="field__hint">Only enabled servers are listed.</p>
         </div>
         <div className="field">
           <label htmlFor="client">Client</label>
@@ -35,11 +36,21 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
             <option value="codex">Codex</option>
             <option value="vscode">VS Code</option>
           </select>
+          <p className="field__hint">Choose the client where this setup will be pasted.</p>
         </div>
         <div className="field">
           <label htmlFor="profile">Client profile</label>
           <input id="profile" name="profile" defaultValue={selectedProfile} placeholder="local, prod, incident-response" />
+          <p className="field__hint">Use a profile name that matches the operator workflow.</p>
         </div>
+      </div>
+      <div className="submission-summary" aria-label="Client setup summary">
+        <strong>Before generating</strong>
+        <ul>
+          <li>The selected server is enabled and healthy enough for client traffic.</li>
+          <li>Your user, team, or service account has access to the tools you need.</li>
+          <li>The profile name is safe to share in local setup instructions.</li>
+        </ul>
       </div>
       <div className="form-actions">
         <button className="button" type="submit" disabled={pending}>{pending ? "Generating..." : "Generate config"}</button>
@@ -47,10 +58,10 @@ export function ClientConfigForm({ servers }: Readonly<{ servers: ApiMcpServer[]
       </div>
       <div className="config-summary">
         <p><strong>Selected server:</strong> {selectedServer?.displayName ?? "No server selected"}</p>
-        <p><strong>Selected client:</strong> {selectedClient}</p>
-        <p><strong>Client profile:</strong> {selectedProfile}</p>
-        <p><strong>Gateway URL:</strong> {state.gatewayUrl ? <CopyButton value={state.gatewayUrl} label="Copy URL" /> : <span className="muted">Unavailable from generated Control Plane response</span>}</p>
-        <p><strong>Test instruction:</strong> {state.gatewayUrl ? <code>mcphubctl --profile {selectedProfile} health && mcp inspector {state.gatewayUrl}</code> : <span className="muted">Generate a config to reveal the gateway test command.</span>}</p>
+        <p><strong>Client:</strong> {selectedClient}</p>
+        <p><strong>Profile:</strong> {selectedProfile}</p>
+        <p><strong>Gateway URL:</strong> {state.gatewayUrl ? <CopyButton value={state.gatewayUrl} label="Copy URL" /> : <span className="muted">Generate setup to reveal the gateway URL.</span>}</p>
+        <p><strong>How to test:</strong> {state.gatewayUrl ? <code>mcphubctl --profile {selectedProfile} health && mcp inspector {state.gatewayUrl}</code> : <span className="muted">Generate setup to reveal the health check command.</span>}</p>
       </div>
       {state.payload ? (
         <div className="grid">
