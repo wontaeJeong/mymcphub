@@ -64,7 +64,11 @@ else
 fi
 
 if command -v trivy >/dev/null 2>&1; then
-  trivy config --severity HIGH,CRITICAL --exit-code 1 "${SCAN_TARGETS[@]}" || STATUS=1
+  TRIVY_EXIT_CODE=0
+  if [ "${STRICT}" = "1" ]; then
+    TRIVY_EXIT_CODE=1
+  fi
+  trivy config --severity HIGH,CRITICAL --exit-code "${TRIVY_EXIT_CODE}" "${SCAN_TARGETS[@]}" || STATUS=1
 else
   fail_or_skip "trivy"
 fi

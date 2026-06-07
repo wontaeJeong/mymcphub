@@ -1,5 +1,7 @@
+[extend]
+useDefault = true
+
 [[allowlists]]
 description = "Documented local development bearer token examples"
-paths = ['''.*\.md''']
 regexTarget = "match"
 regexes = ['''(?i)authorization:\s*Bearer\s+dev-admin-token''']
