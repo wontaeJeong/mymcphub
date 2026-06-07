@@ -76,10 +76,12 @@ export async function createApprovalAction(formData: FormData) {
       requestedAction: readRequired(formData, "requestedAction")
     });
     revalidatePath("/user/access");
+    revalidatePath("/admin/access");
     revalidatePath("/admin/approvals");
     revalidatePath("/user");
   } catch {
     revalidatePath("/user/access");
+    revalidatePath("/admin/access");
   }
 }
 
@@ -110,7 +112,7 @@ export async function createServerAction(_previousState: FormActionState, formDa
     revalidatePath("/admin");
     return {
       status: "success",
-      message: `Registered ${server.displayName} through /api/servers.`
+      message: `Registered ${server.displayName}. Review tools and grants before sharing client setup.`
     };
   } catch (error) {
     return {
@@ -136,9 +138,11 @@ export async function createGrantAction(formData: FormData) {
       enabled: true
     });
     revalidatePath("/admin");
+    revalidatePath("/admin/access");
     revalidatePath("/user/access");
   } catch {
     revalidatePath("/admin");
+    revalidatePath("/admin/access");
   }
 }
 
@@ -148,9 +152,11 @@ export async function revokeGrantAction(formData: FormData) {
   try {
     await revokeGrant(grantId);
     revalidatePath("/admin");
+    revalidatePath("/admin/access");
     revalidatePath("/user/access");
   } catch {
     revalidatePath("/admin");
+    revalidatePath("/admin/access");
   }
 }
 
@@ -209,7 +215,7 @@ export async function adminDisableServerAction(_previousState: FormActionState, 
     revalidateServerSurfaces(serverId);
     return {
       status: "success",
-      message: `Server ${serverId} disabled through the Control Plane API.`
+      message: `Server ${serverId} disabled for containment.`
     };
   } catch (error) {
     return {
@@ -248,7 +254,7 @@ export async function generateClientConfigAction(_previousState: FormActionState
     const gatewayUrl = result.gatewayUrl ?? extractGatewayUrl(result.config);
     return {
       status: "success",
-      message: result.placeholder ? "Generated placeholder client config from the Control Plane API." : "Generated client config from the Control Plane API.",
+      message: result.placeholder ? "Generated placeholder client setup from the backend." : "Generated client setup.",
       payload: JSON.stringify(result.config, null, 2),
       selectedServerId: serverId,
       selectedClient: client,
