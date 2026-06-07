@@ -18,6 +18,12 @@ auth:
   trustedHeaderToken:
     secretName: ""
 
+webAuth:
+  enabledProviders: dev
+  devAuthEnabled: true
+  sessionSecret:
+    secretName: ""
+
 web:
   replicas: 1
 

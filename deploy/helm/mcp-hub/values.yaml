@@ -53,6 +53,17 @@ auth:
     secretName: mcp-hub-trusted-proxy
     secretKey: sharedSecret
 
+webAuth:
+  enabledProviders: ""
+  sessionCookieName: mcp_hub_session
+  sessionTtlSeconds: 28800
+  localAuthEnabled: false
+  devAuthEnabled: false
+  oidcProviders: ""
+  sessionSecret:
+    secretName: mcp-hub-web-session
+    secretKey: sessionSecret
+
 postgres:
   external:
     enabled: true
