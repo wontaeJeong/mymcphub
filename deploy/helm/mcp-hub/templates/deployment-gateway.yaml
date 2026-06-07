@@ -1,4 +1,7 @@
 {{- if .Values.gateway.enabled }}
+{{- if and .Values.corporateCa.enabled (not .Values.corporateCa.secretName) }}
+{{- fail "corporateCa.secretName is required when corporateCa.enabled=true" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,6 +33,7 @@ spec:
             - name: PORT
               value: {{ .Values.gateway.port | quote }}
 {{ include "mcp-hub.secretEnv" . | indent 12 }}
+{{ include "mcp-hub.corporateCaEnv" . | indent 12 }}
           envFrom:
 {{ include "mcp-hub.commonEnvFrom" . | indent 12 }}
           {{- if .Values.gateway.probes.enabled }}
@@ -53,7 +57,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+{{ include "mcp-hub.corporateCaVolumeMount" . | indent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
+{{ include "mcp-hub.corporateCaVolume" . | indent 8 }}
 {{- end }}

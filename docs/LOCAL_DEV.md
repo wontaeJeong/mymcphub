@@ -21,6 +21,23 @@ pnpm dev
 
 API, Gateway, and Worker share local runtime state through `MCP_STORE_PATH` (default: `/tmp/mcp-hub/store.json` when unset). Remove that file or run `pnpm dev:reset-db` to reset only the Go runtime catalog/audit/health state.
 
+## Corporate proxy and CA placeholders
+
+For development from an internal corporate network, set `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` in `.env` or pass them as Docker build args. Dockerfiles consume those proxy values only in build stages so dependency downloads can reach internal mirrors or external registries; the final runtime images do not set proxy environment variables.
+
+If internal TLS inspection or private package registries require a corporate trust anchor, place PEM-encoded `.crt` files under `deploy/certs/` before building images. The placeholder directory is copied into both build and runtime image stages, and `update-ca-certificates` runs only when non-empty `.crt` files are present. Do not commit private or sensitive certificate material unless it has been approved for repository distribution.
+
+Example image build behind a corporate proxy:
+
+```sh
+docker build \
+  --build-arg HTTP_PROXY="$HTTP_PROXY" \
+  --build-arg HTTPS_PROXY="$HTTPS_PROXY" \
+  --build-arg NO_PROXY="$NO_PROXY" \
+  -f apps/api/Dockerfile \
+  -t mcp-hub/api:dev .
+```
+
 ## Seed Data
 
 Local seed data is code-backed in `internal/db.NewSeedStore` and mirrored for tests/Web fixtures in `tests/fixtures/local-seed.json`.
