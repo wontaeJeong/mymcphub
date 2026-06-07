@@ -92,7 +92,7 @@ export default async function ServerDetailPage({ params }: ServerDetailPageProps
   const toolItems = tools.ok ? tools.data.items : [];
   const grantStatusByToolKey = buildGrantStatus(
     toolItems,
-    grants.ok ? grants.data.items : [],
+    grants.ok ? grants.data.items : undefined,
   );
 
   return (

@@ -41,7 +41,7 @@ export default async function ToolsPage() {
   );
   const grantStatusByToolKey = buildGrantStatus(
     toolItems,
-    grants.ok ? grants.data.items : [],
+    grants.ok ? grants.data.items : undefined,
   );
   const testOptions = buildToolTestOptions(servers.data.items, toolItems);
 

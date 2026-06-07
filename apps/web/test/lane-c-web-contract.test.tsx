@@ -89,9 +89,13 @@ describe("Lane C Web contract helpers", () => {
     const tool = buildTool();
     const options = buildToolTestOptions([server], [tool]);
     const grantStatus = buildGrantStatus([tool], [buildGrant()]);
+    const noGrantStatus = buildGrantStatus([tool], []);
+    const unavailableGrantStatus = buildGrantStatus([tool], undefined);
 
     expect(options).toEqual([{ value: "server-prod-docs::prod-docs::docs.search", label: "Production Docs · docs.search", serverId: "server-prod-docs", serverSlug: "prod-docs", toolName: "docs.search", riskLevel: "high", enabled: true }]);
-    expect(grantStatus.get("server-prod-docs:docs.search")).toContain("team:team-platform");
+    expect(grantStatus.get("server-prod-docs:docs.search")).toBe("1개 활성 권한: 팀:team-platform");
+    expect(noGrantStatus.get("server-prod-docs:docs.search")).toBe("활성 권한 없음");
+    expect(unavailableGrantStatus.get("server-prod-docs:docs.search")).toBe("권한 상태 확인 불가");
   });
 
   it("creates dry-run policy test call payloads and redacts sensitive arguments", () => {
