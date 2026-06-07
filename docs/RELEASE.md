@@ -138,3 +138,17 @@ kustomize build --enable-helm deploy/gitops/overlays/prod
 ## Non Goals
 
 This release slice does not implement real canary routing, Argo Rollouts, Flagger, service mesh traffic splitting, weighted Services, automated production deployment, API Postgres persistence, an external deployment controller, or registry credentials and secret material. Worker support is limited to the pure schema diff helper and placeholder path; it does not add a real runtime MCP scanner.
+
+## Operator Handoff
+
+Before handing a release to operators, include:
+
+| Item | Evidence |
+| --- | --- |
+| Health | `curl http://localhost:4000/healthz` and `curl http://localhost:4000/readyz` against the target environment equivalent. |
+| Gateway | `curl http://localhost:5000/metrics` and one approved `/mcp/:serverSlug` check. |
+| Helm | `pnpm helm:template` for chart rendering and `helm history mcp-hub --namespace mcp-hub` for deployed revision context. |
+| Web pages | `/catalog`, `/servers/:serverId`, `/audit`, `/operations`, `/admin`, and `/client-config`. |
+| Rollback | Known-good Helm or GitOps revision plus `helm rollback mcp-hub <revision> --namespace mcp-hub` if using direct Helm. |
+
+Use [RUNBOOK.md](RUNBOOK.md) during release incidents and [CLIENT_SETUP.md](CLIENT_SETUP.md) when client config snippets change.

@@ -121,3 +121,27 @@ kustomize build --enable-helm deploy/gitops/overlays/prod
 ```
 
 Also inspect the rendered manifests for `NetworkPolicy`, `Ingress`, `secretKeyRef` entries, security contexts, resource limits, and probe behavior before syncing to a shared cluster.
+
+## Post-Deploy Operator Checks
+
+After install, upgrade, GitOps sync, or rollback, check the deployed equivalents of these local commands:
+
+```sh
+curl http://localhost:4000/healthz
+curl http://localhost:4000/readyz
+curl http://localhost:5000/metrics
+helm history mcp-hub --namespace mcp-hub
+kubectl get pods -n mcp-hub -l app.kubernetes.io/instance=mcp-hub
+kubectl logs deploy/mcp-hub-api -n mcp-hub --since=30m
+kubectl logs deploy/mcp-hub-gateway -n mcp-hub --since=30m
+```
+
+Then use the Web pages `/catalog`, `/operations`, `/audit`, `/admin`, and `/client-config` to confirm catalog visibility, server health, audit events, emergency controls, and generated client snippets.
+
+## Current Runtime Limits
+
+- API store state is in memory in this skeleton.
+- Gateway registry, grants, emergency state, audit events, and metrics are in memory.
+- Postgres and Redis are deployed as support infrastructure, but current API/Gateway runtime state is not fully persisted or queued through them.
+- `@mcp-hub/auth` has OIDC JWT verifier support, but API and Gateway runtime JWKS verification is not wired. Use a trusted auth proxy or ingress in shared environments.
+- `rollout.canary` is a disabled placeholder. The chart does not render traffic splitting resources.
