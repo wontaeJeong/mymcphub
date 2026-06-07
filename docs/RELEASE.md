@@ -6,13 +6,13 @@ This guide covers MCP Hub release promotion from development to staging to produ
 
 Track each release with these targets:
 
-| Target | Purpose | Expected source |
-| --- | --- | --- |
-| Release version | Human readable release identity | SemVer tag or CI release name |
-| Component image tag | Mutable build pointer for dev and early staging tests | CI image tag |
-| Component image digest | Immutable runtime identity for staging and production | Registry digest after scan and signing |
-| Helm values or GitOps revision | Cluster config identity | Chart values file or overlay commit |
-| API version metadata | Runtime proof of what the server is running | Deployed API metadata response |
+| Target                         | Purpose                                               | Expected source                        |
+| ------------------------------ | ----------------------------------------------------- | -------------------------------------- |
+| Release version                | Human readable release identity                       | SemVer tag or CI release name          |
+| Component image tag            | Mutable build pointer for dev and early staging tests | CI image tag                           |
+| Component image digest         | Immutable runtime identity for staging and production | Registry digest after scan and signing |
+| Helm values or GitOps revision | Cluster config identity                               | Chart values file or overlay commit    |
+| API version metadata           | Runtime proof of what the server is running           | Deployed API metadata response         |
 
 Use tags to find and test a candidate quickly. Use digests when promoting a known image between shared environments.
 
@@ -103,11 +103,11 @@ Keep `rollout.canary.enabled=false` until real canary routing is designed, revie
 
 Use three rollback signals together:
 
-| Signal | Use |
-| --- | --- |
-| API metadata | Confirm the runtime version before and after rollback |
-| Helm revision | Return a direct Helm deployment to a known good chart and values render |
-| GitOps revision | Revert or resync the overlay revision used by Argo CD or Flux |
+| Signal          | Use                                                                     |
+| --------------- | ----------------------------------------------------------------------- |
+| API metadata    | Confirm the runtime version before and after rollback                   |
+| Helm revision   | Return a direct Helm deployment to a known good chart and values render |
+| GitOps revision | Revert or resync the overlay revision used by Argo CD or Flux           |
 
 For direct Helm deployments:
 
@@ -167,12 +167,12 @@ This release slice does not implement real canary routing, Argo Rollouts, Flagge
 
 Before handing a release to operators, include:
 
-| Item | Evidence |
-| --- | --- |
-| Health | `curl http://localhost:4000/healthz` and `curl http://localhost:4000/readyz` against the target environment equivalent. |
-| Gateway | `curl http://localhost:5000/metrics` and one approved `/mcp/:serverSlug` check. |
-| Helm | `pnpm helm:template` for chart rendering and `helm history mcp-hub --namespace mcp-hub` for deployed revision context. |
-| Web pages | `/catalog`, `/servers/:serverId`, `/audit`, `/operations`, `/admin`, and `/client-config`. |
-| Rollback | Known-good Helm or GitOps revision plus `helm rollback mcp-hub <revision> --namespace mcp-hub` if using direct Helm. |
+| Item      | Evidence                                                                                                                |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Health    | `curl http://localhost:4000/healthz` and `curl http://localhost:4000/readyz` against the target environment equivalent. |
+| Gateway   | `curl http://localhost:5000/metrics` and one approved `/mcp/:serverSlug` check.                                         |
+| Helm      | `pnpm helm:template` for chart rendering and `helm history mcp-hub --namespace mcp-hub` for deployed revision context.  |
+| Web pages | `/catalog`, `/servers/:serverId`, `/audit`, `/operations`, `/admin`, and `/client-config`.                              |
+| Rollback  | Known-good Helm or GitOps revision plus `helm rollback mcp-hub <revision> --namespace mcp-hub` if using direct Helm.    |
 
 Use [RUNBOOK.md](RUNBOOK.md) during release incidents and [CLIENT_SETUP.md](CLIENT_SETUP.md) when client config snippets change.
