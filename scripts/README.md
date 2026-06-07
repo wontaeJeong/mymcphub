@@ -2,7 +2,7 @@
 
 Local automation scripts for development, CI, generation, and release support live here. Operator actions move to `mcphubctl`, the Web UI, or the Control Plane API.
 
-Security scan and hardening checks are in [security/](security/). Run all prompt-11 checks from the repository root with:
+Security scan and hardening checks are in [security/](security/). Run all security checks from the repository root with:
 
 ```sh
 pnpm security:check
@@ -20,7 +20,7 @@ Scripts must not be the primary interface for server publish/disable, grant appr
 
 ## Local Development Scripts
 
-Prompt-13 local development helpers are in [dev/](dev/):
+Local development helpers are in [dev/](dev/):
 
 ```sh
 pnpm dev:infra
@@ -34,7 +34,7 @@ See [../docs/LOCAL_DEV.md](../docs/LOCAL_DEV.md) for the full local workflow, re
 
 ## Release Scripts
 
-Lane G release-note generation is intentionally render-only:
+Release-note generation is intentionally render-only:
 
 ```sh
 pnpm release:notes -- --version 0.1.0 --image-digest api=sha256:...
