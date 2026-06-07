@@ -1,8 +1,11 @@
-# Policy Schemas
+# Policy Schema Notes
 
-Policy schema files describe authorization decisions and policy-related payloads used by the Control Plane and Gateway. They are hand-authored source contracts, not generated output.
+Active policy JSON Schema contracts live in `../jsonschema/`:
 
-Validate JSON Schema files from the repository root:
+- `../jsonschema/policy.schema.json` validates policy decisions.
+- `../jsonschema/policy-as-code.schema.json` validates policy-as-code rules.
+
+They are hand-authored source contracts, not generated output. Validate them from the repository root:
 
 ```sh
 scripts/gen/schemas.sh --check
