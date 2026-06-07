@@ -12,8 +12,8 @@ export default async function ClientConfigPage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Client config generator" title="Turn approved servers into client-ready snippets." description="Submit real /api/client-config/generate requests for opencode, Claude Code, Codex, VS Code, or generic remote MCP clients." />
-      {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} /> : servers.ok ? <EmptyState title="No enabled servers" description="Client configs can only be generated for enabled servers." /> : <ErrorState message={servers.error} />}
+      <PageHero eyebrow="클라이언트 설정 생성기" title="승인된 서버를 클라이언트 설정으로 변환하세요." description="opencode, Claude Code, Codex, VS Code 또는 일반 원격 MCP 클라이언트를 위한 실제 /api/client-config/generate 요청을 전송합니다." />
+      {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} /> : servers.ok ? <EmptyState title="활성 서버 없음" description="클라이언트 설정은 활성 서버에 대해서만 생성할 수 있습니다." /> : <ErrorState message={servers.error} />}
     </div>
   );
 }

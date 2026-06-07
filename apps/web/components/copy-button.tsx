@@ -7,7 +7,7 @@ export type CopyButtonProps = Readonly<{
   label?: string;
 }>;
 
-export function CopyButton({ value, label = "Copy" }: CopyButtonProps) {
+export function CopyButton({ value, label = "복사" }: CopyButtonProps) {
   const [status, setStatus] = useState("");
 
   return (
@@ -18,8 +18,8 @@ export function CopyButton({ value, label = "Copy" }: CopyButtonProps) {
         type="button"
         onClick={() => {
           void navigator.clipboard.writeText(value).then(
-            () => setStatus("Copied"),
-            () => setStatus("Copy failed")
+            () => setStatus("복사됨"),
+            () => setStatus("복사 실패")
           );
         }}
       >
