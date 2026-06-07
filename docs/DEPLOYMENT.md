@@ -27,4 +27,4 @@ Use component image digests for shared environments:
 --set web.image.digest=sha256:<web-digest>
 ```
 
-Do not store plaintext secrets in values. Database, Redis, and OIDC client secret values are referenced through Kubernetes Secret refs.
+Do not store plaintext secrets in values. Database, Redis, OIDC client secret, trusted auth-proxy token, and Worker job trigger token values are referenced through Kubernetes Secret refs. For OIDC deployments, set both `auth.trustedHeaderToken.secretName` and `auth.trustedHeaderToken.secretKey`; for manual Worker job triggers, set both `worker.jobToken.secretName` and `worker.jobToken.secretKey`.

@@ -1,4 +1,7 @@
 {{- if .Values.api.enabled }}
+{{- if and (eq .Values.auth.mode "oidc") (or (not .Values.auth.trustedHeaderToken.secretName) (not .Values.auth.trustedHeaderToken.secretKey)) }}
+{{- fail "auth.trustedHeaderToken.secretName and auth.trustedHeaderToken.secretKey are required when auth.mode=oidc" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +32,13 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.api.port | quote }}
+{{- if .Values.auth.trustedHeaderToken.secretName }}
+            - name: MCP_TRUSTED_AUTH_HEADER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.trustedHeaderToken.secretName }}
+                  key: {{ .Values.auth.trustedHeaderToken.secretKey }}
+{{- end }}
 {{ include "mcp-hub.secretEnv" . | indent 12 }}
           envFrom:
 {{ include "mcp-hub.commonEnvFrom" . | indent 12 }}

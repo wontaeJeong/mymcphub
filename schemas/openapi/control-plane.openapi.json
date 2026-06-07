@@ -254,6 +254,49 @@
         "summary": "Validate policy"
       }
     },
+    "/api/runtime/secret-leases": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "List runtime secret leases"
+          },
+          "403": {
+            "description": "Platform admin required"
+          }
+        },
+        "summary": "List runtime secret leases",
+        "x-admin-required": true
+      }
+    },
+    "/api/runtime/secret-leases/{leaseId}/revoke": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Revoke runtime secret lease"
+          },
+          "403": {
+            "description": "Platform admin required"
+          }
+        },
+        "summary": "Revoke runtime secret lease",
+        "x-admin-required": true,
+        "x-audit-event-required": true
+      }
+    },
+    "/api/runtime/status": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "List runtime render status"
+          },
+          "403": {
+            "description": "Platform admin required"
+          }
+        },
+        "summary": "List runtime render status",
+        "x-admin-required": true
+      }
+    },
     "/api/secret-bindings": {
       "get": {
         "responses": {
@@ -396,6 +439,20 @@
         "summary": "Get server rollout status"
       }
     },
+    "/api/servers/{serverId}/runtime": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Get server runtime status"
+          },
+          "403": {
+            "description": "Platform admin required"
+          }
+        },
+        "summary": "Get server runtime status",
+        "x-admin-required": true
+      }
+    },
     "/api/servers/{serverId}/schema-diff": {
       "get": {
         "responses": {
@@ -504,17 +561,25 @@
         "responses": {
           "200": {
             "description": "List server versions"
+          },
+          "403": {
+            "description": "Platform admin required"
           }
         },
-        "summary": "List server versions"
+        "summary": "List server versions",
+        "x-admin-required": true
       },
       "post": {
         "responses": {
           "201": {
             "description": "Create server version"
+          },
+          "403": {
+            "description": "Platform admin required"
           }
         },
         "summary": "Create server version",
+        "x-admin-required": true,
         "x-audit-event-required": true
       }
     },
@@ -523,9 +588,13 @@
         "responses": {
           "200": {
             "description": "Activate server version"
+          },
+          "403": {
+            "description": "Platform admin required"
           }
         },
         "summary": "Activate server version",
+        "x-admin-required": true,
         "x-audit-event-required": true
       }
     },
@@ -534,9 +603,13 @@
         "responses": {
           "200": {
             "description": "Roll back server version"
+          },
+          "403": {
+            "description": "Platform admin required"
           }
         },
         "summary": "Roll back server version",
+        "x-admin-required": true,
         "x-audit-event-required": true
       }
     },

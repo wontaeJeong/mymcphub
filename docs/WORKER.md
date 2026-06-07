@@ -10,6 +10,8 @@ Supported jobs:
 - prompts/list scan
 - schema snapshot
 - schema diff
+- runtime reconcile
+- secret lease renewal
 - stale session cleanup
 - audit retention cleanup
 - audit export
@@ -19,8 +21,13 @@ Manual trigger:
 ```sh
 curl -X POST http://localhost:4100/jobs/run \
   -H 'content-type: application/json' \
-  -d '[{"kind":"health-check","targetServerId":"00000000-0000-4000-8000-000000000100"}]'
+  -H 'authorization: Bearer dev-admin-token' \
+  -d '[{"kind":"runtime-reconcile","targetServerId":"00000000-0000-4000-8000-000000000102","manifestPath":"servers/k8s/mcp-server.manifest.json"}]'
 ```
+
+`/jobs/run` requires a platform-admin bearer token in local mock mode or a service token configured through `MCP_WORKER_JOB_TOKEN`. The request body must be a JSON job array; malformed JSON, trailing JSON values, and JSON `null` are rejected. The scheduled worker loop runs without the HTTP trigger token.
+
+`runtime-reconcile` validates an MCP server manifest, renders Deployment/Service/ServiceAccount/NetworkPolicy objects, persists admin-only `GET /api/runtime/status` data, and issues reference-only secret lease metadata. It does not apply resources to a live cluster in this skeleton; status phase is render state, not pod readiness.
 
 Each job records a result. Job failures are returned as failed job results and do not kill the Worker process.
 

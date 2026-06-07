@@ -40,3 +40,30 @@ func TestRegistryPersistsSchemaDiffToStore(t *testing.T) {
 		t.Fatalf("expected recorded approval-required diff, got %#v", diff)
 	}
 }
+
+func TestRuntimeReconcileJobPersistsStatusAndSecretLease(t *testing.T) {
+	store := db.NewSeedStore()
+	registry := NewRegistry(store)
+	manifest := map[string]interface{}{
+		"slug":                   "k8s-readonly",
+		"displayName":            "Kubernetes Readonly",
+		"ownerTeamId":            db.PlatformTeamID,
+		"environment":            "dev",
+		"transport":              "streamable_http",
+		"riskLevel":              "medium",
+		"implementationLanguage": "go",
+		"runtime":                map[string]interface{}{"image": "registry.example.com/k8s:1", "port": float64(5102)},
+		"secrets":                []interface{}{map[string]interface{}{"ref": "kubeconfig", "targetEnv": "KUBECONFIG", "secretName": "k8s-readonly", "secretKey": "kubeconfig", "leaseDurationSeconds": float64(600)}},
+		"tools":                  []interface{}{map[string]interface{}{"name": "list_namespaces", "riskLevel": "medium", "readOnly": true, "inputSchema": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}, "additionalProperties": false}}},
+	}
+	results := registry.RunOnce(context.Background(), []Job{{Kind: RuntimeReconcile, TargetServerID: db.K8sReadonlyID, ManifestJSON: manifest}})
+	if len(results) != 1 || results[0].Status != "success" {
+		t.Fatalf("unexpected results: %#v", results)
+	}
+	if statuses := store.ListRuntimeStatus(); len(statuses.Items) != 1 || statuses.Items[0].ResourceCount == 0 {
+		t.Fatalf("expected persisted runtime status, got %#v", statuses)
+	}
+	if leases := store.ListSecretLeases(false); len(leases.Items) != 1 || leases.Items[0].Status != "active" {
+		t.Fatalf("expected active secret lease, got %#v", leases)
+	}
+}

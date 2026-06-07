@@ -3,10 +3,12 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/mcp-hub/mcp-hub/internal/db"
+	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
 )
 
 type Kind string
@@ -21,15 +23,20 @@ const (
 	StaleSessionCleanup   Kind = "stale-session-cleanup"
 	AuditRetentionCleanup Kind = "audit-retention-cleanup"
 	AuditExport           Kind = "audit-export"
+	RuntimeReconcile      Kind = "runtime-reconcile"
+	SecretLeaseRenewal    Kind = "secret-lease-renewal"
 )
 
-var DefaultKinds = []Kind{HealthCheck, ToolScan, ResourceScan, PromptScan, SchemaSnapshot, SchemaDiff, StaleSessionCleanup, AuditRetentionCleanup, AuditExport}
+var DefaultKinds = []Kind{HealthCheck, ToolScan, ResourceScan, PromptScan, SchemaSnapshot, SchemaDiff, RuntimeReconcile, SecretLeaseRenewal, StaleSessionCleanup, AuditRetentionCleanup, AuditExport}
 
 type Job struct {
-	Kind             Kind           `json:"kind"`
-	TargetServerID   string         `json:"targetServerId"`
-	PreviousSnapshot []ToolSnapshot `json:"previousSnapshot,omitempty"`
-	CurrentSnapshot  []ToolSnapshot `json:"currentSnapshot,omitempty"`
+	Kind             Kind                   `json:"kind"`
+	TargetServerID   string                 `json:"targetServerId"`
+	PreviousSnapshot []ToolSnapshot         `json:"previousSnapshot,omitempty"`
+	CurrentSnapshot  []ToolSnapshot         `json:"currentSnapshot,omitempty"`
+	ManifestPath     string                 `json:"manifestPath,omitempty"`
+	ManifestJSON     map[string]interface{} `json:"manifestJson,omitempty"`
+	DryRun           bool                   `json:"dryRun,omitempty"`
 }
 type ToolSnapshot struct {
 	Name        string                 `json:"name"`
@@ -62,7 +69,7 @@ func (r *Registry) Store() *db.Store { return r.store }
 
 func (r *Registry) RunOnce(ctx context.Context, jobs []Job) []Result {
 	if len(jobs) == 0 {
-		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: ToolScan, TargetServerID: db.K8sReadonlyID}, {Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID}}
+		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: ToolScan, TargetServerID: db.K8sReadonlyID}, {Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID}, {Kind: RuntimeReconcile, TargetServerID: db.K8sReadonlyID, ManifestPath: "servers/k8s/mcp-server.manifest.json"}}
 	}
 	results := make([]Result, 0, len(jobs))
 	for _, job := range jobs {
@@ -135,12 +142,101 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 		result.Metadata["schemaDiffId"] = recorded.ID
 	case StaleSessionCleanup, AuditRetentionCleanup, AuditExport:
 		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+	case RuntimeReconcile:
+		if err := r.reconcileRuntime(job, &result); err != nil {
+			result.Status = "failed"
+			result.FailureReason = err.Error()
+		}
+	case SecretLeaseRenewal:
+		renewed := r.store.RenewExpiringSecretLeases(secretLeaseSeconds(), runtimeAuth(), db.NewID())
+		result.Metadata["renewedCount"] = len(renewed)
 	default:
 		result.Status = "failed"
 		result.FailureReason = fmt.Sprintf("unsupported job kind %s", job.Kind)
 	}
 	result.FinishedAt = db.Now()
 	return result
+}
+
+func (r *Registry) reconcileRuntime(job Job, result *Result) error {
+	manifest, err := loadManifest(job)
+	if err != nil {
+		return err
+	}
+	reconciler := mcruntime.NewReconciler(firstEnv("MCP_RUNTIME_NAMESPACE", mcruntime.DefaultNamespace))
+	mode := firstEnv("MCP_RUNTIME_CONTROLLER_MODE", "render")
+	switch mode {
+	case "render":
+		reconciler.DryRun = job.DryRun
+	case "dry_run":
+		reconciler.DryRun = true
+	default:
+		return fmt.Errorf("unsupported runtime controller mode %s", mode)
+	}
+	plan, err := reconciler.Reconcile(manifest)
+	if err != nil {
+		return err
+	}
+	serverID := job.TargetServerID
+	if serverID == "" {
+		if server, _, _, err := r.store.FindServerBySlug(manifest.Slug); err == nil {
+			serverID = server.ID
+		}
+	}
+	rendered := []map[string]interface{}{}
+	resourceKinds := []string{}
+	for _, resource := range plan.Resources {
+		rendered = append(rendered, resource.Object)
+		resourceKinds = append(resourceKinds, resource.Kind)
+	}
+	auth := runtimeAuth()
+	traceID := db.NewID()
+	status := db.RuntimeStatus{ServerID: serverID, ServerSlug: manifest.Slug, ManifestHash: plan.ManifestHash, Phase: plan.Phase, Namespace: plan.Namespace, ResourceKinds: resourceKinds, ResourceCount: len(plan.Resources), RenderedObjects: rendered, Warnings: plan.Warnings, LastReconciledAt: db.Now(), UpdatedAt: db.Now()}
+	r.store.UpsertRuntimeStatus(status, auth, traceID, map[string]interface{}{"manifestPath": job.ManifestPath, "manifestHash": plan.ManifestHash, "phase": plan.Phase})
+	leases := []db.SecretLease{}
+	for _, lease := range plan.SecretLeases {
+		leases = append(leases, db.SecretLease{ID: lease.ID, ServerID: serverID, ServerSlug: lease.ServerSlug, SecretRef: lease.SecretRef, TargetEnv: lease.TargetEnv, Status: lease.Status, IssuedAt: lease.IssuedAt, ExpiresAt: lease.ExpiresAt, LeaseDurationSeconds: lease.LeaseDurationSeconds})
+	}
+	r.store.UpsertSecretLeases(leases, auth, traceID, map[string]interface{}{"serverSlug": manifest.Slug, "leaseCount": len(leases)})
+	result.Metadata["manifestHash"] = plan.ManifestHash
+	result.Metadata["phase"] = plan.Phase
+	result.Metadata["namespace"] = plan.Namespace
+	result.Metadata["resourceKinds"] = resourceKinds
+	result.Metadata["resourceCount"] = len(plan.Resources)
+	result.Metadata["leaseCount"] = len(leases)
+	return nil
+}
+
+func loadManifest(job Job) (mcruntime.Manifest, error) {
+	if len(job.ManifestJSON) > 0 {
+		return mcruntime.ManifestFromMap(job.ManifestJSON)
+	}
+	path := job.ManifestPath
+	if path == "" {
+		path = "servers/k8s/mcp-server.manifest.json"
+	}
+	return mcruntime.LoadManifest(path)
+}
+
+func runtimeAuth() db.AuthContext {
+	return db.AuthContext{UserID: "runtime-controller", PrincipalType: db.SubjectServiceAccount, ClientID: "mcp-worker", Issuer: "worker", Audience: "mcp-hub", AuthSource: "worker", TokenIssuer: "worker", ProjectID: db.SampleProjectID, IsPlatformAdmin: true}
+}
+
+func firstEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func secretLeaseSeconds() int {
+	if value := os.Getenv("MCP_SECRET_LEASE_SECONDS"); value != "" {
+		var parsed int
+		if _, err := fmt.Sscanf(value, "%d", &parsed); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return int(mcruntime.DefaultLeaseDuration.Seconds())
 }
 
 type Diff struct {

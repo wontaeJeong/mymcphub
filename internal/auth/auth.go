@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -45,6 +46,8 @@ func ContextFromHeaders(r *http.Request) db.AuthContext {
 			if authErr == nil {
 				return principal
 			}
+		}
+		if !trustedOIDCHeaders(r) {
 			return Anonymous()
 		}
 		roles := split(r.Header.Get("x-roles"))
@@ -399,6 +402,21 @@ func scopeListClaim(claims map[string]interface{}, key string) []string {
 		return stringListClaim(claims, key)
 	}
 	return strings.Fields(strings.ReplaceAll(value, ",", " "))
+}
+
+func trustedOIDCHeaders(r *http.Request) bool {
+	if os.Getenv("MCP_TRUSTED_AUTH_HEADERS") == "true" {
+		return true
+	}
+	expected := strings.TrimSpace(os.Getenv("MCP_TRUSTED_AUTH_HEADER_TOKEN"))
+	if expected == "" {
+		return false
+	}
+	actual := strings.TrimSpace(r.Header.Get("x-auth-proxy-token"))
+	if actual == "" || len(actual) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1
 }
 
 func split(value string) []string {

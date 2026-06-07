@@ -16,6 +16,7 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/logger"
 	"github.com/mcp-hub/mcp-hub/internal/policy"
 	"github.com/mcp-hub/mcp-hub/internal/ratelimit"
+	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
 )
 
 type Server struct {
@@ -82,6 +83,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, 200, s.store.ListToolCallEvents())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/server-health":
 		httpx.WriteJSON(w, 200, s.store.ListHealth())
+	case strings.HasPrefix(r.URL.Path, "/api/runtime"):
+		s.handleRuntime(w, r, principal, traceID)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/client-config/generate":
 		s.handleClientConfig(w, r, traceID)
 	case strings.HasPrefix(r.URL.Path, "/api/policy"):
@@ -172,6 +175,16 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal
 			return
 		}
 		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+	case "runtime":
+		if r.Method == http.MethodGet {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
+			value, err := s.store.GetRuntimeStatus(serverID)
+			respond(w, traceID, value, err)
+			return
+		}
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
 	case "tools":
 		s.handleTools(w, r, principal, traceID, serverID, parts[2:])
 	case "enable", "disable", "publish", "unpublish", "quarantine":
@@ -204,6 +217,9 @@ func (s *Server) createServer(w http.ResponseWriter, r *http.Request, principal 
 func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID, serverID string, parts []string) {
 	if len(parts) == 0 {
 		if r.Method == http.MethodGet {
+			if !requireAdmin(w, principal, traceID) {
+				return
+			}
 			value, err := s.store.ListVersions(serverID)
 			respond(w, traceID, value, err)
 			return
@@ -214,6 +230,12 @@ func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request, principa
 			}
 			var input db.MCPServerVersion
 			if decode(w, r, traceID, &input) {
+				if len(input.ManifestJSON) > 0 {
+					if _, err := mcruntime.ManifestFromMap(input.ManifestJSON); err != nil {
+						httpx.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), traceID, nil)
+						return
+					}
+				}
 				value, err := s.store.CreateVersion(serverID, input, principal, traceID, input)
 				respondStatus(w, traceID, 201, value, err)
 			}
@@ -706,6 +728,34 @@ func writeRateLimitHeaders(w http.ResponseWriter, decision ratelimit.Decision) {
 	}
 }
 
+func (s *Server) handleRuntime(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if r.Method == http.MethodGet && r.URL.Path == "/api/runtime/status" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		httpx.WriteJSON(w, 200, s.store.ListRuntimeStatus())
+		return
+	}
+	if r.Method == http.MethodGet && r.URL.Path == "/api/runtime/secret-leases" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		includeRevoked := r.URL.Query().Get("includeRevoked") == "true"
+		httpx.WriteJSON(w, 200, s.store.ListSecretLeases(includeRevoked))
+		return
+	}
+	parts := pathParts(r.URL.Path, "/api/runtime/secret-leases")
+	if r.Method == http.MethodPost && len(parts) == 2 && parts[1] == "revoke" {
+		if !requireAdmin(w, principal, traceID) {
+			return
+		}
+		value, err := s.store.RevokeSecretLease(parts[0], principal, traceID)
+		respond(w, traceID, value, err)
+		return
+	}
+	httpx.WriteError(w, 404, "NOT_FOUND", "Runtime route not found", traceID, nil)
+}
+
 func requireAdmin(w http.ResponseWriter, principal db.AuthContext, traceID string) bool {
 	if auth.RequirePlatformAdmin(principal) {
 		return true
@@ -795,12 +845,13 @@ func openAPIDocument() map[string]interface{} {
 			"/api/servers/{serverId}/enable":     map[string]interface{}{"post": operation("Enable server", true)},
 			"/api/servers/{serverId}/quarantine": map[string]interface{}{"post": operation("Quarantine server", true)},
 			"/api/servers/{serverId}/rollout":    map[string]interface{}{"get": operation("Get server rollout status", false)},
-			"/api/servers/{serverId}/versions":   map[string]interface{}{"get": operation("List server versions", false), "post": operation("Create server version", true, 201)},
-			"/api/servers/{serverId}/versions/{versionId}/activate": map[string]interface{}{"post": operation("Activate server version", true)},
-			"/api/servers/{serverId}/versions/{versionId}/rollback": map[string]interface{}{"post": operation("Roll back server version", true)},
+			"/api/servers/{serverId}/versions":   map[string]interface{}{"get": adminOperation("List server versions", false), "post": adminOperation("Create server version", true, 201)},
+			"/api/servers/{serverId}/versions/{versionId}/activate": map[string]interface{}{"post": adminOperation("Activate server version", true)},
+			"/api/servers/{serverId}/versions/{versionId}/rollback": map[string]interface{}{"post": adminOperation("Roll back server version", true)},
 			"/api/servers/{serverId}/schema-diff":                   map[string]interface{}{"get": operation("Get server schema diff", false)},
 			"/api/servers/{serverId}/schema-diff/history":           map[string]interface{}{"get": operation("List server schema diff history", false)},
 			"/api/servers/{serverId}/schema-snapshots":              map[string]interface{}{"get": operation("List server schema snapshots", false), "post": operation("Record server schema snapshot", true, 201)},
+			"/api/servers/{serverId}/runtime":                       map[string]interface{}{"get": adminOperation("Get server runtime status", false)},
 			"/api/servers/{serverId}/tools":                         map[string]interface{}{"get": operation("List server tools", false)},
 			"/api/servers/{serverId}/tools/{toolId}":                map[string]interface{}{"patch": operation("Patch server tool", true)},
 			"/api/servers/{serverId}/tools/{toolId}/enable":         map[string]interface{}{"post": operation("Enable server tool", true)},
@@ -826,17 +877,20 @@ func openAPIDocument() map[string]interface{} {
 			"/api/tenancy/projects":                        map[string]interface{}{"get": operation("List tenancy projects", true), "post": operation("Create tenancy project", true, 201)},
 			"/api/tenancy/projects/{projectId}/members":    map[string]interface{}{"post": operation("Add project member", true, 201)},
 			"/api/tenancy/projects/{projectId}/members/{subjectType}/{subjectId}": map[string]interface{}{"delete": operation("Remove project member", true)},
-			"/api/tenancy/policy-input":                  map[string]interface{}{"get": operation("Get tenancy policy input", true)},
-			"/api/tool-call-events":                      map[string]interface{}{"get": operation("List tool call events", false)},
-			"/api/server-health":                         map[string]interface{}{"get": operation("List server health records", false)},
-			"/api/client-config/generate":                map[string]interface{}{"post": operation("Generate client config", false)},
-			"/api/policy/validate":                       map[string]interface{}{"post": operation("Validate policy", false)},
-			"/api/policy/simulate":                       map[string]interface{}{"post": operation("Simulate policy", false)},
-			"/api/policy/test-call":                      map[string]interface{}{"post": operation("Simulate one policy-protected tool call", false)},
-			"/api/admin/kill-switch":                     map[string]interface{}{"post": operation("Apply admin kill switch", true)},
-			"/api/admin/emergency-deny":                  map[string]interface{}{"post": operation("Enable emergency deny", true)},
-			"/api/admin/emergency-deny/disable":          map[string]interface{}{"post": operation("Disable emergency deny", true)},
-			"/api/admin/revoke-server-grants/{serverId}": map[string]interface{}{"post": operation("Revoke all grants for one server", true)},
+			"/api/tenancy/policy-input":                   map[string]interface{}{"get": operation("Get tenancy policy input", true)},
+			"/api/tool-call-events":                       map[string]interface{}{"get": operation("List tool call events", false)},
+			"/api/server-health":                          map[string]interface{}{"get": operation("List server health records", false)},
+			"/api/client-config/generate":                 map[string]interface{}{"post": operation("Generate client config", false)},
+			"/api/policy/validate":                        map[string]interface{}{"post": operation("Validate policy", false)},
+			"/api/policy/simulate":                        map[string]interface{}{"post": operation("Simulate policy", false)},
+			"/api/policy/test-call":                       map[string]interface{}{"post": operation("Simulate one policy-protected tool call", false)},
+			"/api/admin/kill-switch":                      map[string]interface{}{"post": operation("Apply admin kill switch", true)},
+			"/api/admin/emergency-deny":                   map[string]interface{}{"post": operation("Enable emergency deny", true)},
+			"/api/admin/emergency-deny/disable":           map[string]interface{}{"post": operation("Disable emergency deny", true)},
+			"/api/admin/revoke-server-grants/{serverId}":  map[string]interface{}{"post": operation("Revoke all grants for one server", true)},
+			"/api/runtime/status":                         map[string]interface{}{"get": adminOperation("List runtime render status", false)},
+			"/api/runtime/secret-leases":                  map[string]interface{}{"get": adminOperation("List runtime secret leases", false)},
+			"/api/runtime/secret-leases/{leaseId}/revoke": map[string]interface{}{"post": adminOperation("Revoke runtime secret lease", true)},
 		},
 		"components": map[string]interface{}{"schemas": map[string]interface{}{"ErrorResponse": map[string]interface{}{"type": "object", "required": []string{"error", "traceId"}}}},
 	}
@@ -854,6 +908,13 @@ func operation(summary string, audit bool, statuses ...int) map[string]interface
 	if audit {
 		out["x-audit-event-required"] = true
 	}
+	return out
+}
+
+func adminOperation(summary string, audit bool, statuses ...int) map[string]interface{} {
+	out := operation(summary, audit, statuses...)
+	out["x-admin-required"] = true
+	out["responses"].(map[string]interface{})["403"] = map[string]interface{}{"description": "Platform admin required"}
 	return out
 }
 

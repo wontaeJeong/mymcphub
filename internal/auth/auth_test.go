@@ -24,13 +24,27 @@ func TestOIDCContextRequiresUserHeader(t *testing.T) {
 func TestOIDCContextMapsAdminHeaders(t *testing.T) {
 	t.Setenv("MCP_AUTH_MODE", "oidc")
 	t.Setenv("MCP_TRUSTED_AUTH_HEADERS", "true")
+	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
 	request := &http.Request{Header: http.Header{}}
+	request.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
 	request.Header.Set("x-user-id", "operator-1")
 	request.Header.Set("x-roles", "platform_admin")
 	request.Header.Set("x-team-ids", db.PlatformTeamID)
 	principal := ContextFromHeaders(request)
 	if principal.UserID != "operator-1" || !principal.IsPlatformAdmin || principal.TeamIDs[0] != db.PlatformTeamID {
 		t.Fatalf("expected mapped platform admin, got %#v", principal)
+	}
+}
+
+func TestOIDCContextRejectsUntrustedAdminHeaders(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
+	request := &http.Request{Header: http.Header{}}
+	request.Header.Set("x-user-id", "operator-1")
+	request.Header.Set("x-roles", "platform_admin")
+	principal := ContextFromHeaders(request)
+	if principal.UserID != "" || principal.IsPlatformAdmin {
+		t.Fatalf("expected untrusted headers to map to anonymous, got %#v", principal)
 	}
 }
 

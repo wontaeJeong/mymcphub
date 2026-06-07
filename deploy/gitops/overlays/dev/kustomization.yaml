@@ -22,6 +22,8 @@ helmCharts:
         mode: mock
         oidcIssuerUrl: https://issuer-dev.example.com
         audience: mcp-hub-dev
+        trustedHeaderToken:
+          secretName: ""
       web:
         replicas: 1
       api:
@@ -30,6 +32,8 @@ helmCharts:
         replicas: 1
       worker:
         replicas: 1
+        jobToken:
+          secretName: ""
       cli:
         image:
           repository: mcphubctl

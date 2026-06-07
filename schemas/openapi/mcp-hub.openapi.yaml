@@ -43,12 +43,12 @@ paths:
   /api/servers/{serverId}/rollout:
     get: { summary: Get server rollout status, responses: { "200": { description: Rollout status with active version, pending versions, rollback targets, and GitOps metadata } } }
   /api/servers/{serverId}/versions:
-    get: { summary: List server versions, responses: { "200": { description: Server versions } } }
-    post: { summary: Create server version, x-audit-event-required: true, responses: { "201": { description: Created version } } }
+    get: { summary: List server versions, x-admin-required: true, responses: { "200": { description: Server versions }, "403": { description: Platform admin required } } }
+    post: { summary: Create server version, x-admin-required: true, x-audit-event-required: true, responses: { "201": { description: Created version }, "403": { description: Platform admin required } } }
   /api/servers/{serverId}/versions/{versionId}/activate:
-    post: { summary: Activate server version, x-audit-event-required: true, responses: { "200": { description: Activated version } } }
+    post: { summary: Activate server version, x-admin-required: true, x-audit-event-required: true, responses: { "200": { description: Activated version }, "403": { description: Platform admin required } } }
   /api/servers/{serverId}/versions/{versionId}/rollback:
-    post: { summary: Roll back server version, x-audit-event-required: true, responses: { "200": { description: Rolled back version } } }
+    post: { summary: Roll back server version, x-admin-required: true, x-audit-event-required: true, responses: { "200": { description: Rolled back version }, "403": { description: Platform admin required } } }
   /api/servers/{serverId}/schema-diff:
     get: { summary: Get latest server schema diff, responses: { "200": { description: Schema diff with added, removed, changed, risk, and approval state } } }
   /api/servers/{serverId}/schema-diff/history:
@@ -56,6 +56,8 @@ paths:
   /api/servers/{serverId}/schema-snapshots:
     get: { summary: List server schema snapshots, responses: { "200": { description: Schema snapshot history } } }
     post: { summary: Record current server schema snapshot, x-audit-event-required: true, responses: { "201": { description: Recorded schema snapshot } } }
+  /api/servers/{serverId}/runtime:
+    get: { summary: Get server runtime status, x-admin-required: true, responses: { "200": { description: Runtime status }, "403": { description: Platform admin required } } }
   /api/servers/{serverId}/tools:
     get: { summary: List server tools, responses: { "200": { description: Tool list } } }
   /api/servers/{serverId}/tools/{toolId}:
@@ -135,6 +137,12 @@ paths:
     get: { summary: List tool call events, responses: { "200": { description: Tool call event list } } }
   /api/server-health:
     get: { summary: List server health records, responses: { "200": { description: Server health list } } }
+  /api/runtime/status:
+    get: { summary: List runtime render status, x-admin-required: true, responses: { "200": { description: Runtime status list }, "403": { description: Platform admin required } } }
+  /api/runtime/secret-leases:
+    get: { summary: List runtime secret leases, x-admin-required: true, responses: { "200": { description: Runtime secret lease list }, "403": { description: Platform admin required } } }
+  /api/runtime/secret-leases/{leaseId}/revoke:
+    post: { summary: Revoke runtime secret lease, x-admin-required: true, x-audit-event-required: true, responses: { "200": { description: Runtime secret lease revoked }, "403": { description: Platform admin required } } }
   /api/client-config/generate:
     post: { summary: Generate client config, responses: { "200": { description: Client config } } }
   /api/policy/validate:

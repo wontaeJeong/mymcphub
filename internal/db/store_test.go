@@ -388,3 +388,37 @@ func TestPersistenceBackfillsLaneBSeedData(t *testing.T) {
 func MockAuth() AuthContext {
 	return AuthContext{UserID: AdminUserID, TeamIDs: []string{PlatformTeamID}, ProjectID: SampleProjectID, IsPlatformAdmin: true}
 }
+
+func TestMutationAuditRedactsSensitiveArguments(t *testing.T) {
+	store := NewSeedStore()
+	_, err := store.CreateVersion(K8sReadonlyID, MCPServerVersion{Version: "v2"}, MockAuth(), "trace-redact", map[string]interface{}{"token": "raw-token", "nested": map[string]interface{}{"password": "raw-password"}})
+	if err != nil {
+		t.Fatalf("create version: %v", err)
+	}
+	audit := store.ListAuditEvents(10, "", map[string]string{"event_type": "mcp_server_version.created"})
+	if len(audit.Items) != 1 {
+		t.Fatalf("expected audit event")
+	}
+	encoded, _ := json.Marshal(audit.Items[0].ArgumentRedactedJSON)
+	if string(encoded) != `{"nested":{"password":"[REDACTED]"},"token":"[REDACTED]"}` {
+		t.Fatalf("expected redacted audit argument, got %s", encoded)
+	}
+}
+
+func TestCreateVersionRejectsRawSecretManifest(t *testing.T) {
+	store := NewSeedStore()
+	_, err := store.CreateVersion(K8sReadonlyID, MCPServerVersion{Version: "v2", ManifestJSON: map[string]interface{}{
+		"slug":                   "bad-secret",
+		"displayName":            "Bad Secret",
+		"ownerTeamId":            PlatformTeamID,
+		"environment":            "dev",
+		"transport":              "streamable_http",
+		"riskLevel":              "low",
+		"implementationLanguage": "go",
+		"secrets":                []interface{}{map[string]interface{}{"ref": "provider", "targetEnv": "PROVIDER_TOKEN", "secretName": "provider", "secretKey": "token", "apiKey": "raw-secret"}},
+		"tools":                  []interface{}{map[string]interface{}{"name": "probe", "riskLevel": "low", "readOnly": true, "inputSchema": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}, "additionalProperties": false}}},
+	}}, MockAuth(), "trace", nil)
+	if err == nil {
+		t.Fatal("expected raw secret manifest validation error")
+	}
+}
