@@ -11,3 +11,5 @@ curl http://localhost:5000/mcp/k8s-readonly \
 ```
 
 Requests without bearer tokens are denied. Policy deny happens before upstream calls.
+
+The Gateway validates OIDC bearer JWTs when `MCP_AUTH_MODE=oidc`, enforces registered MCP clients unless `MCP_ALLOW_DYNAMIC_CLIENTS=true`, creates Streamable HTTP sessions on `initialize`, filters `tools/list`, enforces windowed quota keys across user/client/server/tool dimensions, requires one-time step-up tokens for critical tools, and hot-reloads catalog/grant/policy state through safe registry cache swaps.

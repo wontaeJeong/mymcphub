@@ -55,11 +55,23 @@ type AuthContext struct {
 	ClientID        string           `json:"clientId"`
 	Issuer          string           `json:"issuer"`
 	Audience        string           `json:"audience"`
+	RedirectURI     string           `json:"redirectUri,omitempty"`
 	IsAdmin         bool             `json:"isAdmin"`
 	IsPlatformAdmin bool             `json:"isPlatformAdmin"`
 	AuthSource      string           `json:"authSource"`
 	TokenIssuer     string           `json:"tokenIssuer"`
 	ProjectID       string           `json:"-"`
+}
+
+type OAuthClient struct {
+	ID           string   `json:"id"`
+	ClientID     string   `json:"clientId"`
+	DisplayName  string   `json:"displayName"`
+	OwnerTeamID  string   `json:"ownerTeamId"`
+	RedirectURIs []string `json:"redirectUris"`
+	DCRAllowed   bool     `json:"dcrAllowed"`
+	Enabled      bool     `json:"enabled"`
+	CreatedAt    string   `json:"createdAt"`
 }
 
 type MCPServer struct {
@@ -71,6 +83,7 @@ type MCPServer struct {
 	Environment Environment     `json:"environment"`
 	Transport   ServerTransport `json:"transport"`
 	UpstreamURL string          `json:"upstreamUrl,omitempty"`
+	TimeoutMS   int             `json:"timeoutMs,omitempty"`
 	Enabled     bool            `json:"enabled"`
 	Published   bool            `json:"published"`
 	Quarantined bool            `json:"quarantined"`
@@ -179,6 +192,12 @@ type ToolCallEvent struct {
 	Status       string `json:"status"`
 	LatencyMS    int    `json:"latencyMs,omitempty"`
 	CreatedAt    string `json:"createdAt"`
+}
+
+type RateLimitBucket struct {
+	Key     string `json:"key"`
+	Count   int    `json:"count"`
+	ResetAt string `json:"resetAt"`
 }
 
 type ServerHealth struct {

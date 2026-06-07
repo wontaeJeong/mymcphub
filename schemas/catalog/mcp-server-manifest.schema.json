@@ -11,6 +11,7 @@
     "environment": { "enum": ["dev", "stg", "prod", "shared"] },
     "transport": { "enum": ["streamable_http", "sse_legacy", "stdio_adapter", "external"] },
     "upstreamUrl": { "type": "string", "format": "uri" },
+    "timeoutMs": { "type": "integer", "minimum": 1 },
     "enabled": { "type": "boolean", "default": true },
     "riskLevel": { "enum": ["low", "medium", "high", "critical"], "default": "low" },
     "implementationLanguage": { "enum": ["go", "python"] },

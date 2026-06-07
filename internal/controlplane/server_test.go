@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/mcp-hub/mcp-hub/internal/config"
@@ -42,5 +43,64 @@ func TestControlPlaneRequiresAdminForMutation(t *testing.T) {
 	server.Handler().ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", recorder.Code)
+	}
+}
+
+func TestControlPlaneRateLimitIsStoreBacked(t *testing.T) {
+	cfg := config.Load(4000)
+	cfg.GatewayRateLimit = 1
+	cfg.GatewayRateLimitWindow = 60
+	path := filepath.Join(t.TempDir(), "store.json")
+	firstStore := db.NewSeedStore()
+	firstStore.UsePersistence(path)
+	first := NewServer(firstStore, cfg)
+	recorder := httptest.NewRecorder()
+	first.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/me", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected first API request allowed, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+
+	secondStore := db.NewSeedStore()
+	secondStore.UsePersistence(path)
+	second := NewServer(secondStore, cfg)
+	recorder = httptest.NewRecorder()
+	second.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/me", nil))
+	if recorder.Code != http.StatusTooManyRequests || !bytes.Contains(recorder.Body.Bytes(), []byte("RATE_LIMITED")) {
+		t.Fatalf("expected persisted API quota to rate limit, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestControlPlaneRateLimitUsesCanonicalUnknownRouteKey(t *testing.T) {
+	cfg := config.Load(4000)
+	cfg.GatewayRateLimit = 1
+	cfg.GatewayRateLimitWindow = 60
+	server := NewServer(db.NewSeedStore(), cfg)
+	first := httptest.NewRecorder()
+	server.Handler().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/api/servers/random-one", nil))
+	if first.Code != http.StatusNotFound {
+		t.Fatalf("expected first unknown API route to reach router, got %d body %s", first.Code, first.Body.String())
+	}
+	second := httptest.NewRecorder()
+	server.Handler().ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/api/servers/random-two", nil))
+	if second.Code != http.StatusTooManyRequests || !bytes.Contains(second.Body.Bytes(), []byte("RATE_LIMITED")) {
+		t.Fatalf("expected second unknown API route to share canonical quota key, got %d body %s", second.Code, second.Body.String())
+	}
+}
+
+func TestClientConfigUsesGatewayAndBearerAuth(t *testing.T) {
+	cfg := config.Load(4000)
+	cfg.GatewayURL = "http://gateway.local"
+	server := NewServer(db.NewSeedStore(), cfg)
+	body := []byte(`{"client":"opencode","profile":"local","serverId":"00000000-0000-4000-8000-000000000102"}`)
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/client-config/generate", bytes.NewReader(body)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+	if !bytes.Contains(recorder.Body.Bytes(), []byte("http://gateway.local/mcp/k8s-readonly")) || !bytes.Contains(recorder.Body.Bytes(), []byte("Bearer ${MCPHUB_TOKEN}")) {
+		t.Fatalf("expected gateway URL and bearer header in client config: %s", recorder.Body.String())
+	}
+	if bytes.Contains(recorder.Body.Bytes(), []byte("http://localhost:5102/mcp")) {
+		t.Fatalf("client config must not bypass gateway: %s", recorder.Body.String())
 	}
 }

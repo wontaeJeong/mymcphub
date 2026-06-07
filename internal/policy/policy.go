@@ -97,7 +97,7 @@ func activeGrants(principal db.AuthContext, server db.MCPServer, grants []db.Gra
 	now := time.Now().UTC()
 	out := make([]db.Grant, 0, len(grants))
 	for _, grant := range grants {
-		if !grant.Enabled || grant.ServerID != server.ID || grant.Environment != server.Environment || !grantMatchesPrincipal(principal, grant) {
+		if !grant.Enabled || grant.ServerID != server.ID || grant.ProjectID != principal.ProjectID || grant.Environment != server.Environment || !grantMatchesPrincipal(principal, grant) {
 			continue
 		}
 		if grant.ExpiresAt != "" {

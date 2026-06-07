@@ -62,6 +62,11 @@ func Result(id ID, payload map[string]interface{}) Response {
 func Error(id ID, code int, message string) Response {
 	return Response{JSONRPC: "2.0", ID: idOrNull(id), Error: &RPCError{Code: code, Message: message}}
 }
+
+func ErrorData(id ID, code int, message string, data map[string]interface{}) Response {
+	return Response{JSONRPC: "2.0", ID: idOrNull(id), Error: &RPCError{Code: code, Message: message, Data: data}}
+}
+
 func idOrNull(id ID) ID {
 	if id == nil {
 		return nil
