@@ -99,3 +99,19 @@ Platform admins can use existing Control Plane API routes to disable access with
 - `POST /api/admin/emergency-deny/disable` disables emergency deny policy.
 
 Emergency deny can be scoped with `global`, `highCritical`, `serverIds`, `serverSlugs`, `toolNames`, `subjectIds`, and `clientIds`. All kill-switch routes require platform admin authorization and emit audit events.
+
+Examples for local operator testing:
+
+```sh
+curl -X POST http://localhost:4000/api/admin/emergency-deny \
+  -H 'content-type: application/json' \
+  -d '{"reason":"operator test","serverSlugs":["echo"]}'
+
+curl -X POST http://localhost:4000/api/admin/emergency-deny/disable
+
+curl -X POST http://localhost:4000/api/admin/revoke-server-grants/00000000-0000-4000-8000-000000000100
+```
+
+Use `/admin` for the same operations through the Web UI. Emergency state and grant revocation results are in memory in the current API skeleton, so restart behavior is not durable yet.
+
+See [RUNBOOK.md](RUNBOOK.md) for incident response steps and [MCP_SERVER_ONBOARDING.md](MCP_SERVER_ONBOARDING.md) for manifest review workflow.
