@@ -13,9 +13,12 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/db"
 )
 
-func TestOIDCContextRequiresUserHeader(t *testing.T) {
+func TestOIDCContextRequiresTrustedProxyHeader(t *testing.T) {
 	t.Setenv("MCP_AUTH_MODE", "oidc")
-	principal := ContextFromHeaders(&http.Request{Header: http.Header{}})
+	request := &http.Request{Header: http.Header{}}
+	request.Header.Set("x-user-id", "operator-1")
+	request.Header.Set("x-roles", "platform_admin")
+	principal := ContextFromHeaders(request)
 	if principal.UserID != "" || principal.IsPlatformAdmin {
 		t.Fatalf("expected anonymous non-admin principal, got %#v", principal)
 	}
@@ -27,6 +30,20 @@ func TestOIDCContextMapsAdminHeaders(t *testing.T) {
 	t.Setenv("MCP_TRUSTED_AUTH_HEADER_TOKEN", "trusted-proxy-token")
 	request := &http.Request{Header: http.Header{}}
 	request.Header.Set("x-auth-proxy-token", "trusted-proxy-token")
+	request.Header.Set("x-user-id", "operator-1")
+	request.Header.Set("x-roles", "platform_admin")
+	request.Header.Set("x-team-ids", db.PlatformTeamID)
+	principal := ContextFromHeaders(request)
+	if principal.UserID != "operator-1" || !principal.IsPlatformAdmin || principal.TeamIDs[0] != db.PlatformTeamID {
+		t.Fatalf("expected mapped platform admin, got %#v", principal)
+	}
+}
+
+func TestOIDCContextMapsAdminProxyHeaders(t *testing.T) {
+	t.Setenv("MCP_AUTH_MODE", "oidc")
+	t.Setenv("MCP_TRUSTED_PROXY_SECRET", "test-secret")
+	request := &http.Request{Header: http.Header{}}
+	request.Header.Set("x-mcp-hub-trusted-proxy", "test-secret")
 	request.Header.Set("x-user-id", "operator-1")
 	request.Header.Set("x-roles", "platform_admin")
 	request.Header.Set("x-team-ids", db.PlatformTeamID)

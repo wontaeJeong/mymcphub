@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mcp-hub/mcp-hub/internal/db"
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 const (
@@ -28,7 +29,13 @@ const (
 )
 
 func TraceID(r *http.Request) string {
+	if value := telemetry.TraceID(r.Context()); value != "" {
+		return value
+	}
 	if value := strings.TrimSpace(r.Header.Get("x-trace-id")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(r.Header.Get("x-request-id")); value != "" {
 		return value
 	}
 	b := make([]byte, 16)
@@ -409,14 +416,19 @@ func trustedOIDCHeaders(r *http.Request) bool {
 		return true
 	}
 	expected := strings.TrimSpace(os.Getenv("MCP_TRUSTED_AUTH_HEADER_TOKEN"))
-	if expected == "" {
+	if expected != "" {
+		actual := strings.TrimSpace(r.Header.Get("x-auth-proxy-token"))
+		if actual != "" && len(actual) == len(expected) && subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1 {
+			return true
+		}
+	}
+	secret := strings.TrimSpace(os.Getenv("MCP_TRUSTED_PROXY_SECRET"))
+	if secret == "" {
 		return false
 	}
-	actual := strings.TrimSpace(r.Header.Get("x-auth-proxy-token"))
-	if actual == "" || len(actual) != len(expected) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1
+	header := getenv("MCP_TRUSTED_PROXY_HEADER", "x-mcp-hub-trusted-proxy")
+	value := strings.TrimSpace(r.Header.Get(header))
+	return value != "" && len(value) == len(secret) && subtle.ConstantTimeCompare([]byte(value), []byte(secret)) == 1
 }
 
 func split(value string) []string {

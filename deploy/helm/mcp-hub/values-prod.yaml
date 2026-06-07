@@ -34,6 +34,20 @@ worker:
     secretName: mcp-hub-worker-job
     secretKey: token
 
+serviceMonitor:
+  enabled: true
+
+prometheusRule:
+  enabled: true
+  thresholds:
+    gatewayErrorRate: 0.03
+    authFailures: 20
+    upstreamFailures: 5
+    workerLagSeconds: 300
+
+grafanaDashboards:
+  enabled: true
+
 ingress:
   hosts:
     - host: mcp-hub.example.com

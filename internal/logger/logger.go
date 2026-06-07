@@ -1,11 +1,14 @@
 package logger
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 type Logger struct {
@@ -18,6 +21,28 @@ func New(service string) Logger { return Logger{service: service, logger: log.Ne
 func (l Logger) Info(message string, fields map[string]interface{}) { l.write("info", message, fields) }
 func (l Logger) Error(message string, fields map[string]interface{}) {
 	l.write("error", message, fields)
+}
+func (l Logger) InfoContext(ctx context.Context, message string, fields map[string]interface{}) {
+	l.writeContext(ctx, "info", message, fields)
+}
+func (l Logger) ErrorContext(ctx context.Context, message string, fields map[string]interface{}) {
+	l.writeContext(ctx, "error", message, fields)
+}
+
+func (l Logger) writeContext(ctx context.Context, level, message string, fields map[string]interface{}) {
+	if fields == nil {
+		fields = map[string]interface{}{}
+	}
+	if traceID := telemetry.TraceID(ctx); traceID != "" {
+		fields["traceId"] = traceID
+	}
+	if spanID := telemetry.SpanID(ctx); spanID != "" {
+		fields["spanId"] = spanID
+	}
+	if requestID := telemetry.RequestID(ctx); requestID != "" {
+		fields["requestId"] = requestID
+	}
+	l.write(level, message, fields)
 }
 
 func (l Logger) write(level, message string, fields map[string]interface{}) {

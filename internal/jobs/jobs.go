@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/mcp-hub/mcp-hub/internal/db"
 	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 type Kind string
@@ -25,9 +27,10 @@ const (
 	AuditExport           Kind = "audit-export"
 	RuntimeReconcile      Kind = "runtime-reconcile"
 	SecretLeaseRenewal    Kind = "secret-lease-renewal"
+	UsageAccountingReport Kind = "usage-accounting-report"
 )
 
-var DefaultKinds = []Kind{HealthCheck, ToolScan, ResourceScan, PromptScan, SchemaSnapshot, SchemaDiff, RuntimeReconcile, SecretLeaseRenewal, StaleSessionCleanup, AuditRetentionCleanup, AuditExport}
+var DefaultKinds = []Kind{HealthCheck, ToolScan, ResourceScan, PromptScan, SchemaSnapshot, SchemaDiff, RuntimeReconcile, SecretLeaseRenewal, StaleSessionCleanup, AuditRetentionCleanup, AuditExport, UsageAccountingReport}
 
 type Job struct {
 	Kind             Kind                   `json:"kind"`
@@ -68,8 +71,11 @@ func NewRegistry(store *db.Store) *Registry {
 func (r *Registry) Store() *db.Store { return r.store }
 
 func (r *Registry) RunOnce(ctx context.Context, jobs []Job) []Result {
+	if telemetry.TraceID(ctx) == "" {
+		ctx = telemetry.ContextWithNewCorrelation(ctx)
+	}
 	if len(jobs) == 0 {
-		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: ToolScan, TargetServerID: db.K8sReadonlyID}, {Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID}, {Kind: RuntimeReconcile, TargetServerID: db.K8sReadonlyID, ManifestPath: "servers/k8s/mcp-server.manifest.json"}}
+		jobs = []Job{{Kind: HealthCheck, TargetServerID: db.K8sReadonlyID}, {Kind: ToolScan, TargetServerID: db.K8sReadonlyID}, {Kind: SchemaDiff, TargetServerID: db.K8sReadonlyID}, {Kind: RuntimeReconcile, TargetServerID: db.K8sReadonlyID, ManifestPath: "servers/k8s/mcp-server.manifest.json"}, {Kind: UsageAccountingReport, TargetServerID: db.K8sReadonlyID}}
 	}
 	results := make([]Result, 0, len(jobs))
 	for _, job := range jobs {
@@ -79,8 +85,12 @@ func (r *Registry) RunOnce(ctx context.Context, jobs []Job) []Result {
 }
 
 func (r *Registry) run(ctx context.Context, job Job) Result {
+	wallStarted := time.Now()
 	started := db.Now()
 	result := Result{Job: job, Status: "success", StartedAt: started, Metadata: map[string]interface{}{"attempt": 1}}
+	defer func() {
+		telemetry.RecordJob("worker", string(job.Kind), result.Status, time.Since(wallStarted))
+	}()
 	lockKey := string(job.Kind) + ":" + job.TargetServerID
 	if _, loaded := r.locks.LoadOrStore(lockKey, true); loaded {
 		result.Status = "skipped"
@@ -103,10 +113,12 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 
 	switch job.Kind {
 	case HealthCheck:
-		r.store.UpsertHealth(db.ServerHealth{ServerID: job.TargetServerID, Status: "healthy", LatencyMS: 10})
-		r.store.AddAudit(db.AuditEvent{EventType: "health.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "status": "healthy"}})
+		health := r.healthCheck(job.TargetServerID, telemetry.TraceID(jobCtx))
+		r.store.UpsertHealth(health)
+		result.Metadata["status"] = health.Status
+		result.Metadata["backoffSeconds"] = health.BackoffSeconds
 	case ToolScan, ResourceScan, PromptScan:
-		r.store.AddAudit(db.AuditEvent{EventType: "scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+		r.store.AddAudit(db.AuditEvent{EventType: "scan.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
 	case SchemaSnapshot:
 		snapshot, err := r.store.RecordCurrentSchemaSnapshot(job.TargetServerID, string(job.Kind))
 		if err != nil {
@@ -114,7 +126,7 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 			result.FailureReason = err.Error()
 			break
 		}
-		r.store.AddAudit(db.AuditEvent{EventType: "schema.snapshot.recorded", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "snapshotId": snapshot.ID}})
+		r.store.AddAudit(db.AuditEvent{EventType: "schema.snapshot.recorded", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "snapshotId": snapshot.ID}})
 		result.Metadata["snapshotId"] = snapshot.ID
 	case SchemaDiff:
 		diffs := DiffToolSnapshots(job.PreviousSnapshot, job.CurrentSnapshot)
@@ -136,12 +148,21 @@ func (r *Registry) run(ctx context.Context, job Job) Result {
 			result.FailureReason = err.Error()
 			break
 		}
-		r.store.AddAudit(db.AuditEvent{EventType: "schema.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "diffCount": len(diffs), "approvalRequired": approvalRequired(diffs)}})
+		r.store.AddAudit(db.AuditEvent{EventType: "schema.changed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "diffCount": len(diffs), "approvalRequired": approvalRequired(diffs)}})
 		result.Metadata["diffCount"] = len(diffs)
 		result.Metadata["approvalRequired"] = approvalRequired(diffs)
 		result.Metadata["schemaDiffId"] = recorded.ID
-	case StaleSessionCleanup, AuditRetentionCleanup, AuditExport:
-		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: db.NewID(), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
+	case AuditExport, UsageAccountingReport:
+		report := r.store.UsageReport(map[string]string{"period": "daily"})
+		calls := 0
+		for _, item := range report.Items {
+			calls += item.Calls
+		}
+		result.Metadata["reportRows"] = len(report.Items)
+		result.Metadata["calls"] = calls
+		r.store.AddAudit(db.AuditEvent{EventType: "usage.report.generated", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind, "period": report.Period, "rows": len(report.Items), "calls": calls}})
+	case StaleSessionCleanup, AuditRetentionCleanup:
+		r.store.AddAudit(db.AuditEvent{EventType: "maintenance.completed", ServerID: job.TargetServerID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: telemetry.TraceID(jobCtx), MetadataJSON: map[string]interface{}{"jobKind": job.Kind}})
 	case RuntimeReconcile:
 		if err := r.reconcileRuntime(job, &result); err != nil {
 			result.Status = "failed"
@@ -237,6 +258,53 @@ func secretLeaseSeconds() int {
 		}
 	}
 	return int(mcruntime.DefaultLeaseDuration.Seconds())
+}
+
+func (r *Registry) healthCheck(serverID, traceID string) db.ServerHealth {
+	server, err := r.store.GetServer(serverID)
+	status := "healthy"
+	latencyMS := 10
+	errorMessage := ""
+	if err != nil {
+		status = "unhealthy"
+		latencyMS = 0
+		errorMessage = "server not found"
+	} else if !server.Enabled || server.Quarantined {
+		status = "unhealthy"
+		latencyMS = 0
+		errorMessage = "server disabled or quarantined"
+	} else if server.UpstreamURL == "" {
+		status = "degraded"
+		latencyMS = 25
+		errorMessage = "upstream URL not configured"
+	}
+	previous, ok := r.store.LatestHealth(serverID)
+	attempt := 1
+	if ok && previous.Status != "healthy" && status != "healthy" {
+		attempt = previous.Attempt + 1
+		if attempt <= 1 {
+			attempt = 2
+		}
+	}
+	backoffSeconds := 0
+	if status != "healthy" {
+		backoffSeconds = 60
+		for i := 1; i < attempt && backoffSeconds < 1800; i++ {
+			backoffSeconds *= 2
+		}
+		if backoffSeconds > 1800 {
+			backoffSeconds = 1800
+		}
+	}
+	health := db.ServerHealth{ServerID: serverID, Status: status, LatencyMS: latencyMS, ErrorMessage: errorMessage, CheckedAt: db.Now(), TraceID: traceID, Attempt: attempt, BackoffSeconds: backoffSeconds}
+	metadata := map[string]interface{}{"jobKind": HealthCheck, "status": status, "attempt": attempt, "backoffSeconds": backoffSeconds}
+	if !ok || previous.Status != status {
+		r.store.AddAudit(db.AuditEvent{EventType: "health.changed", ServerID: serverID, RiskLevel: db.RiskLow, PolicyDecision: db.PolicyAllow, TraceID: traceID, MetadataJSON: metadata})
+	}
+	if status != "healthy" {
+		r.store.AddAudit(db.AuditEvent{EventType: "health.alert", ServerID: serverID, RiskLevel: db.RiskMedium, PolicyDecision: db.PolicyDeny, TraceID: traceID, ErrorCode: "SERVER_HEALTH_" + strings.ToUpper(status), MetadataJSON: metadata})
+	}
+	return health
 }
 
 type Diff struct {

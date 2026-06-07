@@ -7,5 +7,8 @@ func NewEvent(eventType string, principal db.AuthContext, traceID string, server
 	if len(principal.TeamIDs) > 0 {
 		teamID = principal.TeamIDs[0]
 	}
-	return db.AuditEvent{ID: db.NewID(), Timestamp: db.Now(), UserID: principal.UserID, TeamID: teamID, ProjectID: principal.ProjectID, ClientID: principal.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: decision, TraceID: traceID, MetadataJSON: map[string]interface{}{"source": "go-core"}}
+	if traceID == "" {
+		traceID = db.NewID()
+	}
+	return db.AuditEvent{ID: db.NewID(), Timestamp: db.Now(), UserID: principal.UserID, TeamID: teamID, ProjectID: principal.ProjectID, ClientID: principal.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: decision, TraceID: traceID, MetadataJSON: map[string]interface{}{"source": "go-core", "schemaVersion": "2026-06"}}
 }

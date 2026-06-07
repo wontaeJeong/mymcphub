@@ -12,6 +12,7 @@ data:
   OIDC_ISSUER_URL: {{ .Values.auth.oidcIssuerUrl | quote }}
   OIDC_AUDIENCE: {{ .Values.auth.audience | quote }}
   OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
+  MCP_TRUSTED_PROXY_HEADER: {{ .Values.auth.trustedProxy.headerName | quote }}
   MCP_HUB_PUBLIC_URL: {{ .Values.config.publicUrl | quote }}
   MCP_API_URL: {{ .Values.config.apiUrl | quote }}
   NEXT_PUBLIC_MCP_API_URL: {{ .Values.config.apiUrl | quote }}
@@ -20,3 +21,4 @@ data:
   MCP_RUNTIME_NAMESPACE: {{ .Values.managedRuntime.namespace | quote }}
   MCP_RUNTIME_CONTROLLER_MODE: {{ .Values.managedRuntime.controller.mode | quote }}
   MCP_SECRET_LEASE_SECONDS: {{ .Values.managedRuntime.defaults.secretLeaseSeconds | quote }}
+  MCP_WORKER_INTERVAL_SECONDS: {{ .Values.config.workerIntervalSeconds | quote }}

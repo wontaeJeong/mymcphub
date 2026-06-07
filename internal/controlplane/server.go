@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/mcp-hub/mcp-hub/internal/policy"
 	"github.com/mcp-hub/mcp-hub/internal/ratelimit"
 	mcruntime "github.com/mcp-hub/mcp-hub/internal/runtime"
+	"github.com/mcp-hub/mcp-hub/internal/telemetry"
 )
 
 type Server struct {
@@ -34,9 +36,11 @@ func NewServer(store *db.Store, cfg config.Config) *Server {
 }
 func (s *Server) Store() *db.Store { return s.store }
 
-func (s *Server) Handler() http.Handler { return http.HandlerFunc(s.handle) }
+func (s *Server) Handler() http.Handler { return telemetry.Handler("api", http.HandlerFunc(s.handle)) }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	finish := s.store.BeginRequest(r.Method != http.MethodGet)
+	defer finish()
 	traceID := auth.TraceID(r)
 	w.Header().Set("x-trace-id", traceID)
 	if err := s.store.Refresh(); err != nil {
@@ -52,6 +56,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	principal := auth.ContextFromHeaders(r)
 	s.log.Info("api.request", map[string]interface{}{"traceId": traceID, "method": r.Method, "path": r.URL.Path})
+	s.log.InfoContext(r.Context(), "api.request", map[string]interface{}{"traceId": traceID, "method": r.Method, "path": r.URL.Path})
 	if s.rateLimitAPI(w, r, principal, traceID) {
 		return
 	}
@@ -62,7 +67,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == "/readyz":
 		httpx.WriteJSON(w, 200, map[string]interface{}{"service": "api", "status": "ready", "dependencies": map[string]string{"store": "ready"}})
 	case r.Method == http.MethodGet && r.URL.Path == "/metrics":
-		httpx.WriteText(w, 200, "text/plain; version=0.0.4", "mcp_api_request_info{service=\"api\"} 1\n")
+		httpx.WriteText(w, 200, "text/plain; version=0.0.4", telemetry.MetricsText("api"))
 	case r.Method == http.MethodGet && (r.URL.Path == "/openapi.json" || r.URL.Path == "/api/openapi.json"):
 		httpx.WriteJSON(w, 200, OpenAPIDocument())
 	case r.Method == http.MethodGet && r.URL.Path == "/api/me":
@@ -85,6 +90,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, 200, s.store.ListHealth())
 	case strings.HasPrefix(r.URL.Path, "/api/runtime"):
 		s.handleRuntime(w, r, principal, traceID)
+	case strings.HasPrefix(r.URL.Path, "/api/analytics"):
+		s.handleAnalytics(w, r, principal, traceID)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/client-config/generate":
 		s.handleClientConfig(w, r, traceID)
 	case strings.HasPrefix(r.URL.Path, "/api/policy"):
@@ -553,6 +560,36 @@ func (s *Server) handleTenancy(w http.ResponseWriter, r *http.Request, principal
 	httpx.WriteError(w, 404, "NOT_FOUND", "Tenancy route not found", traceID, nil)
 }
 
+func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request, principal db.AuthContext, traceID string) {
+	if !requireAdmin(w, principal, traceID) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		httpx.WriteError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", traceID, nil)
+		return
+	}
+	filters := analyticsFilters(r)
+	switch r.URL.Path {
+	case "/api/analytics/usage":
+		httpx.WriteJSON(w, 200, s.store.UsageReport(filters))
+	case "/api/analytics/usage/export":
+		w.Header().Set("content-disposition", "attachment; filename=usage-report.csv")
+		httpx.WriteText(w, 200, "text/csv", s.store.UsageReportCSV(filters))
+	case "/api/analytics/denied-calls":
+		httpx.WriteJSON(w, 200, s.store.DeniedCallAnalytics(filters))
+	default:
+		httpx.WriteError(w, 404, "NOT_FOUND", "Analytics route not found", traceID, nil)
+	}
+}
+
+func analyticsFilters(r *http.Request) map[string]string {
+	filters := map[string]string{}
+	for _, key := range []string{"from", "to", "period", "group_by", "user", "team", "project", "client", "server", "tool", "event_type", "policy_decision", "risk_level", "trace_id"} {
+		filters[key] = r.URL.Query().Get(key)
+	}
+	return filters
+}
+
 func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request, traceID string) {
 	var input struct {
 		Client   string `json:"client"`
@@ -880,6 +917,9 @@ func openAPIDocument() map[string]interface{} {
 			"/api/tenancy/policy-input":                   map[string]interface{}{"get": operation("Get tenancy policy input", true)},
 			"/api/tool-call-events":                       map[string]interface{}{"get": operation("List tool call events", false)},
 			"/api/server-health":                          map[string]interface{}{"get": operation("List server health records", false)},
+			"/api/analytics/usage":                        map[string]interface{}{"get": analyticsOperation("Get usage accounting report", usageAnalyticsParameters())},
+			"/api/analytics/usage/export":                 map[string]interface{}{"get": analyticsOperation("Export usage accounting report", usageAnalyticsParameters())},
+			"/api/analytics/denied-calls":                 map[string]interface{}{"get": analyticsOperation("Get denied-call analytics", deniedAnalyticsParameters())},
 			"/api/client-config/generate":                 map[string]interface{}{"post": operation("Generate client config", false)},
 			"/api/policy/validate":                        map[string]interface{}{"post": operation("Validate policy", false)},
 			"/api/policy/simulate":                        map[string]interface{}{"post": operation("Simulate policy", false)},
@@ -918,7 +958,59 @@ func adminOperation(summary string, audit bool, statuses ...int) map[string]inte
 	return out
 }
 
+func analyticsOperation(summary string, parameters []map[string]interface{}) map[string]interface{} {
+	out := operation(summary, false)
+	out["x-platform-admin-required"] = true
+	out["parameters"] = parameters
+	responses := out["responses"].(map[string]interface{})
+	responses["403"] = map[string]interface{}{"description": "Platform admin required"}
+	return out
+}
+
+func usageAnalyticsParameters() []map[string]interface{} {
+	return []map[string]interface{}{
+		queryParameter("from", map[string]interface{}{"type": "string", "format": "date-time"}),
+		queryParameter("to", map[string]interface{}{"type": "string", "format": "date-time"}),
+		queryParameter("period", map[string]interface{}{"type": "string", "enum": []string{"daily", "monthly"}}),
+		queryParameter("group_by", map[string]interface{}{"type": "string"}),
+		queryParameter("team", map[string]interface{}{"type": "string"}),
+		queryParameter("project", map[string]interface{}{"type": "string"}),
+		queryParameter("user", map[string]interface{}{"type": "string"}),
+		queryParameter("client", map[string]interface{}{"type": "string"}),
+		queryParameter("server", map[string]interface{}{"type": "string"}),
+		queryParameter("tool", map[string]interface{}{"type": "string"}),
+		queryParameter("event_type", map[string]interface{}{"type": "string"}),
+		queryParameter("policy_decision", map[string]interface{}{"type": "string", "enum": []string{"allow", "deny", "needs_approval"}}),
+		queryParameter("risk_level", map[string]interface{}{"type": "string", "enum": []string{"low", "medium", "high", "critical"}}),
+		queryParameter("trace_id", map[string]interface{}{"type": "string"}),
+	}
+}
+
+func deniedAnalyticsParameters() []map[string]interface{} {
+	return []map[string]interface{}{
+		queryParameter("from", map[string]interface{}{"type": "string", "format": "date-time"}),
+		queryParameter("to", map[string]interface{}{"type": "string", "format": "date-time"}),
+		queryParameter("server", map[string]interface{}{"type": "string"}),
+		queryParameter("tool", map[string]interface{}{"type": "string"}),
+		queryParameter("user", map[string]interface{}{"type": "string"}),
+		queryParameter("team", map[string]interface{}{"type": "string"}),
+		queryParameter("project", map[string]interface{}{"type": "string"}),
+		queryParameter("client", map[string]interface{}{"type": "string"}),
+		queryParameter("risk_level", map[string]interface{}{"type": "string", "enum": []string{"low", "medium", "high", "critical"}}),
+		queryParameter("trace_id", map[string]interface{}{"type": "string"}),
+	}
+}
+
+func queryParameter(name string, schema map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{"name": name, "in": "query", "schema": schema}
+}
+
 func ListenAndServe(store *db.Store, cfg config.Config) error {
+	shutdown, err := telemetry.Init(context.Background(), "api")
+	if err != nil {
+		return err
+	}
+	defer shutdown(context.Background())
 	address := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	return http.ListenAndServe(address, NewServer(store, cfg).Handler())
 }

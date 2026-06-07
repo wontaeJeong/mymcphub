@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -382,6 +383,72 @@ func TestPersistenceBackfillsLaneBSeedData(t *testing.T) {
 	reloaded.UsePersistence(path)
 	if _, err := reloaded.PolicyInputFor(AdminUserID, SampleProjectID); err != nil {
 		t.Fatalf("expected persisted backfilled tenancy seed data: %v", err)
+	}
+}
+
+func TestAuditAnalyticsAggregateUsageAndDeniedCalls(t *testing.T) {
+	store := NewSeedStore()
+	store.AddAudit(AuditEvent{Timestamp: "2026-06-07T10:00:00Z", TeamID: PlatformTeamID, ProjectID: SampleProjectID, UserID: AdminUserID, ClientID: "client-a", ServerID: K8sReadonlyID, ToolName: "list_pods", EventType: "tool.call.succeeded", RiskLevel: RiskMedium, PolicyDecision: PolicyAllow, TraceID: "trace-usage", LatencyMS: 30, ArgumentRedactedJSON: map[string]interface{}{"token": "raw-token"}})
+	store.AddAudit(AuditEvent{Timestamp: "2026-06-07T10:01:00Z", TeamID: PlatformTeamID, ProjectID: SampleProjectID, UserID: AdminUserID, ClientID: "client-a", ServerID: K8sReadonlyID, ToolName: "delete_pod", EventType: "tool.call.denied", RiskLevel: RiskHigh, PolicyDecision: PolicyDeny, TraceID: "trace-deny", ErrorCode: "NO_MATCHING_GRANT", LatencyMS: 12})
+	store.AddAudit(AuditEvent{Timestamp: "2026-06-07T10:02:00Z", TeamID: PlatformTeamID, ProjectID: SampleProjectID, UserID: AdminUserID, ClientID: "client-a", ServerID: K8sReadonlyID, ToolName: "list_pods", EventType: "tool.call.failed", RiskLevel: RiskMedium, PolicyDecision: PolicyDeny, TraceID: "trace-failed", ErrorCode: "UPSTREAM_TIMEOUT", LatencyMS: 99})
+
+	usage := store.UsageReport(map[string]string{"period": "daily", "group_by": "server,tool"})
+	if len(usage.Items) != 2 {
+		t.Fatalf("expected two usage rows, got %#v", usage.Items)
+	}
+	denied := store.DeniedCallAnalytics(map[string]string{})
+	if denied.TotalDenied != 1 || len(denied.ByReason) != 1 || denied.ByReason[0].Reason != "NO_MATCHING_GRANT" {
+		t.Fatalf("unexpected denied analytics: %#v", denied)
+	}
+	toolCalls := store.ListToolCallEvents()
+	if len(toolCalls.Items) < 2 {
+		t.Fatalf("expected audit-derived tool call events, got %#v", toolCalls.Items)
+	}
+	audit := store.ListAuditEvents(10, "", map[string]string{"trace_id": "trace-usage"})
+	if len(audit.Items) != 1 || audit.Items[0].ArgumentHash == "" {
+		t.Fatalf("expected stable hash for redacted audit argument, got %#v", audit.Items)
+	}
+	csv := store.UsageReportCSV(map[string]string{"period": "daily", "group_by": "tool"})
+	if csvCell("=cmd") != "'=cmd" || csvCell("+cmd") != "'+cmd" {
+		t.Fatalf("expected formula-safe CSV cells")
+	}
+	if csv == "" {
+		t.Fatalf("expected usage CSV")
+	}
+}
+
+func TestPersistentStoreRequestLockPreservesConcurrentAuditWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+	first := NewSeedStore()
+	first.UsePersistence(path)
+	second := NewSeedStore()
+	second.UsePersistence(path)
+
+	var wg sync.WaitGroup
+	for _, item := range []struct {
+		store *Store
+		trace string
+	}{
+		{store: first, trace: "trace-concurrent-a"},
+		{store: second, trace: "trace-concurrent-b"},
+	} {
+		wg.Add(1)
+		go func(store *Store, trace string) {
+			defer wg.Done()
+			finish := store.BeginRequest(true)
+			defer finish()
+			store.AddAudit(AuditEvent{TraceID: trace, EventType: "tool.call.succeeded", ServerID: K8sReadonlyID, ToolName: "list_namespaces", RiskLevel: RiskLow, PolicyDecision: PolicyAllow, MetadataJSON: map[string]interface{}{"source": trace}})
+		}(item.store, item.trace)
+	}
+	wg.Wait()
+
+	reader := NewSeedStore()
+	reader.UsePersistence(path)
+	for _, trace := range []string{"trace-concurrent-a", "trace-concurrent-b"} {
+		audit := reader.ListAuditEvents(10, "", map[string]string{"trace_id": trace})
+		if len(audit.Items) != 1 {
+			t.Fatalf("expected one audit event for %s, got %#v", trace, audit.Items)
+		}
 	}
 }
 

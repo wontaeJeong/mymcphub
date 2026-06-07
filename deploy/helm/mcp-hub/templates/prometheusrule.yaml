@@ -1,0 +1,50 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "mcp-hub.fullname" . }}-alerts
+  {{- if .Values.prometheusRule.namespace }}
+  namespace: {{ .Values.prometheusRule.namespace }}
+  {{- end }}
+  labels:
+{{ include "mcp-hub.labels" . | indent 4 }}
+{{- with .Values.prometheusRule.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  groups:
+    - name: mcp-hub.rules
+      rules:
+        - alert: MCPHubGatewayErrorRateHigh
+          expr: (sum(rate(mcp_gateway_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(mcp_gateway_http_requests_total[5m])), 0.001) > {{ .Values.prometheusRule.thresholds.gatewayErrorRate }}) and sum(rate(mcp_gateway_http_requests_total[5m])) > 0.01
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: MCP Gateway error rate is high
+            runbook_url: {{ .Values.prometheusRule.runbookURL | quote }}
+        - alert: MCPHubAuthFailuresHigh
+          expr: increase(mcp_gateway_policy_denies_total{reason="AUTH_MISSING_OR_INVALID_BEARER_TOKEN"}[10m]) > {{ .Values.prometheusRule.thresholds.authFailures }}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: MCP Gateway authentication failures increased
+            runbook_url: {{ .Values.prometheusRule.runbookURL | quote }}
+        - alert: MCPHubUpstreamFailuresHigh
+          expr: sum(increase(mcp_gateway_upstream_errors_total[10m])) > {{ .Values.prometheusRule.thresholds.upstreamFailures }}
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: MCP Gateway upstream failures increased
+            runbook_url: {{ .Values.prometheusRule.runbookURL | quote }}
+        - alert: MCPHubWorkerLagHigh
+          expr: time() - mcp_worker_last_run_timestamp_seconds > {{ .Values.prometheusRule.thresholds.workerLagSeconds }}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: MCP worker has not completed a recent run
+            runbook_url: {{ .Values.prometheusRule.runbookURL | quote }}
+{{- end }}

@@ -36,6 +36,18 @@ spec:
           port: {{ .Values.api.port }}
         - protocol: TCP
           port: {{ .Values.gateway.port }}
+    {{- if and .Values.serviceMonitor.enabled .Values.worker.enabled .Values.worker.service.enabled }}
+    - from:
+        - namespaceSelector:
+{{ toYaml .Values.serviceMonitor.networkPolicy.namespaceSelector | indent 12 }}
+          {{- with .Values.serviceMonitor.networkPolicy.podSelector }}
+          podSelector:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.worker.port }}
+    {{- end }}
   egress:
     - to:
         - namespaceSelector: {}

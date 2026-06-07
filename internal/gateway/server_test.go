@@ -21,7 +21,11 @@ import (
 )
 
 func TestGatewayFiltersDiscoveryAndCallsAllowedTool(t *testing.T) {
+	var upstreamTraceParent string
+	var upstreamRequestID string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamTraceParent = r.Header.Get("traceparent")
+		upstreamRequestID = r.Header.Get("x-request-id")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": float64(2), "result": map[string]interface{}{"content": []interface{}{map[string]interface{}{"type": "text", "text": "ok"}}}})
 	}))
 	defer upstream.Close()
@@ -52,6 +56,14 @@ func TestGatewayFiltersDiscoveryAndCallsAllowedTool(t *testing.T) {
 	audit := store.ListAuditEvents(20, "", map[string]string{"event_type": "tool.call.succeeded"})
 	if len(audit.Items) == 0 || bytes.Contains(mustJSONBytes(audit.Items[0].ArgumentRedactedJSON), []byte("secret-value")) {
 		t.Fatalf("expected redacted successful audit event")
+	}
+	if upstreamTraceParent == "" || upstreamRequestID == "" {
+		t.Fatalf("expected upstream trace propagation, got traceparent=%q request=%q", upstreamTraceParent, upstreamRequestID)
+	}
+	metrics := httptest.NewRecorder()
+	handler.ServeHTTP(metrics, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if !bytes.Contains(metrics.Body.Bytes(), []byte("mcp_gateway_tool_calls_total")) {
+		t.Fatalf("expected gateway tool call metrics, got %s", metrics.Body.String())
 	}
 }
 
@@ -324,6 +336,24 @@ func TestSecureUpstreamTransportDisablesProxy(t *testing.T) {
 	transport, ok := secureUpstreamTransport().(*http.Transport)
 	if !ok || transport.Proxy != nil {
 		t.Fatalf("expected secure upstream transport to disable proxy, transport=%#v", transport)
+	}
+}
+
+func TestGatewayDeniedToolCallFeedsAnalytics(t *testing.T) {
+	store := db.NewSeedStore()
+	handler := NewServer(store, config.Load(5000), nil).Handler()
+	request := map[string]interface{}{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": map[string]interface{}{"name": "missing_tool", "arguments": map[string]interface{}{"password": "raw-secret"}}}
+	response := postMCP(t, handler, "/mcp/k8s-readonly", request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected MCP error response over 200, got %d", response.Code)
+	}
+	denied := store.DeniedCallAnalytics(map[string]string{})
+	if denied.TotalDenied == 0 || denied.ByReason[0].Reason == "" {
+		t.Fatalf("expected denied analytics from gateway event: %#v", denied)
+	}
+	audit := store.ListAuditEvents(10, "", map[string]string{"event_type": "tool.call.denied"})
+	if len(audit.Items) == 0 || bytes.Contains(mustJSONBytes(audit.Items[0].ArgumentRedactedJSON), []byte("raw-secret")) || audit.Items[0].ArgumentHash == "" {
+		t.Fatalf("expected redacted denied event with hash, got %#v", audit.Items)
 	}
 }
 

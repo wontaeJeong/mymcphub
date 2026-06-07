@@ -1,0 +1,51 @@
+{{- if .Values.grafanaDashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-hub.fullname" . }}-grafana-dashboard
+  labels:
+{{ include "mcp-hub.labels" . | indent 4 }}
+{{- with .Values.grafanaDashboards.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  mcp-hub-observability.json: |-
+    {
+      "title": "MCP Hub Observability",
+      "schemaVersion": 39,
+      "tags": ["mcp-hub", "go-core"],
+      "time": { "from": "now-6h", "to": "now" },
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Gateway latency p50/p95/p99",
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(mcp_gateway_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(mcp_gateway_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(mcp_gateway_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Gateway error rate",
+          "targets": [
+            { "expr": "sum(rate(mcp_gateway_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(mcp_gateway_http_requests_total[5m])), 1)", "legendFormat": "5xx rate" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Tool calls by decision",
+          "targets": [
+            { "expr": "sum(rate(mcp_gateway_tool_calls_total[5m])) by (decision)", "legendFormat": "{{`{{decision}}`}}" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Worker jobs by status",
+          "targets": [
+            { "expr": "sum(rate(mcp_worker_jobs_total[5m])) by (status)", "legendFormat": "{{`{{status}}`}}" }
+          ]
+        }
+      ]
+    }
+{{- end }}

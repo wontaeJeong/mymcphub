@@ -30,10 +30,13 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrUnauthorized = errors.New("unauthorized")
 	ErrValidation   = errors.New("validation failed")
+	pathLocksMu     sync.Mutex
+	pathLocks       = map[string]*sync.RWMutex{}
 )
 
 type Store struct {
 	mu              sync.RWMutex
+	requestMu       sync.RWMutex
 	persistPath     string
 	users           []User
 	teams           []Team
@@ -166,6 +169,84 @@ func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.saveLocked()
+}
+
+func (s *Store) BeginRequest(write bool) func() {
+	if write {
+		s.requestMu.Lock()
+	} else {
+		s.requestMu.RLock()
+	}
+	pathLock := s.pathLock()
+	if pathLock != nil {
+		if write {
+			pathLock.Lock()
+		} else {
+			pathLock.RLock()
+		}
+	}
+	s.Refresh()
+	return func() {
+		if write {
+			s.Save()
+		}
+		if pathLock != nil {
+			if write {
+				pathLock.Unlock()
+			} else {
+				pathLock.RUnlock()
+			}
+		}
+		if write {
+			s.requestMu.Unlock()
+		} else {
+			s.requestMu.RUnlock()
+		}
+	}
+}
+
+func (s *Store) pathLock() *sync.RWMutex {
+	if s.persistPath == "" {
+		return nil
+	}
+	pathLocksMu.Lock()
+	defer pathLocksMu.Unlock()
+	lock := pathLocks[s.persistPath]
+	if lock == nil {
+		lock = &sync.RWMutex{}
+		pathLocks[s.persistPath] = lock
+	}
+	return lock
+}
+
+func (s *Store) lockPersistence(write bool) *os.File {
+	if s.persistPath == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.persistPath), 0o700); err != nil {
+		return nil
+	}
+	file, err := os.OpenFile(s.persistPath+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil
+	}
+	flag := syscall.LOCK_SH
+	if write {
+		flag = syscall.LOCK_EX
+	}
+	if err := syscall.Flock(int(file.Fd()), flag); err != nil {
+		_ = file.Close()
+		return nil
+	}
+	return file
+}
+
+func unlockPersistence(file *os.File) {
+	if file == nil {
+		return
+	}
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	_ = file.Close()
 }
 
 func (s *Store) loadLocked() error {
@@ -789,22 +870,130 @@ func (s *Store) ListAuditEvents(limit int, cursor string, filters map[string]str
 	return ListResponse[AuditEvent]{Items: items, PageInfo: page}
 }
 
+func (s *Store) UsageReport(filters map[string]string) UsageReport {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	period := filters["period"]
+	if period != "monthly" {
+		period = "daily"
+	}
+	groupBy := readGroupBy(filters["group_by"])
+	type aggregate struct {
+		item      UsageReportItem
+		latencies []int
+	}
+	aggregates := map[string]*aggregate{}
+	for _, event := range s.auditEvents {
+		if !auditMatches(event, filters) || !isUsageAuditEvent(event) {
+			continue
+		}
+		bucket := periodBucket(event.Timestamp, period)
+		key := usageKey(event, bucket, groupBy)
+		current := aggregates[key]
+		if current == nil {
+			current = &aggregate{item: UsageReportItem{Period: bucket}}
+			applyUsageDimensions(&current.item, event, groupBy)
+			aggregates[key] = current
+		}
+		current.item.Calls++
+		switch toolCallStatus(event) {
+		case "succeeded":
+			current.item.Succeeded++
+		case "failed":
+			current.item.Failed++
+		case "denied":
+			current.item.Denied++
+		}
+		if event.LatencyMS > 0 {
+			current.latencies = append(current.latencies, event.LatencyMS)
+		}
+	}
+	items := make([]UsageReportItem, 0, len(aggregates))
+	for _, current := range aggregates {
+		sort.Ints(current.latencies)
+		current.item.AvgLatencyMS = average(current.latencies)
+		current.item.P95LatencyMS = percentile(current.latencies, 0.95)
+		current.item.P99LatencyMS = percentile(current.latencies, 0.99)
+		items = append(items, current.item)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Period != items[j].Period {
+			return items[i].Period < items[j].Period
+		}
+		return fmt.Sprint(items[i]) < fmt.Sprint(items[j])
+	})
+	return UsageReport{From: filters["from"], To: filters["to"], Period: period, GroupBy: groupBy, Items: items}
+}
+
+func (s *Store) UsageReportCSV(filters map[string]string) string {
+	report := s.UsageReport(filters)
+	var b strings.Builder
+	b.WriteString("period,team_id,project_id,user_id,client_id,server_id,tool_name,calls,succeeded,failed,denied,avg_latency_ms,p95_latency_ms,p99_latency_ms\n")
+	for _, item := range report.Items {
+		fmt.Fprintf(&b, "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d\n", csvCell(item.Period), csvCell(item.TeamID), csvCell(item.ProjectID), csvCell(item.UserID), csvCell(item.ClientID), csvCell(item.ServerID), csvCell(item.ToolName), item.Calls, item.Succeeded, item.Failed, item.Denied, item.AvgLatencyMS, item.P95LatencyMS, item.P99LatencyMS)
+	}
+	return b.String()
+}
+
+func (s *Store) DeniedCallAnalytics(filters map[string]string) DeniedCallAnalytics {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	reasonCounts := map[string]int{}
+	toolCounts := map[string]DeniedToolCount{}
+	serverCounts := map[string]DeniedServerCount{}
+	total := 0
+	for _, event := range s.auditEvents {
+		if !auditMatches(event, filters) || !isDeniedAuditEvent(event) {
+			continue
+		}
+		total++
+		reason := event.ErrorCode
+		if reason == "" {
+			reason = "POLICY_DENY"
+		}
+		reasonCounts[reason]++
+		toolKey := event.ServerID + "\x00" + event.ToolName
+		tool := toolCounts[toolKey]
+		tool.ServerID = event.ServerID
+		tool.ToolName = event.ToolName
+		tool.Count++
+		toolCounts[toolKey] = tool
+		server := serverCounts[event.ServerID]
+		server.ServerID = event.ServerID
+		server.Count++
+		serverCounts[event.ServerID] = server
+	}
+	byReason := make([]DeniedReasonCount, 0, len(reasonCounts))
+	for reason, count := range reasonCounts {
+		byReason = append(byReason, DeniedReasonCount{Reason: reason, Count: count})
+	}
+	sort.Slice(byReason, func(i, j int) bool {
+		return byReason[i].Count > byReason[j].Count || byReason[i].Count == byReason[j].Count && byReason[i].Reason < byReason[j].Reason
+	})
+	topTools := make([]DeniedToolCount, 0, len(toolCounts))
+	for _, item := range toolCounts {
+		topTools = append(topTools, item)
+	}
+	sort.Slice(topTools, func(i, j int) bool {
+		return topTools[i].Count > topTools[j].Count || topTools[i].Count == topTools[j].Count && topTools[i].ToolName < topTools[j].ToolName
+	})
+	topServers := make([]DeniedServerCount, 0, len(serverCounts))
+	for _, item := range serverCounts {
+		topServers = append(topServers, item)
+	}
+	sort.Slice(topServers, func(i, j int) bool {
+		return topServers[i].Count > topServers[j].Count || topServers[i].Count == topServers[j].Count && topServers[i].ServerID < topServers[j].ServerID
+	})
+	return DeniedCallAnalytics{From: filters["from"], To: filters["to"], TotalDenied: total, ByReason: byReason, TopTools: topTools, TopServers: topServers, PolicyTuning: policyTuning(byReason)}
+}
+
 func (s *Store) RecordGatewayAudit(event AuditEvent) AuditEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if event.ID == "" {
-		event.ID = NewID()
-	}
-	if event.Timestamp == "" {
-		event.Timestamp = Now()
-	}
 	if event.MetadataJSON == nil {
 		event.MetadataJSON = map[string]interface{}{"source": "gateway"}
 	}
-	event = sanitizeAuditEvent(event)
-	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
-	_ = s.persistAuditEventLocked(event)
-	return event
+	return s.addAuditLocked(event)
 }
 func (s *Store) ListToolCallEvents() ListResponse[ToolCallEvent] {
 	s.mu.RLock()
@@ -942,6 +1131,17 @@ func (s *Store) RenewExpiringSecretLeases(durationSeconds int, auth AuthContext,
 	return out
 }
 
+func (s *Store) LatestHealth(serverID string) (ServerHealth, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.health {
+		if item.ServerID == serverID {
+			return item, true
+		}
+	}
+	return ServerHealth{}, false
+}
+
 func (s *Store) SetEmergencyDeny(input EmergencyDeny, auth AuthContext, traceID string) EmergencyDeny {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -996,6 +1196,10 @@ func (s *Store) UpsertHealth(result ServerHealth) {
 func (s *Store) AddAudit(event AuditEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.addAuditLocked(event)
+}
+
+func (s *Store) addAuditLocked(event AuditEvent) AuditEvent {
 	if event.ID == "" {
 		event.ID = NewID()
 	}
@@ -1007,7 +1211,11 @@ func (s *Store) AddAudit(event AuditEvent) {
 	}
 	event = sanitizeAuditEvent(event)
 	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
+	if status := toolCallStatus(event); status != "" {
+		s.toolCallEvents = append([]ToolCallEvent{{ID: NewID(), AuditEventID: event.ID, ServerID: event.ServerID, ToolName: event.ToolName, Status: status, LatencyMS: event.LatencyMS, CreatedAt: event.Timestamp}}, s.toolCallEvents...)
+	}
 	_ = s.persistAuditEventLocked(event)
+	return event
 }
 
 func (s *Store) IncrementRateLimitBucket(key string, window time.Duration) (int, time.Time, error) {
@@ -1267,8 +1475,11 @@ func (s *Store) recordAuditLocked(auth AuthContext, traceID, eventType, serverID
 	if len(auth.TeamIDs) > 0 {
 		teamID = auth.TeamIDs[0]
 	}
-	event := sanitizeAuditEvent(AuditEvent{ID: NewID(), Timestamp: Now(), UserID: auth.UserID, TeamID: teamID, ProjectID: auth.ProjectID, ClientID: auth.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: effect, TraceID: traceID, MetadataJSON: map[string]interface{}{"issuer": auth.Issuer}, ArgumentRedactedJSON: argument})
-	s.auditEvents = append([]AuditEvent{event}, s.auditEvents...)
+	event := AuditEvent{ID: NewID(), Timestamp: Now(), UserID: auth.UserID, TeamID: teamID, ProjectID: auth.ProjectID, ClientID: auth.ClientID, ServerID: serverID, ToolName: toolName, EventType: eventType, RiskLevel: risk, PolicyDecision: effect, TraceID: traceID, MetadataJSON: map[string]interface{}{"issuer": auth.Issuer}, ArgumentRedactedJSON: argument}
+	if argument != nil {
+		event.ArgumentHash = redaction.Hash(argument)
+	}
+	s.addAuditLocked(event)
 }
 
 func sanitizeAuditEvent(event AuditEvent) AuditEvent {
@@ -1359,7 +1570,7 @@ func intValue(value interface{}) (int, bool) {
 }
 
 func auditMatches(event AuditEvent, filters map[string]string) bool {
-	checks := map[string]string{"user": event.UserID, "team": event.TeamID, "project": event.ProjectID, "server": event.ServerID, "tool": event.ToolName, "event_type": event.EventType, "policy_decision": string(event.PolicyDecision), "risk_level": string(event.RiskLevel), "trace_id": event.TraceID}
+	checks := map[string]string{"user": event.UserID, "team": event.TeamID, "project": event.ProjectID, "client": event.ClientID, "server": event.ServerID, "tool": event.ToolName, "event_type": event.EventType, "policy_decision": string(event.PolicyDecision), "risk_level": string(event.RiskLevel), "trace_id": event.TraceID}
 	for key, actual := range checks {
 		if expected := filters[key]; expected != "" && expected != actual {
 			return false
@@ -1382,4 +1593,145 @@ func auditMatches(event AuditEvent, filters map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func toolCallStatus(event AuditEvent) string {
+	switch event.EventType {
+	case "tool.call.succeeded":
+		return "succeeded"
+	case "tool.call.failed":
+		return "failed"
+	case "tool.call.denied":
+		return "denied"
+	default:
+		return ""
+	}
+}
+
+func isUsageAuditEvent(event AuditEvent) bool {
+	return toolCallStatus(event) != ""
+}
+
+func isDeniedAuditEvent(event AuditEvent) bool {
+	return event.PolicyDecision == PolicyDeny && event.EventType == "tool.call.denied"
+}
+
+func readGroupBy(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return []string{"team", "project", "user", "server", "tool"}
+	}
+	allowed := map[string]bool{"team": true, "project": true, "user": true, "client": true, "server": true, "tool": true}
+	parts := strings.Split(value, ",")
+	out := []string{}
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if allowed[trimmed] {
+			out = append(out, trimmed)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"server", "tool"}
+	}
+	return out
+}
+
+func usageKey(event AuditEvent, bucket string, groupBy []string) string {
+	parts := []string{bucket}
+	for _, dimension := range groupBy {
+		switch dimension {
+		case "team":
+			parts = append(parts, event.TeamID)
+		case "project":
+			parts = append(parts, event.ProjectID)
+		case "user":
+			parts = append(parts, event.UserID)
+		case "client":
+			parts = append(parts, event.ClientID)
+		case "server":
+			parts = append(parts, event.ServerID)
+		case "tool":
+			parts = append(parts, event.ToolName)
+		}
+	}
+	return strings.Join(parts, "\x00")
+}
+
+func applyUsageDimensions(item *UsageReportItem, event AuditEvent, groupBy []string) {
+	for _, dimension := range groupBy {
+		switch dimension {
+		case "team":
+			item.TeamID = event.TeamID
+		case "project":
+			item.ProjectID = event.ProjectID
+		case "user":
+			item.UserID = event.UserID
+		case "client":
+			item.ClientID = event.ClientID
+		case "server":
+			item.ServerID = event.ServerID
+		case "tool":
+			item.ToolName = event.ToolName
+		}
+	}
+}
+
+func periodBucket(timestamp, period string) string {
+	parsed, err := time.Parse(time.RFC3339Nano, timestamp)
+	if err != nil {
+		return "unknown"
+	}
+	if period == "monthly" {
+		return parsed.UTC().Format("2006-01")
+	}
+	return parsed.UTC().Format("2006-01-02")
+}
+
+func average(values []int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	sum := 0
+	for _, value := range values {
+		sum += value
+	}
+	return sum / len(values)
+}
+
+func percentile(values []int, ratio float64) int {
+	if len(values) == 0 {
+		return 0
+	}
+	idx := int(float64(len(values)-1) * ratio)
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(values) {
+		idx = len(values) - 1
+	}
+	return values[idx]
+}
+
+func policyTuning(reasons []DeniedReasonCount) []PolicyTuningSuggestion {
+	out := make([]PolicyTuningSuggestion, 0, len(reasons))
+	for _, reason := range reasons {
+		message := "Review policy and grants for this deny reason before changing access."
+		if strings.Contains(reason.Reason, "GRANT") || strings.Contains(reason.Reason, "NO_MATCHING") {
+			message = "Confirm whether missing grants should become explicit approvals or remain denied by design."
+		}
+		if strings.Contains(reason.Reason, "EMERGENCY") {
+			message = "Emergency deny is active; verify scope and owner communication before disabling it."
+		}
+		out = append(out, PolicyTuningSuggestion{Reason: reason.Reason, Message: message, Count: reason.Count})
+	}
+	return out
+}
+
+func csvCell(value string) string {
+	if value != "" && strings.ContainsAny(value[:1], "=+-@\t\r") {
+		value = "'" + value
+	}
+	if !strings.ContainsAny(value, ",\"\n") {
+		return value
+	}
+	return "\"" + strings.ReplaceAll(value, "\"", "\"\"") + "\""
 }
