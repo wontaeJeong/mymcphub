@@ -63,3 +63,9 @@ The web workspace also includes a component test for the dashboard summary:
 ```sh
 pnpm --filter @mcp-hub/web test
 ```
+
+See also:
+
+- [Local Development](../../docs/LOCAL_DEV.md)
+- [MVP Demo](../../docs/MVP_DEMO.md)
+- [Web Auth Route Split](../../docs/WEB_AUTH_ROUTE_SPLIT.md)
