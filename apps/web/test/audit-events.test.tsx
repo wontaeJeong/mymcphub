@@ -23,7 +23,7 @@ describe("audit events", () => {
       },
       argumentHash: "sha256:abc123",
       argumentRedactedJson: {
-        prompt: "safe value",
+        message: "safe value",
         token: "[REDACTED]",
         nested: {
           password: "raw-secret-value"
@@ -39,7 +39,7 @@ describe("audit events", () => {
     expect(html).not.toContain("raw-secret-value");
   });
 
-  it("builds audit-events URLs with prompt-09 query filters", () => {
+  it("builds audit-events URLs with server-side query filters", () => {
     const path = buildAuditEventsPath({
       trace_id: "trace-123",
       event_type: "tool.call",

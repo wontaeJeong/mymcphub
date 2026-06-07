@@ -27,10 +27,10 @@ export async function AuditPageContent({ searchParams }: AuditPageProps) {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Audit log" title="Trace the decisions that shaped access." description="Render audit events and tool call events from the Control Plane API with server-side audit filters, redacted metadata, and trace-id copy controls." />
+      <PageHero eyebrow="Audit" title="Trace the decisions that shaped access." description="Review policy outcomes, admin actions, tool-call records, redacted metadata, and trace identifiers." />
       <form className="form-card" action="/admin/audit">
         <h2>Audit filters</h2>
-        <p>Audit filters are sent to /api/audit-events. Tool call status remains a Web-only filter for /api/tool-call-events.</p>
+        <p>Use server-side audit filters for policy and admin events. Tool-call status is filtered locally from the loaded call records.</p>
         <div className="filter-grid">
           {auditFilterFields.map((field) => (
             <div className="field" key={field.name}>
@@ -45,11 +45,11 @@ export async function AuditPageContent({ searchParams }: AuditPageProps) {
         </div>
       </form>
       <section>
-        <SectionHeader title="Policy and admin events" description="Paginated /api/audit-events results with server-side filters and redacted argument detail." action={<div className="actions"><a className="button button--ghost" href={exportHref}>Export filtered JSON</a>{nextAuditHref ? <Link className="button" href={nextAuditHref}>Next page</Link> : null}</div>} />
+        <SectionHeader title="Policy and admin events" description="Paginated events with policy outcomes, trace links, and redacted argument detail." action={<div className="actions"><a className="button button--ghost" href={exportHref}>Export filtered JSON</a>{nextAuditHref ? <Link className="button" href={nextAuditHref}>Next page</Link> : null}</div>} />
         {audit.ok && auditItems.length > 0 ? <AuditTable events={auditItems} /> : audit.ok ? <EmptyState title="No audit events" description="No audit event matched the current server-side filters." /> : <ErrorState message={audit.error} />}
       </section>
       <section>
-        <SectionHeader title="Tool call events" description="Operational tool execution records from /api/tool-call-events." />
+        <SectionHeader title="Tool call events" description="Operational execution records with server, status, latency, and creation time." />
         {calls.ok && filteredCalls.length > 0 ? <ToolCallTable events={filteredCalls} serverNameById={serverNameById} /> : calls.ok ? <EmptyState title="No tool calls" description="No tool call events matched the current filters." /> : <ErrorState message={calls.error} />}
       </section>
     </div>

@@ -15,13 +15,13 @@ export async function ApprovalsPageContent() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="Approval queue" title="Decide access before it becomes risk." description="Approve or reject pending approval requests with Control Plane server actions and visible prompt-required decision context." />
+      <PageHero eyebrow="Approvals" title="Decide access before it becomes risk." description="Approve or reject pending requests with the subject, server, tools, reason, and expiry visible before action." />
       <section>
-        <SectionHeader title="Pending approvals" description="POST real approve/reject decision payloads to /api/approvals/:approvalId with allowed tools, expiry, and reviewer comments." />
+        <SectionHeader title="Pending approvals" description="Review the requested scope, then approve with allowed tools and expiry or reject with a clear comment." />
         {approvals.ok && pending.length > 0 ? <ApprovalTable approvals={pending} actionSlot={ApprovalActions} /> : approvals.ok ? <EmptyState title="Queue is clear" description="There are no pending approvals." /> : <ErrorState message={approvals.error} />}
       </section>
       <section>
-        <SectionHeader title="Decision history" description="Recently decided requests returned by the approvals endpoint." />
+        <SectionHeader title="Decision history" description="Recently approved, rejected, cancelled, or expired requests." />
         {approvals.ok && decided.length > 0 ? <ApprovalTable approvals={decided} /> : approvals.ok ? <EmptyState title="No decisions yet" description="Approved and rejected requests will appear here." /> : null}
       </section>
     </div>
