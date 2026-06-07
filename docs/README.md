@@ -17,6 +17,7 @@ Use this index to find the smallest document set needed for the current work.
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [Architecture](ARCHITECTURE.md)                       | Current runtime planes, Go services, Web UI, schemas, and deployment shape.                  |
 | [Developer Guide](DEVELOPER_GUIDE.md)                 | Go conventions, fixtures, and validation surfaces.                                          |
+| [Data Model](DATA_MODEL.md)                           | Store areas, schema boundaries, and migration notes.                                        |
 | [Control Plane API](API.md)                           | Current API routes and local curl checks.                                                   |
 | [Gateway](GATEWAY.md)                                 | Gateway auth, policy, redaction, and proxy behavior.                                        |
 | [Worker](WORKER.md)                                   | Worker jobs and manual trigger endpoint.                                                    |
