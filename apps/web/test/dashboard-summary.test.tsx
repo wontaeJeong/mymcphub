@@ -13,17 +13,17 @@ describe("DashboardSummary", () => {
         highCriticalTools={4}
         recentDeniedCalls={5}
         recentFailedCalls={6}
-        activeSessionStatus="Unavailable"
-        activeSessionDetail="No prompt-05 Control Plane session endpoint"
+        activeSessionStatus="사용 불가"
+        activeSessionDetail="제어 플레인 세션 엔드포인트가 없습니다"
       />
     );
 
-    expect(html).toContain("Registered servers");
-    expect(html).toContain("Enabled servers");
-    expect(html).toContain("Disabled servers");
-    expect(html).toContain("High or critical tools");
-    expect(html).toContain("Recent denied calls");
-    expect(html).toContain("Active sessions");
-    expect(html).toContain("Unavailable");
+    expect(html).toContain("등록된 서버");
+    expect(html).toContain("활성 서버");
+    expect(html).toContain("비활성 서버");
+    expect(html).toContain("높음 또는 심각 도구");
+    expect(html).toContain("최근 거부된 호출");
+    expect(html).toContain("활성 세션");
+    expect(html).toContain("사용 불가");
   });
 });
