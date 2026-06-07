@@ -2,6 +2,8 @@
 
 MCP Hub separates identity, catalog, authorization, runtime session, audit, and operations data.
 
+This document describes the intended database boundaries plus the current skeleton state. The API and Gateway currently keep most runtime state in memory. Postgres is started and deployed as support infrastructure, but API/Gateway catalog, grants, emergency state, audit events, and Gateway metrics are not fully persisted through Postgres yet. Redis is also support infrastructure today and is not used as a runtime queue or cache.
+
 ## Identity and Ownership
 
 - `users` stores authenticated human users.
@@ -37,3 +39,16 @@ MCP Hub separates identity, catalog, authorization, runtime session, audit, and 
 Runtime validation schemas live in `packages/db/src/validation.ts`. The required shared schemas are `McpServerManifestSchema`, `McpToolSchema`, `McpGrantSchema`, `PolicyDecisionInputSchema`, `PolicyDecisionResultSchema`, `AuditEventSchema`, and `HealthCheckResultSchema`.
 
 The local seed data includes `stdio-sample` with transport `stdio_adapter` and upstream URL `http://localhost:5103/mcp`. This records the adapter HTTP endpoint in catalog data while keeping the stdio command and child-process configuration in the adapter deployment environment.
+
+## Current Skeleton Storage
+
+| Area | Current behavior |
+| --- | --- |
+| API catalog, versions, tools, grants, approvals, audit, tool-call events, health, emergency deny | In-memory API store. |
+| Gateway registry, grants, emergency state, audit events, metrics | In-memory Gateway runtime. |
+| Worker schema diff and metrics | Pure helper and placeholder job path, with in-memory audit and metrics. |
+| Postgres | Local and deployed support infrastructure plus package model boundary. |
+| Redis | Local and deployed support infrastructure only. |
+| OIDC data | Local Keycloak support service and shared auth contracts. Runtime JWKS verification is not wired into API or Gateway. |
+
+Operators should treat Web and API state in the current local skeleton as process-local unless a route explicitly reads seeded or package-level data.
