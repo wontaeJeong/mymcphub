@@ -14,7 +14,7 @@ pnpm security:check
 - `scripts/ci`: CI wrappers for Go, Web UI, schemas, and Helm.
 - `scripts/gen`: OpenAPI and JSON Schema generation/drift checks.
 - `scripts/release`: release helper scripts only.
-- `scripts/deprecated`: warning wrappers for retired operational scripts.
+- `scripts/deprecated`: reserved for future warning wrappers if retired operational scripts need them.
 
 Scripts must not be the primary interface for server publish/disable, grant approve/revoke, policy apply, direct DB mutation, direct Kubernetes patching, or secret manipulation.
 
