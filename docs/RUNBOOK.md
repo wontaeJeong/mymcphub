@@ -1,5 +1,7 @@
 # MCP Hub Runbook
 
+Use [Runbooks](RUNBOOKS.md) first when choosing an incident path. This file holds the detailed operational procedures referenced by that quick index.
+
 Use these runbooks for local, development, staging, and production-style operations. Commands use current repository surfaces. In this skeleton, API state and Gateway state use the local runtime store, Postgres and Redis are support infrastructure, Gateway runtime OIDC/JWKS verification is wired for bearer JWTs, and canary routing is a disabled placeholder.
 
 Start with these checks unless the situation says otherwise:
