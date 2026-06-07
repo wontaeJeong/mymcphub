@@ -23,7 +23,7 @@ done
 
 api_url="${MCP_API_URL:-http://localhost:4000}"
 gateway_url="${MCP_GATEWAY_URL:-http://localhost:5000}"
-echo_url="${MCP_ECHO_URL:-http://localhost:5100}"
+k8s_url="${MCP_K8S_URL:-http://localhost:5102}"
 oidc_url="${OIDC_ISSUER_URL:-http://localhost:8080/realms/mcp-hub}"
 admin_token="dev-admin-token"
 
@@ -102,45 +102,45 @@ request 200 "$tmp_dir/api-ready.json" "$api_url/readyz"
 json_assert "$tmp_dir/api-ready.json" "data.service === 'api' && data.status === 'ready'" "API readyz is ready"
 
 request 200 "$tmp_dir/catalog.json" "$api_url/api/servers"
-json_assert "$tmp_dir/catalog.json" "Array.isArray(data.items) && data.items.some((server) => server.slug === 'echo')" "Seeded catalog includes echo"
+json_assert "$tmp_dir/catalog.json" "Array.isArray(data.items) && data.items.some((server) => server.slug === 'k8s-readonly')" "Seeded catalog includes k8s-readonly"
 
-request 200 "$tmp_dir/echo-health.json" "$echo_url/health"
-json_assert "$tmp_dir/echo-health.json" "data.status === 'ok' && data.server === 'echo'" "Echo upstream health is ok"
+request 200 "$tmp_dir/k8s-health.json" "$k8s_url/health"
+json_assert "$tmp_dir/k8s-health.json" "data.status === 'ok' && data.server === 'k8s-readonly'" "K8s upstream health is ok"
 
-request 200 "$tmp_dir/gateway-get.json" "$gateway_url/mcp/echo" -H "authorization: Bearer $admin_token"
-json_assert "$tmp_dir/gateway-get.json" "data.server && data.server.slug === 'echo'" "Gateway authenticated GET /mcp/echo works"
+request 200 "$tmp_dir/gateway-get.json" "$gateway_url/mcp/k8s-readonly" -H "authorization: Bearer $admin_token"
+json_assert "$tmp_dir/gateway-get.json" "data.server && data.server.slug === 'k8s-readonly'" "Gateway authenticated GET /mcp/k8s-readonly works"
 
-request 401 "$tmp_dir/gateway-missing-auth.json" "$gateway_url/mcp/echo"
+request 401 "$tmp_dir/gateway-missing-auth.json" "$gateway_url/mcp/k8s-readonly"
 json_assert "$tmp_dir/gateway-missing-auth.json" "data.error === 'missing_or_invalid_bearer_token'" "Gateway rejects missing bearer token"
 
-request 401 "$tmp_dir/gateway-invalid-auth.json" "$gateway_url/mcp/echo" -H "authorization: Bearer invalid-token"
+request 401 "$tmp_dir/gateway-invalid-auth.json" "$gateway_url/mcp/k8s-readonly" -H "authorization: Bearer invalid-token"
 json_assert "$tmp_dir/gateway-invalid-auth.json" "data.error === 'missing_or_invalid_bearer_token'" "Gateway rejects invalid bearer token"
 
-request 200 "$tmp_dir/tools-list.json" "$gateway_url/mcp/echo" \
+request 200 "$tmp_dir/tools-list.json" "$gateway_url/mcp/k8s-readonly" \
   -H "authorization: Bearer $admin_token" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-json_assert "$tmp_dir/tools-list.json" "Array.isArray(data.result?.tools) && data.result.tools.some((tool) => tool.name === 'echo_message')" "Gateway tools/list includes echo_message"
+json_assert "$tmp_dir/tools-list.json" "Array.isArray(data.result?.tools) && data.result.tools.some((tool) => tool.name === 'list_namespaces')" "Gateway tools/list includes list_namespaces"
 
-request 200 "$tmp_dir/echo-call.json" "$gateway_url/mcp/echo" \
+request 200 "$tmp_dir/k8s-call.json" "$gateway_url/mcp/k8s-readonly" \
   -H "authorization: Bearer $admin_token" \
   -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"echo_message","arguments":{"message":"hello from smoke test"}}}'
-json_assert "$tmp_dir/echo-call.json" "Array.isArray(data.result?.content) && data.result.content.some((item) => item.text === 'hello from smoke test')" "Gateway allowed echo_message succeeds"
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_namespaces","arguments":{}}}'
+json_assert "$tmp_dir/k8s-call.json" "Array.isArray(data.result?.content) && data.result.content.some((item) => item.text && item.text.includes('platform'))" "Gateway allowed list_namespaces succeeds"
 
-request 200 "$tmp_dir/missing-tool.json" "$gateway_url/mcp/echo" \
+request 200 "$tmp_dir/missing-tool.json" "$gateway_url/mcp/k8s-readonly" \
   -H "authorization: Bearer $admin_token" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"missing_tool","arguments":{}}}'
 json_assert "$tmp_dir/missing-tool.json" "data.error?.code === -32001" "Gateway denies missing_tool"
 
 trace_id="local-smoke-$(date +%s)"
-audit_payload=$(node -e 'console.log(JSON.stringify({eventType:"tool.call.succeeded",policyDecision:"allow",traceId:process.argv[1],serverId:"00000000-0000-4000-8000-000000000100",toolName:"echo_message",riskLevel:"low",latencyMs:1,upstreamStatus:200,argumentRedactedJson:{message:"hello from smoke test"}}))' "$trace_id")
+audit_payload=$(node -e 'console.log(JSON.stringify({eventType:"tool.call.succeeded",policyDecision:"allow",traceId:process.argv[1],serverId:"00000000-0000-4000-8000-000000000102",toolName:"list_namespaces",riskLevel:"medium",latencyMs:1,upstreamStatus:200,argumentRedactedJson:{}}))' "$trace_id")
 request 201 "$tmp_dir/audit-create.json" "$api_url/api/audit-events/gateway" \
   -H 'content-type: application/json' \
   -H 'x-roles: admin' \
   -d "$audit_payload"
 json_assert "$tmp_dir/audit-create.json" "data.traceId === '$trace_id' && data.eventType === 'tool.call.succeeded'" "API creates Gateway audit event"
 
-request 200 "$tmp_dir/audit-query.json" "$api_url/api/audit-events?trace_id=$trace_id&tool=echo_message&event_type=tool.call.succeeded"
-json_assert "$tmp_dir/audit-query.json" "Array.isArray(data.items) && data.items.some((event) => event.traceId === '$trace_id' && event.toolName === 'echo_message')" "API queries created Gateway audit event"
+request 200 "$tmp_dir/audit-query.json" "$api_url/api/audit-events?trace_id=$trace_id&tool=list_namespaces&event_type=tool.call.succeeded"
+json_assert "$tmp_dir/audit-query.json" "Array.isArray(data.items) && data.items.some((event) => event.traceId === '$trace_id' && event.toolName === 'list_namespaces')" "API queries created Gateway audit event"

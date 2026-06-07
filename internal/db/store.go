@@ -15,15 +15,11 @@ import (
 )
 
 const (
-	AdminUserID        = "00000000-0000-4000-8000-000000000001"
-	PlatformTeamID     = "00000000-0000-4000-8000-000000000010"
-	SampleProjectID    = "00000000-0000-4000-8000-000000000020"
-	EchoServerID       = "00000000-0000-4000-8000-000000000100"
-	InternalDocsID     = "00000000-0000-4000-8000-000000000101"
-	K8sReadonlyID      = "00000000-0000-4000-8000-000000000102"
-	StdioSampleID      = "00000000-0000-4000-8000-000000000103"
-	SampleGrantID      = "00000000-0000-4000-8000-000000000200"
-	StdioSampleGrantID = "00000000-0000-4000-8000-000000000201"
+	AdminUserID     = "00000000-0000-4000-8000-000000000001"
+	PlatformTeamID  = "00000000-0000-4000-8000-000000000010"
+	SampleProjectID = "00000000-0000-4000-8000-000000000020"
+	K8sReadonlyID   = "00000000-0000-4000-8000-000000000102"
+	SampleGrantID   = "00000000-0000-4000-8000-000000000200"
 )
 
 var (
@@ -62,32 +58,22 @@ func NewSeedStore() *Store {
 	now := Now()
 	store := &Store{
 		servers: []MCPServer{
-			seedServer(EchoServerID, "echo", "Echo MCP Server", "First-party echo MCP server.", TransportStreamableHTTP, RiskLow, "http://localhost:5100/mcp", now),
-			seedServer(InternalDocsID, "internal-docs", "Internal Docs MCP Server", "First-party internal docs MCP server.", TransportStreamableHTTP, RiskMedium, "http://localhost:5101/mcp", now),
 			seedServer(K8sReadonlyID, "k8s-readonly", "Kubernetes Readonly MCP Server", "Read-only Kubernetes MCP server with local mock mode.", TransportStreamableHTTP, RiskMedium, "http://localhost:5102/mcp", now),
-			seedServer(StdioSampleID, "stdio-sample", "stdio Sample MCP Server", "First-party stdio MCP server exposed through the stdio adapter runtime.", TransportStdioAdapter, RiskLow, "http://localhost:5103/mcp", now),
 		},
 		versions: []MCPServerVersion{
-			seedVersion(EchoServerID, now), seedVersion(InternalDocsID, now), seedVersion(K8sReadonlyID, now), seedVersion(StdioSampleID, now),
+			seedVersion(K8sReadonlyID, now),
 		},
 		tools: []MCPTool{
-			seedTool(EchoServerID, "echo_message", "Return the provided message unchanged.", RiskLow, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"message": map[string]interface{}{"type": "string", "description": "Message to echo back."}}, "required": []interface{}{"message"}, "additionalProperties": false}, now),
-			seedTool(EchoServerID, "get_server_time", "Return the current server time as an ISO-8601 timestamp.", RiskLow, emptySchema(), now),
-			seedTool(InternalDocsID, "search_docs", "Search synthetic internal documentation by keyword.", RiskLow, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"query": map[string]interface{}{"type": "string"}, "limit": map[string]interface{}{"type": "number", "minimum": 1, "maximum": 10}}, "required": []interface{}{"query"}, "additionalProperties": false}, now),
-			seedTool(InternalDocsID, "read_doc", "Read one synthetic internal document by id.", RiskLow, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"docId": map[string]interface{}{"type": "string"}}, "required": []interface{}{"docId"}, "additionalProperties": false}, now),
 			seedTool(K8sReadonlyID, "list_namespaces", "List namespace names from the local read-only mock Kubernetes dataset.", RiskMedium, emptySchema(), now),
 			seedTool(K8sReadonlyID, "list_pods", "List pods in one namespace from the local read-only mock Kubernetes dataset.", RiskMedium, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"namespace": map[string]interface{}{"type": "string"}}, "required": []interface{}{"namespace"}, "additionalProperties": false}, now),
 			seedTool(K8sReadonlyID, "get_pod", "Read one pod by namespace and name from the local read-only mock Kubernetes dataset.", RiskMedium, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"namespace": map[string]interface{}{"type": "string"}, "podName": map[string]interface{}{"type": "string"}}, "required": []interface{}{"namespace", "podName"}, "additionalProperties": false}, now),
-			seedTool(StdioSampleID, "stdio_echo", "Return the provided message and metadata from the stdio sample server.", RiskLow, map[string]interface{}{"type": "object", "properties": map[string]interface{}{"message": map[string]interface{}{"type": "string"}}, "required": []interface{}{"message"}, "additionalProperties": false}, now),
-			seedTool(StdioSampleID, "get_stdio_status", "Return process and uptime status for the stdio sample server.", RiskLow, emptySchema(), now),
 		},
 		grants: []Grant{
-			{ID: SampleGrantID, SubjectType: SubjectTeam, SubjectID: PlatformTeamID, ProjectID: SampleProjectID, ServerID: EchoServerID, AllowedTools: []string{"echo_message", "get_server_time"}, Environment: EnvironmentDev, ApprovedBy: AdminUserID, Reason: "Initial sample grant for local development.", Enabled: true, CreatedAt: now},
-			{ID: StdioSampleGrantID, SubjectType: SubjectTeam, SubjectID: PlatformTeamID, ProjectID: SampleProjectID, ServerID: StdioSampleID, AllowedTools: []string{"stdio_echo", "get_stdio_status"}, Environment: EnvironmentDev, ApprovedBy: AdminUserID, Reason: "Initial stdio adapter sample grant for local development.", Enabled: true, CreatedAt: now},
+			{ID: SampleGrantID, SubjectType: SubjectTeam, SubjectID: PlatformTeamID, ProjectID: SampleProjectID, ServerID: K8sReadonlyID, AllowedTools: []string{"list_namespaces", "list_pods", "get_pod"}, Environment: EnvironmentDev, ApprovedBy: AdminUserID, Reason: "Initial sample grant for local development.", Enabled: true, CreatedAt: now},
 		},
-		auditEvents:    []AuditEvent{{ID: NewID(), Timestamp: now, UserID: AdminUserID, TeamID: PlatformTeamID, ProjectID: SampleProjectID, ClientID: "local-dev-client", ServerID: EchoServerID, ToolName: "echo_message", EventType: "seed.audit_event", RiskLevel: RiskLow, PolicyDecision: PolicyAllow, TraceID: "seed-trace", MetadataJSON: map[string]interface{}{"source": "seed"}}},
-		toolCallEvents: []ToolCallEvent{{ID: NewID(), AuditEventID: "seed-audit-event", ServerID: EchoServerID, ToolName: "echo_message", Status: "ok", LatencyMS: 12, CreatedAt: now}},
-		health:         []ServerHealth{{ID: NewID(), ServerID: EchoServerID, Status: "healthy", LatencyMS: 10, CheckedAt: now}},
+		auditEvents:    []AuditEvent{{ID: NewID(), Timestamp: now, UserID: AdminUserID, TeamID: PlatformTeamID, ProjectID: SampleProjectID, ClientID: "local-dev-client", ServerID: K8sReadonlyID, ToolName: "list_namespaces", EventType: "seed.audit_event", RiskLevel: RiskMedium, PolicyDecision: PolicyAllow, TraceID: "seed-trace", MetadataJSON: map[string]interface{}{"source": "seed"}}},
+		toolCallEvents: []ToolCallEvent{{ID: NewID(), AuditEventID: "seed-audit-event", ServerID: K8sReadonlyID, ToolName: "list_namespaces", Status: "ok", LatencyMS: 12, CreatedAt: now}},
+		health:         []ServerHealth{{ID: NewID(), ServerID: K8sReadonlyID, Status: "healthy", LatencyMS: 10, CheckedAt: now}},
 	}
 	return store
 }
