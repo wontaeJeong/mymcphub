@@ -2,6 +2,8 @@
 
 Use Docker Compose for support services and Go for core services.
 
+For a demo-focused walkthrough, use [MVP Demo](MVP_DEMO.md). For service-specific commands, see the READMEs under `apps/`.
+
 ```sh
 pnpm install
 cp .env.example .env
@@ -23,14 +25,14 @@ API, Gateway, and Worker share local runtime state through `MCP_STORE_PATH` (def
 
 Local seed data is code-backed in `internal/db.NewSeedStore` and mirrored for tests/Web fixtures in `tests/fixtures/local-seed.json`.
 
-| Seed | Value |
-| --- | --- |
-| Admin user | `00000000-0000-4000-8000-000000000001` / `admin@example.com` |
-| Platform team | `00000000-0000-4000-8000-000000000010` |
-| Local project | `00000000-0000-4000-8000-000000000020` |
-| MCP server | `k8s-readonly` / `00000000-0000-4000-8000-000000000102` |
-| Granted tools | `list_namespaces`, `list_pods`, `get_pod` |
-| Local grant | `00000000-0000-4000-8000-000000000200` |
+| Seed          | Value                                                        |
+| ------------- | ------------------------------------------------------------ |
+| Admin user    | `00000000-0000-4000-8000-000000000001` / `admin@example.com` |
+| Platform team | `00000000-0000-4000-8000-000000000010`                       |
+| Local project | `00000000-0000-4000-8000-000000000020`                       |
+| MCP server    | `k8s-readonly` / `00000000-0000-4000-8000-000000000102`      |
+| Granted tools | `list_namespaces`, `list_pods`, `get_pod`                    |
+| Local grant   | `00000000-0000-4000-8000-000000000200`                       |
 
 Mock tokens:
 
