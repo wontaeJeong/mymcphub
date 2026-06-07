@@ -8,8 +8,8 @@ Use this lifecycle when adding or promoting an MCP server through MCP Hub. The c
 | --- | --- | --- |
 | manifest 작성 | Create or update `servers/<name>/mcp-server.manifest.json` with slug, owner team, transport, upstream URL, risk level, and tool schemas. | `pnpm security:mcp-manifests` validates first-party manifests. |
 | owner team 지정 | Assign `ownerTeam` and `ownerTeamId` to the team accountable for tools, incidents, and approvals. | Seed data uses the platform team for first-party servers. |
-| transport 선택 | Choose `streamable_http` for direct HTTP MCP servers or `stdio_adapter` for stdio servers exposed by `apps/stdio-adapter`. | Gateway always proxies HTTP JSON-RPC upstream URLs. |
-| local test | Start the upstream and call its `/health` or adapter `/healthz`, then call through the Gateway. | Use ports `5100`, `5101`, `5102`, and optional `5103`. |
+| transport 선택 | Choose `streamable_http` for direct HTTP MCP servers. | Gateway proxies HTTP JSON-RPC upstream URLs. |
+| local test | Start the upstream and call its `/health`, then call through the Gateway. | The seeded first-party server uses port `5102`. |
 | tools/list scan | Capture expected `tools/list` output and compare schemas with the manifest. | Worker has a schema diff helper and placeholder job, but no real runtime scanner is wired yet. |
 | risk review | Review server and tool risk levels, closed schemas, dangerous names, and high or critical tool descriptions. | `pnpm security:mcp-manifests` warns on dangerous keywords and fails missing required risk/schema fields. |
 | secret binding | Bind any required secrets through approved secret references or deployment environment. | Do not put secret values in manifests, docs, Helm values, or committed files. |
@@ -25,8 +25,8 @@ First-party manifests live at `servers/*/mcp-server.manifest.json`. Include at l
 1. Stable `slug` used by the Gateway route `/mcp/:serverSlug`.
 2. Human-readable name and description.
 3. `ownerTeam` and `ownerTeamId`.
-4. `transport`, usually `streamable_http` or `stdio_adapter`.
-5. `upstreamUrl`, such as `http://localhost:5100/mcp`.
+4. `transport`, usually `streamable_http`.
+5. `upstreamUrl`, such as `http://localhost:5102/mcp`.
 6. Server `riskLevel`.
 7. Tool entries with `name`, description, `riskLevel`, and closed input schemas.
 
@@ -34,7 +34,7 @@ Run manifest checks:
 
 ```sh
 pnpm security:mcp-manifests
-pnpm security:mcp-manifests -- servers/echo/mcp-server.manifest.json
+pnpm security:mcp-manifests -- servers/k8s/mcp-server.manifest.json
 ```
 
 ## Owner Team 지정
@@ -49,30 +49,17 @@ Every server needs an owner team before shared use. The owner team handles:
 
 ## Transport 선택
 
-Use `streamable_http` when the MCP server already exposes HTTP JSON-RPC. Use `stdio_adapter` when the server is a stdio process and should be wrapped by `apps/stdio-adapter`.
-
-For stdio servers, the catalog still points at an HTTP upstream such as `http://localhost:5103/mcp`. The adapter owns child-process startup, queueing, timeouts, stderr health text, and `/healthz`.
+Use `streamable_http` when the MCP server exposes HTTP JSON-RPC. The current first-party runtime is Go HTTP.
 
 ## Local Test
 
-For the seeded echo server:
+For the seeded k8s server:
 
 ```sh
 pnpm dev
-curl http://localhost:5100/health
-curl http://localhost:5000/mcp/echo -H 'authorization: Bearer dev-admin-token'
-curl http://localhost:5000/mcp/echo \
-  -H 'authorization: Bearer dev-admin-token' \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-```
-
-For the stdio sample:
-
-```sh
-pnpm dev:stdio-adapter
-curl http://localhost:5103/healthz
-curl http://localhost:5000/mcp/stdio-sample \
+curl http://localhost:5102/health
+curl http://localhost:5000/mcp/k8s-readonly -H 'authorization: Bearer dev-admin-token'
+curl http://localhost:5000/mcp/k8s-readonly \
   -H 'authorization: Bearer dev-admin-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

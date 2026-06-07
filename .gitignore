@@ -8,4 +8,6 @@ coverage/
 .sisyphus/
 mcp_hub_prompt_pack/
 mcp_hub_parallel_prompt_pack/
+mcp_hub_go_direct_rewrite_prompt_pack/
+mcp_hub_go_parallel_prompt_pack/
 *.zip:Zone.Identifier
