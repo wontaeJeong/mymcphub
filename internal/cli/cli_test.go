@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -107,5 +108,25 @@ func TestCLIAuditExportBuildsComplianceQuery(t *testing.T) {
 	code := Run(Options{Args: []string{"--api-url", api.URL, "--output", "json", "audit", "export", "--from", "2026-06-07T00:00:00Z", "--to", "2026-06-08T00:00:00Z", "--signed"}, Token: "export-token", Writer: out, ErrWriter: &bytes.Buffer{}})
 	if code != 0 || !strings.Contains(out.String(), "exportId") {
 		t.Fatalf("audit export failed code=%d out=%s", code, out.String())
+	}
+}
+
+func TestCLIClientConfigDefaultsToSeededServer(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/client-config/generate" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "00000000-0000-4000-8000-000000000102") {
+			t.Fatalf("client config default did not use seeded server id: %s", string(body))
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"client":"opencode","placeholder":false,"gatewayUrl":"http://localhost:5000/mcp/k8s-readonly","config":{}}`))
+	}))
+	defer api.Close()
+	out := &bytes.Buffer{}
+	code := Run(Options{Args: []string{"--api-url", api.URL, "--output", "json", "client", "config"}, Writer: out, ErrWriter: &bytes.Buffer{}})
+	if code != 0 || !strings.Contains(out.String(), "opencode") {
+		t.Fatalf("client config failed code=%d out=%s", code, out.String())
 	}
 }

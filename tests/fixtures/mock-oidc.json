@@ -1,0 +1,19 @@
+{
+  "issuer": "mock-auth",
+  "audience": "mcp-hub",
+  "jwksPath": "/protocol/openid-connect/certs",
+  "users": [
+    {
+      "sub": "00000000-0000-4000-8000-000000000001",
+      "email": "admin@example.com",
+      "groups": ["platform-admins"],
+      "roles": ["admin", "platform_admin"]
+    },
+    {
+      "sub": "readonly-user",
+      "email": "readonly@example.com",
+      "groups": ["readonly"],
+      "roles": ["reader"]
+    }
+  ]
+}

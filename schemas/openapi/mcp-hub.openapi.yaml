@@ -355,10 +355,29 @@ paths:
         "403": { description: Platform admin required }
   /api/client-config/generate:
     post:
-      {
-        summary: Generate client config,
-        responses: { "200": { description: Client config } },
-      }
+      summary: Generate client config
+      x-examples:
+        opencodeLocalSeed:
+          summary: Generate opencode config for the seeded k8s server
+          value:
+            client: opencode
+            serverId: 00000000-0000-4000-8000-000000000102
+      responses:
+        "200":
+          description: Client config
+          content:
+            application/json:
+              examples:
+                opencodeLocalSeed:
+                  value:
+                    client: opencode
+                    placeholder: false
+                    gatewayUrl: http://localhost:5000/mcp/k8s-readonly
+                    config:
+                      mcp:
+                        k8s-readonly:
+                          type: remote
+                          url: http://localhost:5000/mcp/k8s-readonly
   /api/policy/validate:
     post:
       {

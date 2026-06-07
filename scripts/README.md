@@ -31,3 +31,13 @@ pnpm dev:infra:down
 ```
 
 See [../docs/LOCAL_DEV.md](../docs/LOCAL_DEV.md) for the full local workflow, reset command, mock token helper, and smoke-test coverage.
+
+## Release Scripts
+
+Lane G release-note generation is intentionally render-only:
+
+```sh
+pnpm release:notes -- --version 0.1.0 --image-digest api=sha256:...
+```
+
+`scripts/release/generate-notes.sh` writes Markdown with the release version, source revision, image digests, CLI artifacts, schema-change summary, and required validation checklist. It does not push tags, publish artifacts, mutate GitOps overlays, or contact a registry.

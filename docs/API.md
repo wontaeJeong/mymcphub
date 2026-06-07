@@ -12,7 +12,7 @@ curl http://localhost:4000/api/me
 curl http://localhost:4000/api/servers
 curl -X POST http://localhost:4000/api/client-config/generate \
   -H 'content-type: application/json' \
-  -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000100"}'
+  -d '{"client":"opencode","serverId":"00000000-0000-4000-8000-000000000102"}'
 ```
 
 ## Route Groups
