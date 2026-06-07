@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { splitApprovalQueue } from "../app/approvals/page-helpers";
 import { buildAuditPageHref, filterToolCallEvents, readAuditOptions } from "../app/audit/page-helpers";
 import { matchesCatalogFilters } from "../app/catalog/page-helpers";
-import ServerDetailPage from "../app/servers/[serverId]/page";
+import { AdminServerDetailPageContent as ServerDetailPage } from "../app/servers/[serverId]/content";
 import { selectActiveServerVersion, selectRecentServerAuditEvents, selectServerHealth } from "../app/servers/[serverId]/page-helpers";
 import { ApprovalTable, AuditTable, ServerTable, ServerVersionTable, ToolCallTable, ToolTable } from "../components/tables";
 import type { ApiApproval, ApiAuditEvent, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth, ApiToolCallEvent } from "../lib/api";
@@ -325,7 +325,7 @@ describe("prompt-12 required web pages", () => {
       risk_level: "high",
       trace_id: "trace-prod-docs"
     });
-    expect(nextHref).toBe("/audit?server=prod-docs&tool=docs.search&event_type=tool.call&policy_decision=needs_approval&risk_level=high&trace_id=trace-prod-docs&limit=25&status=fail&cursor=cursor-next");
+    expect(nextHref).toBe("/admin/audit?server=prod-docs&tool=docs.search&event_type=tool.call&policy_decision=needs_approval&risk_level=high&trace_id=trace-prod-docs&limit=25&status=fail&cursor=cursor-next");
     expect(filteredCalls).toEqual([matchingCall]);
 
     const auditHtml = renderToStaticMarkup(<AuditTable events={[buildAuditEvent()]} />);
