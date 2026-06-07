@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsc -p ../../packages/ui/tsconfig.json && next build",
+    "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p ../../packages/ui/tsconfig.json && vitest run --passWithNoTests",
+    "typecheck": "tsc -p ../../packages/ui/tsconfig.json && tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run --passWithNoTests"
   },
   "dependencies": {
