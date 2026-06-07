@@ -147,3 +147,26 @@ curl http://localhost:5000/mcp/echo \
 The shared logger package includes a lightweight `withSpan` helper. It starts a span, attaches simple attributes, records exceptions, and ends the span around a callback.
 
 This is only a code hook. The current skeleton does not include an OpenTelemetry collector, exporter, backend, sampling policy, or deployment stack.
+
+## Operator Triage
+
+Use these commands and pages during incidents:
+
+```sh
+curl http://localhost:4000/healthz
+curl http://localhost:4000/readyz
+curl http://localhost:5000/metrics
+curl 'http://localhost:4000/api/audit-events?limit=25'
+curl 'http://localhost:4000/api/audit-events?policy_decision=deny&limit=25'
+```
+
+Web pages:
+
+| Page | Use |
+| --- | --- |
+| `/audit` | Search policy, admin, and ingested Gateway audit events. |
+| `/operations` | Inspect server health records from the API skeleton. |
+| `/servers/:serverId` | Correlate one server's versions, tools, health, and recent audit event. |
+| `/admin` | Apply kill-switch actions when audit shows active impact. |
+
+Current audit and health data is in memory. Preserve running API and Gateway processes during investigation if you need their current in-memory evidence.
