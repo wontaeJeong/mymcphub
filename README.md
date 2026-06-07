@@ -12,14 +12,24 @@ apps/
   worker/       Go background worker service
   cli/          Go mcphubctl operator CLI
 servers/
-  k8s/          Go read-only Kubernetes MCP server
-internal/       Go shared auth, audit, config, db, policy, MCP, redaction, telemetry packages
-schemas/        OpenAPI and JSON Schema source of truth
-deploy/         Helm chart and GitOps overlays
-docs/           Architecture, operation, security, and runbook documentation
-scripts/        dev, ci, gen, release, and deprecated helper scripts only
-tests/          Go e2e/security tests and TS contract smoke tests
+  k8s/              Go read-only Kubernetes MCP server
+  runtime-adapter/  Go stdio subprocess adapter MCP server
+  github/           Go read-only GitHub MCP server
+  gitlab/           Go read-only GitLab MCP server
+  internal-docs/    Go read-only internal docs MCP server
+packages/
+  ui/               Shared TypeScript UI package
+internal/           Go shared auth, audit, config, db, policy, MCP, redaction, telemetry packages
+schemas/            OpenAPI and JSON Schema source of truth
+deploy/             Helm chart and GitOps overlays
+docs/               Architecture, operation, security, and runbook documentation
+scripts/            dev, ci, gen, release, and deprecated helper scripts only
+tests/              Go e2e/security tests and TS contract smoke tests
 ```
+
+Executable config is the source of truth for active runtime structure. `Makefile` and CI define the active Go apps and first-party MCP servers, while `pnpm-workspace.yaml` currently includes only `apps/web` and `packages/ui` for TypeScript workspace packages.
+
+Non-source artifacts such as `node_modules`, `dist`, `.next`, `.turbo`, coverage output, local env files, logs, and `.sisyphus` are local or generated and should not be treated as active workspace structure.
 
 ## Local Development
 
