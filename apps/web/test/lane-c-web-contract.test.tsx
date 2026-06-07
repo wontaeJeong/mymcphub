@@ -130,8 +130,8 @@ describe("Lane C Web contract helpers", () => {
 
     expect(html).toContain("Production Docs");
     expect(html).toContain("2026.06.1");
-    expect(html).toContain("degraded");
-    expect(html).toContain("quarantined");
-    expect(html).toContain("disabled");
+    expect(html).toContain("저하");
+    expect(html).toContain("격리됨");
+    expect(html).toContain("비활성");
   });
 });
