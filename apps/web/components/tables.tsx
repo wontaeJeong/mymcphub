@@ -4,7 +4,7 @@ import { StatusPill } from "@mcp-hub/ui";
 
 import { CopyButton } from "./copy-button";
 import type { ApiApproval, ApiAuditEvent, ApiGrant, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth, ApiToolCallEvent, ServerVersionStatus } from "../lib/api";
-import { approvalTone, enabledTone, formatDate, healthTone, policyTone, riskTone } from "./format";
+import { approvalTone, enabledTone, formatApprovalStatus, formatDate, formatEnabled, formatEnvironment, formatGrantStatus, formatHealthStatus, formatPolicyEffect, formatRiskLevel, formatServerVersionStatus, formatSubjectType, formatToolCallStatus, formatTransport, healthTone, policyTone, riskTone } from "./format";
 
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
@@ -17,15 +17,15 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
       <table>
         <thead>
           <tr>
-            <th>Server</th>
-            <th>Slug</th>
-            <th>Owner team</th>
-            <th>Environment</th>
-            <th>Transport</th>
-            <th>Risk</th>
-            <th>Health</th>
-            <th>Enabled</th>
-            <th>Updated</th>
+            <th>서버</th>
+            <th>슬러그</th>
+            <th>소유 팀</th>
+            <th>환경</th>
+            <th>전송 방식</th>
+            <th>위험도</th>
+            <th>상태</th>
+            <th>활성 여부</th>
+            <th>업데이트</th>
           </tr>
         </thead>
         <tbody>
@@ -35,15 +35,15 @@ export function ServerTable({ servers, healthByServerId }: ServerTableProps) {
               <tr key={server.id}>
                 <td>
                   <Link href={`/servers/${server.id}`}>{server.displayName}</Link>
-                  <p className="muted">{server.description ?? "No description published."}</p>
+                  <p className="muted">{server.description ?? "공개된 설명이 없습니다."}</p>
                 </td>
                 <td>{server.slug}</td>
                 <td>{server.ownerTeamId}</td>
-                <td>{server.environment}</td>
-                <td>{server.transport}</td>
-                <td><StatusPill tone={riskTone(server.riskLevel)}>{server.riskLevel}</StatusPill></td>
-                <td>{health ? <StatusPill tone={healthTone(health.status)}>{health.status}</StatusPill> : <StatusPill>unavailable</StatusPill>}</td>
-                <td><StatusPill tone={enabledTone(server.enabled)}>{server.enabled ? "enabled" : "disabled"}</StatusPill></td>
+                <td>{formatEnvironment(server.environment)}</td>
+                <td>{formatTransport(server.transport)}</td>
+                <td><StatusPill tone={riskTone(server.riskLevel)}>{formatRiskLevel(server.riskLevel)}</StatusPill></td>
+                <td>{health ? <StatusPill tone={healthTone(health.status)}>{formatHealthStatus(health.status)}</StatusPill> : <StatusPill>확인 불가</StatusPill>}</td>
+                <td><StatusPill tone={enabledTone(server.enabled)}>{formatEnabled(server.enabled)}</StatusPill></td>
                 <td>{formatDate(server.updatedAt)}</td>
               </tr>
             );
@@ -69,15 +69,15 @@ export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, sho
       <table>
         <thead>
           <tr>
-            <th>Tool</th>
-            <th>Risk</th>
-            <th>Status</th>
-            {showSchema ? <th>Input schema</th> : null}
-            {showAccess ? <th>Access</th> : null}
-            <th>Discovered</th>
-            <th>Last seen</th>
-            {showAdminPlaceholder ? <th>Admin test</th> : null}
-            {actionSlot ? <th>Controls</th> : null}
+            <th>도구</th>
+            <th>위험도</th>
+            <th>상태</th>
+            {showSchema ? <th>입력 스키마</th> : null}
+            {showAccess ? <th>접근 권한</th> : null}
+            <th>발견 시각</th>
+            <th>마지막 확인</th>
+            {showAdminPlaceholder ? <th>관리자 테스트</th> : null}
+            {actionSlot ? <th>제어</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -85,15 +85,15 @@ export function ToolTable({ tools, grantStatusByToolKey, showSchema = false, sho
             <tr key={tool.id}>
               <td>
                 {tool.name}
-                <p className="muted">{tool.description ?? "No description published by the server."}</p>
+                <p className="muted">{tool.description ?? "서버가 공개한 설명이 없습니다."}</p>
               </td>
-              <td><StatusPill tone={riskTone(tool.riskLevel)}>{tool.riskLevel}</StatusPill></td>
-              <td><StatusPill tone={enabledTone(tool.enabled)}>{tool.enabled ? "enabled" : "disabled"}</StatusPill></td>
+              <td><StatusPill tone={riskTone(tool.riskLevel)}>{formatRiskLevel(tool.riskLevel)}</StatusPill></td>
+              <td><StatusPill tone={enabledTone(tool.enabled)}>{formatEnabled(tool.enabled)}</StatusPill></td>
               {showSchema ? <td><SchemaViewer tool={tool} /></td> : null}
-              {showAccess ? <td>{grantStatusByToolKey?.get(toolKey(tool)) ?? "No active grant found"}</td> : null}
+              {showAccess ? <td>{grantStatusByToolKey?.get(toolKey(tool)) ?? "활성 권한이 없습니다"}</td> : null}
               <td>{formatDate(tool.discoveredAt)}</td>
               <td>{formatDate(tool.lastSeenAt)}</td>
-              {showAdminPlaceholder ? <td><StatusPill tone="info">API pending</StatusPill><p className="muted">Admin test-call endpoint is not part of prompt 05.</p></td> : null}
+              {showAdminPlaceholder ? <td><StatusPill tone="info">API 대기</StatusPill><p className="muted">관리자 테스트 호출 엔드포인트는 prompt 05 범위에 없습니다.</p></td> : null}
               {actionSlot ? <td>{actionSlot(tool)}</td> : null}
             </tr>
           ))}
@@ -109,12 +109,12 @@ export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServ
       <table>
         <thead>
           <tr>
-            <th>Version</th>
-            <th>Status</th>
-            <th>Image</th>
-            <th>Hashes</th>
-            <th>Created</th>
-            <th>Activated</th>
+            <th>버전</th>
+            <th>상태</th>
+            <th>이미지</th>
+            <th>해시</th>
+            <th>생성</th>
+            <th>활성화</th>
           </tr>
         </thead>
         <tbody>
@@ -122,13 +122,13 @@ export function ServerVersionTable({ versions }: Readonly<{ versions: ApiMcpServ
             <tr key={version.id}>
               <td>
                 {version.version}
-                <p className="muted">{version.createdBy ? `Created by ${version.createdBy}` : "Creator not recorded"}</p>
+                <p className="muted">{version.createdBy ? `생성자 ${version.createdBy}` : "생성자 기록 없음"}</p>
               </td>
-              <td><StatusPill tone={serverVersionTone(version.status)}>{version.status}</StatusPill></td>
+              <td><StatusPill tone={serverVersionTone(version.status)}>{formatServerVersionStatus(version.status)}</StatusPill></td>
               <td><VersionImage version={version} /></td>
               <td>
-                <p>{version.configHash ?? "Config hash not recorded"}</p>
-                <p className="muted">Schema {version.toolSchemaHash ?? "not recorded"}</p>
+                <p>{version.configHash ?? "설정 해시 기록 없음"}</p>
+                <p className="muted">스키마 {version.toolSchemaHash ?? "기록 없음"}</p>
               </td>
               <td>{formatDate(version.createdAt)}</td>
               <td>{formatDate(version.activatedAt)}</td>
@@ -146,23 +146,23 @@ export function GrantTable({ grants, serverNameById, actionSlot }: Readonly<{ gr
       <table>
         <thead>
           <tr>
-            <th>Subject</th>
-            <th>Server</th>
-            <th>Tools</th>
-            <th>Environment</th>
-            <th>Status</th>
-            <th>Reason</th>
-            {actionSlot ? <th>Controls</th> : null}
+            <th>주체</th>
+            <th>서버</th>
+            <th>도구</th>
+            <th>환경</th>
+            <th>상태</th>
+            <th>사유</th>
+            {actionSlot ? <th>제어</th> : null}
           </tr>
         </thead>
         <tbody>
           {grants.map((grant) => (
             <tr key={grant.id}>
-              <td>{grant.subjectType}: {grant.subjectId}</td>
+              <td>{formatSubjectType(grant.subjectType)}: {grant.subjectId}</td>
               <td>{serverNameById.get(grant.serverId) ?? grant.serverId}</td>
               <td>{grant.allowedTools.join(", ")}</td>
-              <td>{grant.environment}</td>
-              <td><StatusPill tone={enabledTone(grant.enabled)}>{grant.enabled ? "active" : "revoked"}</StatusPill></td>
+              <td>{formatEnvironment(grant.environment)}</td>
+              <td><StatusPill tone={enabledTone(grant.enabled)}>{formatGrantStatus(grant.enabled)}</StatusPill></td>
               <td>{grant.reason}</td>
               {actionSlot ? <td>{actionSlot(grant)}</td> : null}
             </tr>
@@ -179,12 +179,12 @@ export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: A
       <table>
         <thead>
           <tr>
-            <th>Subject</th>
-            <th>Scope</th>
-            <th>Request</th>
-            <th>Status</th>
-            <th>Timing</th>
-            <th>Decision</th>
+            <th>주체</th>
+            <th>범위</th>
+            <th>요청</th>
+            <th>상태</th>
+            <th>시각</th>
+            <th>결정</th>
           </tr>
         </thead>
         <tbody>
@@ -194,24 +194,24 @@ export function ApprovalTable({ approvals, actionSlot }: Readonly<{ approvals: A
             return (
               <tr key={approval.id}>
                 <td>
-                  {approval.subjectType}: {approval.subjectId}
-                  <p className="muted">Requester {approval.requesterId}</p>
+                  {formatSubjectType(approval.subjectType)}: {approval.subjectId}
+                  <p className="muted">요청자 {approval.requesterId}</p>
                 </td>
                 <td>
                   {approval.serverId}
-                  <p className="muted">Project {approval.projectId}</p>
+                  <p className="muted">프로젝트 {approval.projectId}</p>
                 </td>
                 <td>
                   {approval.requestedAction}
-                  <p className="muted">{formatList(approval.requestedTools)} · {approval.environment}</p>
-                  {ticketUrl ? <p><a href={ticketUrl} target="_blank" rel="noreferrer">Ticket</a></p> : null}
-                  {approval.requestedExpiresAt ? <p className="muted">Requested expiry {formatDate(approval.requestedExpiresAt)}</p> : null}
+                  <p className="muted">{formatList(approval.requestedTools)} · {formatEnvironment(approval.environment)}</p>
+                  {ticketUrl ? <p><a href={ticketUrl} target="_blank" rel="noreferrer">티켓</a></p> : null}
+                  {approval.requestedExpiresAt ? <p className="muted">요청 만료 {formatDate(approval.requestedExpiresAt)}</p> : null}
                   <p className="muted">{approval.reason}</p>
                 </td>
-                <td><StatusPill tone={approvalTone(approval.status)}>{approval.status}</StatusPill></td>
+                <td><StatusPill tone={approvalTone(approval.status)}>{formatApprovalStatus(approval.status)}</StatusPill></td>
                 <td>
                   {formatDate(approval.createdAt)}
-                  <p className="muted">Updated {formatDate(approval.updatedAt)}</p>
+                  <p className="muted">업데이트 {formatDate(approval.updatedAt)}</p>
                 </td>
                 <td>{actionSlot ? actionSlot(approval) : <ApprovalDecision approval={approval} />}</td>
               </tr>
@@ -231,13 +231,13 @@ function VersionImage({ version }: Readonly<{ version: ApiMcpServerVersion }>) {
   if (version.imageRepository || version.imageTag || version.imageDigest) {
     return (
       <div>
-        <p>{version.imageRepository ?? "Image repository not recorded"}</p>
-        <p className="muted">{version.imageTag ?? version.imageDigest ?? "Image tag not recorded"}</p>
+        <p>{version.imageRepository ?? "이미지 저장소 기록 없음"}</p>
+        <p className="muted">{version.imageTag ?? version.imageDigest ?? "이미지 태그 기록 없음"}</p>
       </div>
     );
   }
 
-  return <span className="muted">Image not recorded</span>;
+  return <span className="muted">이미지 기록 없음</span>;
 }
 
 function serverVersionTone(status: ServerVersionStatus) {
@@ -249,7 +249,7 @@ function serverVersionTone(status: ServerVersionStatus) {
     return "warning";
   }
 
-  if (status === "deprecated") {
+  if (status === "deprecated" || status === "rolled_back") {
     return "neutral";
   }
 
@@ -258,20 +258,20 @@ function serverVersionTone(status: ServerVersionStatus) {
 
 function ApprovalDecision({ approval }: Readonly<{ approval: ApiApproval }>) {
   if (!approval.decidedAt && !approval.reviewerId && !approval.reviewComment) {
-    return <span className="muted">Not decided</span>;
+    return <span className="muted">결정 전</span>;
   }
 
   return (
     <div>
-      {approval.reviewerId ? <p>Reviewer {approval.reviewerId}</p> : null}
-      {approval.decidedAt ? <p className="muted">Decided {formatDate(approval.decidedAt)}</p> : null}
+      {approval.reviewerId ? <p>검토자 {approval.reviewerId}</p> : null}
+      {approval.decidedAt ? <p className="muted">결정 {formatDate(approval.decidedAt)}</p> : null}
       {approval.reviewComment ? <p className="muted">{approval.reviewComment}</p> : null}
     </div>
   );
 }
 
 function formatList(values: string[]) {
-  return values.length > 0 ? values.join(", ") : "All requested tools";
+  return values.length > 0 ? values.join(", ") : "요청한 모든 도구";
 }
 
 function safeExternalUrl(value: string | undefined) {
@@ -296,30 +296,30 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
       <table>
         <thead>
           <tr>
-            <th>Event</th>
-            <th>Policy</th>
-            <th>Risk</th>
-            <th>Actor</th>
-            <th>Execution</th>
-            <th>Argument hash</th>
-            <th>Trace</th>
-            <th>Redacted payload</th>
-            <th>Time</th>
+            <th>이벤트</th>
+            <th>정책</th>
+            <th>위험도</th>
+            <th>행위자</th>
+            <th>실행</th>
+            <th>인자 해시</th>
+            <th>추적</th>
+            <th>마스킹된 페이로드</th>
+            <th>시각</th>
           </tr>
         </thead>
         <tbody>
           {events.map((event) => (
             <tr key={event.id}>
-              <td>{event.eventType}<p className="muted">{event.toolName ?? event.serverId ?? "Hub scope"}</p></td>
-              <td><StatusPill tone={policyTone(event.policyDecision)}>{event.policyDecision}</StatusPill></td>
-              <td><StatusPill tone={riskTone(event.riskLevel)}>{event.riskLevel}</StatusPill></td>
-              <td>{event.userId ?? event.clientId ?? "unknown"}</td>
+              <td>{event.eventType}<p className="muted">{event.toolName ?? event.serverId ?? "허브 범위"}</p></td>
+              <td><StatusPill tone={policyTone(event.policyDecision)}>{formatPolicyEffect(event.policyDecision)}</StatusPill></td>
+              <td><StatusPill tone={riskTone(event.riskLevel)}>{formatRiskLevel(event.riskLevel)}</StatusPill></td>
+              <td>{event.userId ?? event.clientId ?? "알 수 없음"}</td>
               <td><AuditExecution event={event} /></td>
-              <td>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">Not recorded</span>}</td>
-              <td><CopyButton value={event.traceId} label="Copy trace" /></td>
+              <td>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">기록 없음</span>}</td>
+              <td><CopyButton value={event.traceId} label="추적 ID 복사" /></td>
               <td>
-                <RedactedJsonDetails summary="View redacted arguments" value={event.argumentRedactedJson} emptyText="No redacted arguments returned" />
-                <RedactedJsonDetails summary="View redacted metadata" value={event.metadataJson} emptyText="No metadata returned" />
+                <RedactedJsonDetails summary="마스킹된 인자 보기" value={event.argumentRedactedJson} emptyText="마스킹된 인자가 없습니다" />
+                <RedactedJsonDetails summary="마스킹된 메타데이터 보기" value={event.metadataJson} emptyText="메타데이터가 없습니다" />
               </td>
               <td>{formatDate(event.timestamp)}</td>
             </tr>
@@ -333,9 +333,9 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
 function AuditExecution({ event }: Readonly<{ event: ApiAuditEvent }>) {
   return (
     <div>
-      <p>{event.latencyMs === undefined ? <span className="muted">Latency n/a</span> : `${event.latencyMs} ms`}</p>
-      {event.upstreamStatus === undefined ? <p className="muted">Upstream n/a</p> : <StatusPill tone={event.upstreamStatus < 400 ? "success" : "warning"}>{event.upstreamStatus}</StatusPill>}
-      {event.errorCode ? <p className="muted">Error {event.errorCode}</p> : null}
+      <p>{event.latencyMs === undefined ? <span className="muted">지연 시간 없음</span> : `${event.latencyMs} ms`}</p>
+      {event.upstreamStatus === undefined ? <p className="muted">업스트림 없음</p> : <StatusPill tone={event.upstreamStatus < 400 ? "success" : "warning"}>{event.upstreamStatus}</StatusPill>}
+      {event.errorCode ? <p className="muted">오류 {event.errorCode}</p> : null}
     </div>
   );
 }
@@ -346,11 +346,11 @@ export function ToolCallTable({ events, serverNameById }: Readonly<{ events: Api
       <table>
         <thead>
           <tr>
-            <th>Tool</th>
-            <th>Server</th>
-            <th>Status</th>
-            <th>Latency</th>
-            <th>Created</th>
+            <th>도구</th>
+            <th>서버</th>
+            <th>상태</th>
+            <th>지연 시간</th>
+            <th>생성</th>
           </tr>
         </thead>
         <tbody>
@@ -358,8 +358,8 @@ export function ToolCallTable({ events, serverNameById }: Readonly<{ events: Api
             <tr key={event.id}>
               <td>{event.toolName}</td>
               <td>{serverNameById.get(event.serverId) ?? event.serverId}</td>
-              <td><StatusPill tone={isSuccessfulToolCallStatus(event.status) ? "success" : "warning"}>{event.status}</StatusPill></td>
-              <td>{event.latencyMs === undefined ? "n/a" : `${event.latencyMs} ms`}</td>
+              <td><StatusPill tone={isSuccessfulToolCallStatus(event.status) ? "success" : "warning"}>{formatToolCallStatus(event.status)}</StatusPill></td>
+              <td>{event.latencyMs === undefined ? "해당 없음" : `${event.latencyMs} ms`}</td>
               <td>{formatDate(event.createdAt)}</td>
             </tr>
           ))}
@@ -375,20 +375,20 @@ export function HealthTable({ checks, serverNameById }: Readonly<{ checks: ApiSe
       <table>
         <thead>
           <tr>
-            <th>Server</th>
-            <th>Status</th>
-            <th>Latency</th>
-            <th>Error</th>
-            <th>Checked</th>
+            <th>서버</th>
+            <th>상태</th>
+            <th>지연 시간</th>
+            <th>오류</th>
+            <th>확인 시각</th>
           </tr>
         </thead>
         <tbody>
           {checks.map((check) => (
             <tr key={check.id}>
               <td>{serverNameById.get(check.serverId) ?? check.serverId}</td>
-              <td><StatusPill tone={healthTone(check.status)}>{check.status}</StatusPill></td>
-              <td>{check.latencyMs === undefined ? "n/a" : `${check.latencyMs} ms`}</td>
-              <td>{check.errorMessage ?? "None"}</td>
+              <td><StatusPill tone={healthTone(check.status)}>{formatHealthStatus(check.status)}</StatusPill></td>
+              <td>{check.latencyMs === undefined ? "해당 없음" : `${check.latencyMs} ms`}</td>
+              <td>{check.errorMessage ?? "없음"}</td>
               <td>{formatDate(check.checkedAt)}</td>
             </tr>
           ))}
@@ -401,12 +401,12 @@ export function HealthTable({ checks, serverNameById }: Readonly<{ checks: ApiSe
 function SchemaViewer({ tool }: Readonly<{ tool: ApiMcpTool }>) {
   const schema = tool.inputSchema ?? tool.inputSchemaJson;
   if (schema === undefined) {
-    return <span className="muted">Unavailable from Control Plane API</span>;
+    return <span className="muted">제어 플레인 API에서 확인할 수 없습니다</span>;
   }
 
   return (
     <details className="schema-viewer">
-      <summary>View schema</summary>
+      <summary>스키마 보기</summary>
       <pre className="code-block">{JSON.stringify(schema, null, 2)}</pre>
     </details>
   );

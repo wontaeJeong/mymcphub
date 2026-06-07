@@ -1,15 +1,180 @@
-import type { ApiApproval, PolicyEffect, RiskLevel } from "../lib/api";
+import type { ApiApproval, PolicyEffect, RiskLevel, ServerVersionStatus } from "../lib/api";
 import type { StatusTone } from "@mcp-hub/ui";
 
 export function formatDate(value: string | undefined) {
   if (!value) {
-    return "Not recorded";
+    return "기록 없음";
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+export function formatRiskLevel(riskLevel: RiskLevel) {
+  if (riskLevel === "critical") {
+    return "심각";
+  }
+
+  if (riskLevel === "high") {
+    return "높음";
+  }
+
+  if (riskLevel === "medium") {
+    return "중간";
+  }
+
+  return "낮음";
+}
+
+export function formatHealthStatus(status: string) {
+  if (status === "healthy") {
+    return "정상";
+  }
+
+  if (status === "degraded") {
+    return "저하";
+  }
+
+  if (status === "unhealthy") {
+    return "비정상";
+  }
+
+  return "확인 불가";
+}
+
+export function formatPolicyEffect(effect: PolicyEffect) {
+  if (effect === "allow") {
+    return "허용";
+  }
+
+  if (effect === "needs_approval") {
+    return "승인 필요";
+  }
+
+  return "거부";
+}
+
+export function formatEnabled(enabled: boolean) {
+  return enabled ? "활성" : "비활성";
+}
+
+export function formatGrantStatus(enabled: boolean) {
+  return enabled ? "활성" : "회수됨";
+}
+
+export function formatApprovalStatus(status: ApiApproval["status"]) {
+  if (status === "pending") {
+    return "대기";
+  }
+
+  if (status === "approved") {
+    return "승인";
+  }
+
+  if (status === "cancelled") {
+    return "취소";
+  }
+
+  if (status === "expired") {
+    return "만료";
+  }
+
+  return "거절";
+}
+
+export function formatSubjectType(subjectType: string) {
+  if (subjectType === "team") {
+    return "팀";
+  }
+
+  if (subjectType === "user") {
+    return "사용자";
+  }
+
+  if (subjectType === "service_account") {
+    return "서비스 계정";
+  }
+
+  return subjectType;
+}
+
+export function formatEnvironment(environment: string) {
+  if (environment === "dev") {
+    return "개발";
+  }
+
+  if (environment === "stg") {
+    return "스테이징";
+  }
+
+  if (environment === "prod") {
+    return "운영";
+  }
+
+  if (environment === "shared") {
+    return "공용";
+  }
+
+  return environment;
+}
+
+export function formatTransport(transport: string) {
+  if (transport === "streamable_http") {
+    return "스트리밍 HTTP";
+  }
+
+  if (transport === "sse_legacy") {
+    return "레거시 SSE";
+  }
+
+  if (transport === "stdio_adapter") {
+    return "stdio 어댑터";
+  }
+
+  if (transport === "external") {
+    return "외부";
+  }
+
+  return transport;
+}
+
+export function formatToolCallStatus(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === "ok" || normalized === "success" || normalized === "succeeded") {
+    return "성공";
+  }
+
+  if (normalized === "fail" || normalized === "failed" || normalized === "error") {
+    return "실패";
+  }
+
+  return status;
+}
+
+export function formatServerVersionStatus(status: ServerVersionStatus) {
+  if (status === "active") {
+    return "활성";
+  }
+
+  if (status === "pending") {
+    return "대기";
+  }
+
+  if (status === "draft") {
+    return "초안";
+  }
+
+  if (status === "deprecated") {
+    return "사용 중단";
+  }
+
+  if (status === "rolled_back") {
+    return "롤백됨";
+  }
+
+  return "실패";
 }
 
 export function riskTone(riskLevel: RiskLevel): StatusTone {
