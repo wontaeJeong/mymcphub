@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import type { FormActionState } from "./action-state";
 import {
@@ -24,9 +25,11 @@ import {
   type RiskLevel,
   type ServerTransport
 } from "../lib/api";
+import { getCurrentSession } from "../lib/auth/session";
 import { buildPolicyTestCallInput, buildPolicyTestDisplayPayload, parseToolTestRef } from "../lib/policy-test";
 
 export async function approveApprovalAction(formData: FormData) {
+  await requireAdminForAction();
   const approvalId = readRequired(formData, "approvalId");
   const reviewComment = readOptional(formData, "reviewComment");
   try {
@@ -36,27 +39,29 @@ export async function approveApprovalAction(formData: FormData) {
       reviewComment,
       reason: reviewComment
     });
-    revalidatePath("/approvals");
-    revalidatePath("/");
+    revalidatePath("/admin/approvals");
+    revalidatePath("/admin");
   } catch {
-    revalidatePath("/approvals");
+    revalidatePath("/admin/approvals");
   }
 }
 
 export async function rejectApprovalAction(formData: FormData) {
+  await requireAdminForAction();
   const approvalId = readRequired(formData, "approvalId");
   try {
     await rejectApproval(approvalId, {
       reviewComment: readOptional(formData, "reviewComment")
     });
-    revalidatePath("/approvals");
-    revalidatePath("/");
+    revalidatePath("/admin/approvals");
+    revalidatePath("/admin");
   } catch {
-    revalidatePath("/approvals");
+    revalidatePath("/admin/approvals");
   }
 }
 
 export async function createApprovalAction(formData: FormData) {
+  await requireSessionForAction();
   try {
     await createApproval({
       subjectType: readSubjectType(formData),
@@ -70,15 +75,16 @@ export async function createApprovalAction(formData: FormData) {
       requestedExpiresAt: readOptional(formData, "requestedExpiresAt"),
       requestedAction: readRequired(formData, "requestedAction")
     });
-    revalidatePath("/access");
-    revalidatePath("/approvals");
-    revalidatePath("/");
+    revalidatePath("/user/access");
+    revalidatePath("/admin/approvals");
+    revalidatePath("/user");
   } catch {
-    revalidatePath("/access");
+    revalidatePath("/user/access");
   }
 }
 
 export async function createServerAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireAdminForAction();
   try {
     const server = await createServer({
       slug: readRequired(formData, "slug"),
@@ -100,8 +106,8 @@ export async function createServerAction(_previousState: FormActionState, formDa
         }
       ]
     });
-    revalidatePath("/catalog");
-    revalidatePath("/");
+    revalidatePath("/admin/servers");
+    revalidatePath("/admin");
     return {
       status: "success",
       message: `${server.displayName} 서버를 /api/servers로 등록했습니다.`
@@ -115,6 +121,7 @@ export async function createServerAction(_previousState: FormActionState, formDa
 }
 
 export async function createGrantAction(formData: FormData) {
+  await requireAdminForAction();
   try {
     await createGrant({
       subjectType: readSubjectType(formData),
@@ -128,26 +135,27 @@ export async function createGrantAction(formData: FormData) {
       ticketUrl: readOptional(formData, "ticketUrl"),
       enabled: true
     });
-    revalidatePath("/access");
-    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/user/access");
   } catch {
-    revalidatePath("/access");
+    revalidatePath("/admin");
   }
 }
 
 export async function revokeGrantAction(formData: FormData) {
+  await requireAdminForAction();
   const grantId = readRequired(formData, "grantId");
   try {
     await revokeGrant(grantId);
-    revalidatePath("/access");
     revalidatePath("/admin");
-    revalidatePath("/");
+    revalidatePath("/user/access");
   } catch {
-    revalidatePath("/access");
+    revalidatePath("/admin");
   }
 }
 
 export async function enableServerAction(formData: FormData) {
+  await requireAdminForAction();
   const serverId = readRequired(formData, "serverId");
   try {
     await enableServer(serverId);
@@ -158,6 +166,7 @@ export async function enableServerAction(formData: FormData) {
 }
 
 export async function disableServerAction(formData: FormData) {
+  await requireAdminForAction();
   const serverId = readRequired(formData, "serverId");
   try {
     await disableServer(serverId);
@@ -168,6 +177,7 @@ export async function disableServerAction(formData: FormData) {
 }
 
 export async function enableToolAction(formData: FormData) {
+  await requireAdminForAction();
   const serverId = readRequired(formData, "serverId");
   const toolId = readRequired(formData, "toolId");
   try {
@@ -179,6 +189,7 @@ export async function enableToolAction(formData: FormData) {
 }
 
 export async function disableToolAction(formData: FormData) {
+  await requireAdminForAction();
   const serverId = readRequired(formData, "serverId");
   const toolId = readRequired(formData, "toolId");
   try {
@@ -190,6 +201,7 @@ export async function disableToolAction(formData: FormData) {
 }
 
 export async function adminDisableServerAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireAdminForAction();
   try {
     requireConfirmation(formData, "confirmServerDisable");
     const serverId = readRequired(formData, "serverId");
@@ -208,6 +220,7 @@ export async function adminDisableServerAction(_previousState: FormActionState, 
 }
 
 export async function adminDisableToolAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireAdminForAction();
   try {
     requireConfirmation(formData, "confirmToolDisable");
     const [serverId, toolId] = readToolRef(formData);
@@ -226,6 +239,7 @@ export async function adminDisableToolAction(_previousState: FormActionState, fo
 }
 
 export async function generateClientConfigAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireSessionForAction();
   const serverId = readRequired(formData, "serverId");
   const client = readClientConfigKind(formData);
   const profile = readOptional(formData, "profile") ?? "local";
@@ -253,6 +267,7 @@ export async function generateClientConfigAction(_previousState: FormActionState
 }
 
 export async function testPolicyCallAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireSessionForAction();
   const toolTestRef = readRequired(formData, "toolTestRef");
   try {
     const ref = parseToolTestRef(toolTestRef);
@@ -278,11 +293,12 @@ export async function testPolicyCallAction(_previousState: FormActionState, form
 }
 
 export async function emergencyDenyAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireAdminForAction();
   try {
     requireConfirmation(formData, "confirmEmergencyDeny");
     const result = await enableEmergencyDeny(readRequired(formData, "reason"));
-    revalidatePath("/admin");
-    revalidatePath("/audit");
+    revalidatePath("/admin/emergency");
+    revalidatePath("/admin/audit");
     return {
       status: "success",
       message: `긴급 거부가 ${result.createdAt}에 활성화되었습니다: ${result.reason}`
@@ -296,11 +312,12 @@ export async function emergencyDenyAction(_previousState: FormActionState, formD
 }
 
 export async function revokeServerGrantsAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  await requireAdminForAction();
   try {
     requireConfirmation(formData, "confirmRevokeServerGrants");
     const result = await revokeServerGrants(readRequired(formData, "serverId"));
-    revalidatePath("/admin");
-    revalidatePath("/access");
+    revalidatePath("/admin/emergency");
+    revalidatePath("/user/access");
     return {
       status: "success",
       message: `${result.serverId} 서버의 권한 ${result.revoked}개를 회수했습니다.`
@@ -451,18 +468,38 @@ function readStringProperty(value: Record<string, unknown>, property: string) {
   return typeof candidate === "string" ? candidate : undefined;
 }
 
+async function requireSessionForAction() {
+  const session = await getCurrentSession();
+  if (!session) {
+    redirect("/login");
+  }
+  return session;
+}
+
+async function requireAdminForAction() {
+  const session = await requireSessionForAction();
+  if (!session.principal.isPlatformAdmin) {
+    redirect("/forbidden");
+  }
+  return session;
+}
+
 function revalidateServerSurfaces(serverId: string) {
-  revalidatePath(`/servers/${serverId}`);
-  revalidatePath("/catalog");
-  revalidatePath("/operations");
-  revalidatePath("/client-config");
+  revalidatePath(`/admin/servers/${serverId}`);
+  revalidatePath(`/user/servers/${serverId}`);
+  revalidatePath("/admin/servers");
+  revalidatePath("/user/catalog");
+  revalidatePath("/admin/operations");
+  revalidatePath("/user/client-config");
   revalidatePath("/admin");
-  revalidatePath("/");
+  revalidatePath("/user");
 }
 
 function revalidateToolSurfaces(serverId: string) {
-  revalidatePath(`/servers/${serverId}`);
-  revalidatePath("/tools");
+  revalidatePath(`/admin/servers/${serverId}`);
+  revalidatePath(`/user/servers/${serverId}`);
+  revalidatePath("/user/catalog");
+  revalidatePath("/admin/servers");
   revalidatePath("/admin");
-  revalidatePath("/");
+  revalidatePath("/user");
 }

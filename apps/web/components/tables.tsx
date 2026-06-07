@@ -40,7 +40,7 @@ export type ServerTableProps = Readonly<{
   serverBasePath?: string;
 }>;
 
-export function ServerTable({ servers, healthByServerId, serverBasePath = "/servers" }: ServerTableProps) {
+export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers" }: ServerTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -268,7 +268,7 @@ export type RolloutStatusRow = Readonly<{
 
 export function RolloutStatusTable({
   rows,
-  serverBasePath = "/servers",
+  serverBasePath = "/admin/servers",
 }: Readonly<{ rows: RolloutStatusRow[]; serverBasePath?: string }>) {
   return (
     <div className="table-wrap">
@@ -545,7 +545,7 @@ function safeExternalUrl(value: string | undefined) {
   }
 }
 
-export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
+export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<{ events: ApiAuditEvent[]; auditBasePath?: string }>) {
   return (
     <div className="table-wrap">
       <table>
@@ -596,7 +596,7 @@ export function AuditTable({ events }: Readonly<{ events: ApiAuditEvent[] }>) {
                 <CopyButton value={event.traceId} label="추적 ID 복사" />
                 <Link
                   className="button button--ghost"
-                  href={`/audit?trace_id=${encodeURIComponent(event.traceId)}`}
+                  href={`${auditBasePath}?trace_id=${encodeURIComponent(event.traceId)}`}
                 >
                   추적 링크
                 </Link>
