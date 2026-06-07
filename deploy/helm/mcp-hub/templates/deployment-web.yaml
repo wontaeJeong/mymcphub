@@ -29,6 +29,13 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.web.port | quote }}
+{{- if .Values.webAuth.sessionSecret.secretName }}
+            - name: MCP_WEB_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.webAuth.sessionSecret.secretName }}
+                  key: {{ .Values.webAuth.sessionSecret.secretKey }}
+{{- end }}
 {{ include "mcp-hub.secretEnv" . | indent 12 }}
           envFrom:
 {{ include "mcp-hub.commonEnvFrom" . | indent 12 }}
