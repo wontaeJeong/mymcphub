@@ -125,3 +125,35 @@ tcpSocket:
 initialDelaySeconds: {{ .initialDelaySeconds }}
 periodSeconds: {{ .periodSeconds }}
 {{- end -}}
+
+{{- define "mcp-hub.corporateCaPath" -}}
+{{- printf "%s/%s" (.Values.corporateCa.mountDir | trimSuffix "/") .Values.corporateCa.secretKey -}}
+{{- end -}}
+
+{{- define "mcp-hub.corporateCaEnv" -}}
+{{- if .Values.corporateCa.enabled }}
+- name: SSL_CERT_FILE
+  value: {{ include "mcp-hub.corporateCaPath" . | quote }}
+- name: NODE_EXTRA_CA_CERTS
+  value: {{ include "mcp-hub.corporateCaPath" . | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "mcp-hub.corporateCaVolumeMount" -}}
+{{- if .Values.corporateCa.enabled }}
+- name: corporate-ca
+  mountPath: {{ .Values.corporateCa.mountDir | quote }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "mcp-hub.corporateCaVolume" -}}
+{{- if .Values.corporateCa.enabled }}
+- name: corporate-ca
+  secret:
+    secretName: {{ .Values.corporateCa.secretName | quote }}
+    items:
+      - key: {{ .Values.corporateCa.secretKey | quote }}
+        path: {{ .Values.corporateCa.secretKey | quote }}
+{{- end }}
+{{- end -}}

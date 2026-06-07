@@ -1,4 +1,7 @@
 {{- if .Values.worker.enabled }}
+{{- if and .Values.corporateCa.enabled (not .Values.corporateCa.secretName) }}
+{{- fail "corporateCa.secretName is required when corporateCa.enabled=true" }}
+{{- end }}
 {{- if and (eq .Values.auth.mode "oidc") (or (not .Values.worker.jobToken.secretName) (not .Values.worker.jobToken.secretKey)) }}
 {{- fail "worker.jobToken.secretName and worker.jobToken.secretKey are required when auth.mode=oidc" }}
 {{- end }}
@@ -42,6 +45,7 @@ spec:
                   key: {{ .Values.worker.jobToken.secretKey }}
 {{- end }}
 {{ include "mcp-hub.secretEnv" . | indent 12 }}
+{{ include "mcp-hub.corporateCaEnv" . | indent 12 }}
           envFrom:
 {{ include "mcp-hub.commonEnvFrom" . | indent 12 }}
           {{- if .Values.worker.probes.enabled }}
@@ -57,7 +61,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+{{ include "mcp-hub.corporateCaVolumeMount" . | indent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
+{{ include "mcp-hub.corporateCaVolume" . | indent 8 }}
 {{- end }}

@@ -27,6 +27,14 @@ runtime:
   seccompProfile:
     type: RuntimeDefault
 
+corporateCa:
+  # Runtime trust anchor injection for internal TLS. Leave disabled when the
+  # certificate is baked into the image via deploy/certs/*.crt during build.
+  enabled: false
+  secretName: ""
+  secretKey: ca.crt
+  mountDir: /etc/mcp-hub/tls
+
 config:
   nodeEnv: production
   appEnv: production
