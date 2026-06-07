@@ -1,19 +1,19 @@
 import type { ApiToolCallEvent, ListAuditEventsOptions } from "../../lib/api";
 
 export const auditFilterFields = [
-  { name: "from", label: "From", placeholder: "2026-06-07T00:00:00Z" },
-  { name: "to", label: "To", placeholder: "2026-06-07T23:59:59Z" },
-  { name: "user", label: "User", placeholder: "user id" },
-  { name: "team", label: "Team", placeholder: "team id" },
-  { name: "project", label: "Project", placeholder: "project id" },
-  { name: "server", label: "Server", placeholder: "server id" },
-  { name: "tool", label: "Tool", placeholder: "tool name" },
-  { name: "event_type", label: "Event type", placeholder: "tool.call" },
-  { name: "policy_decision", label: "Policy decision", placeholder: "allow, deny, needs_approval" },
-  { name: "risk_level", label: "Risk level", placeholder: "low, medium, high, critical" },
-  { name: "trace_id", label: "Trace ID", placeholder: "trace id" },
-  { name: "limit", label: "Limit", placeholder: "100" },
-  { name: "status", label: "Tool call status", placeholder: "ok, failed" }
+  { name: "from", label: "시작", placeholder: "2026-06-07T00:00:00Z" },
+  { name: "to", label: "종료", placeholder: "2026-06-07T23:59:59Z" },
+  { name: "user", label: "사용자", placeholder: "사용자 ID" },
+  { name: "team", label: "팀", placeholder: "팀 ID" },
+  { name: "project", label: "프로젝트", placeholder: "프로젝트 ID" },
+  { name: "server", label: "서버", placeholder: "서버 ID" },
+  { name: "tool", label: "도구", placeholder: "도구 이름" },
+  { name: "event_type", label: "이벤트 유형", placeholder: "tool.call" },
+  { name: "policy_decision", label: "정책 결정", placeholder: "allow, deny, needs_approval" },
+  { name: "risk_level", label: "위험도", placeholder: "low, medium, high, critical" },
+  { name: "trace_id", label: "추적 ID", placeholder: "추적 ID" },
+  { name: "limit", label: "제한", placeholder: "100" },
+  { name: "status", label: "도구 호출 상태", placeholder: "ok, failed" }
 ] as const;
 
 export function readFilter(filters: Record<string, string | string[] | undefined>, field: string) {
