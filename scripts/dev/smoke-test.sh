@@ -111,10 +111,10 @@ request 200 "$tmp_dir/gateway-get.json" "$gateway_url/mcp/k8s-readonly" -H "auth
 json_assert "$tmp_dir/gateway-get.json" "data.server && data.server.slug === 'k8s-readonly'" "Gateway authenticated GET /mcp/k8s-readonly works"
 
 request 401 "$tmp_dir/gateway-missing-auth.json" "$gateway_url/mcp/k8s-readonly"
-json_assert "$tmp_dir/gateway-missing-auth.json" "data.error === 'missing_or_invalid_bearer_token'" "Gateway rejects missing bearer token"
+json_assert "$tmp_dir/gateway-missing-auth.json" "data.error?.code === 'AUTH_MISSING_BEARER_TOKEN'" "Gateway rejects missing bearer token"
 
 request 401 "$tmp_dir/gateway-invalid-auth.json" "$gateway_url/mcp/k8s-readonly" -H "authorization: Bearer invalid-token"
-json_assert "$tmp_dir/gateway-invalid-auth.json" "data.error === 'missing_or_invalid_bearer_token'" "Gateway rejects invalid bearer token"
+json_assert "$tmp_dir/gateway-invalid-auth.json" "data.error?.code === 'AUTH_INVALID_BEARER_TOKEN'" "Gateway rejects invalid bearer token"
 
 request 200 "$tmp_dir/tools-list.json" "$gateway_url/mcp/k8s-readonly" \
   -H "authorization: Bearer $admin_token" \
