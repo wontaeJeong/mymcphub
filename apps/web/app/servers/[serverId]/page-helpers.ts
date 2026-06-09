@@ -1,7 +1,15 @@
 import type { ApiAuditEvent, ApiMcpServerVersion, ApiServerHealth } from "../../../lib/api";
 
 export function selectServerHealth(checks: ApiServerHealth[], serverId: string) {
-  return checks.find((check) => check.serverId === serverId);
+  return checks
+    .filter((check) => check.serverId === serverId)
+    .reduce<ApiServerHealth | undefined>((selected, check) => {
+      if (!selected) {
+        return check;
+      }
+
+      return new Date(check.checkedAt).getTime() > new Date(selected.checkedAt).getTime() ? check : selected;
+    }, undefined);
 }
 
 export function selectRecentServerAuditEvents(events: ApiAuditEvent[]) {
