@@ -70,41 +70,25 @@ export async function OperationsPageContent() {
     <div className="page-stack">
       <PageHero
         eyebrow="상태 및 운영"
-        title="허브를 안정적으로 운영하세요."
-        description="제어 플레인의 서버 상태, 거부 호출 분석, 사용량 집계, 상태 워커 출력을 확인합니다."
+        title="인시던트 신호를 먼저 보세요."
+        description="상태 이상, 거부 호출, 격리, 비활성 서버를 먼저 확인하고 상세 표는 필요할 때 펼칩니다."
       />
       <div className="card-grid">
-        <Surface>
-          <SectionHeader title="서버" />
-          <p>{serverItems.length}</p>
-        </Surface>
-        <Surface>
-          <SectionHeader title="비활성" />
-          <p>{serverItems.filter((server) => !server.enabled).length}</p>
-        </Surface>
         <Surface>
           <SectionHeader title="장애" />
           <p>{incidentCount}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="게시됨" />
-          <p>{serverItems.filter((server) => server.published).length}</p>
+          <SectionHeader title="거부 호출" />
+          <p>{deniedToolCalls}</p>
         </Surface>
         <Surface>
           <SectionHeader title="격리됨" />
           <p>{serverItems.filter((server) => server.quarantined).length}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="활성 롤아웃" />
-          <p>{rolloutRows.filter((row) => row.activeVersion).length}</p>
-        </Surface>
-        <Surface>
-          <SectionHeader title="도구 호출" />
-          <p>{totalToolCalls}</p>
-        </Surface>
-        <Surface>
-          <SectionHeader title="거부 호출" />
-          <p>{deniedToolCalls}</p>
+          <SectionHeader title="비활성 서버" />
+          <p>{serverItems.filter((server) => !server.enabled).length}</p>
         </Surface>
       </div>
       {versionErrors.length > 0 ? (
@@ -116,7 +100,7 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="거부 호출 분석"
-          description="/api/analytics/denied-calls의 정책 거부 사유와 상위 거부 도구 집계입니다."
+          description="정책 거부 사유와 조정 안내입니다."
         />
         {denied.ok && deniedReasons.length > 0 ? (
           <div className="table-wrap">
@@ -157,9 +141,11 @@ export async function OperationsPageContent() {
         )}
       </section>
       <section>
+        <details className="schema-viewer">
+        <summary>롤아웃 및 격리 상태 보기</summary>
         <SectionHeader
           title="롤아웃 및 격리 상태"
-          description="/api/servers, /api/servers/:serverId/versions, /api/server-health를 결합해 활성 버전, 롤아웃 최신성, 격리 상태를 함께 표시합니다."
+          description="활성 버전, 롤아웃 최신성, 격리 상태를 함께 표시합니다."
         />
         {servers.ok && rolloutRows.length > 0 ? (
           <RolloutStatusTable rows={rolloutRows} serverBasePath="/admin/servers" />
@@ -171,11 +157,14 @@ export async function OperationsPageContent() {
         ) : (
           <ErrorState message={servers.error} />
         )}
+        </details>
       </section>
       <section>
+        <details className="schema-viewer">
+        <summary>사용량 집계 보기</summary>
         <SectionHeader
           title="사용량 집계"
-          description="/api/analytics/usage의 일별 팀/프로젝트/사용자/서버/도구 집계입니다."
+          description={`일별 호출 ${totalToolCalls}건의 상위 집계입니다.`}
         />
         {usage.ok && usageItems.length > 0 ? (
           <div className="table-wrap">
@@ -218,11 +207,12 @@ export async function OperationsPageContent() {
         ) : (
           <ErrorState message={usage.error} />
         )}
+        </details>
       </section>
       <section>
         <SectionHeader
           title="서버 상태"
-          description="/api/server-health가 반환한 행입니다."
+          description="상태 워커가 반환한 최신 상태입니다."
         />
         {health.ok && healthItems.length > 0 ? (
           <HealthTable checks={healthItems} serverNameById={serverNameById} />
@@ -236,9 +226,11 @@ export async function OperationsPageContent() {
         )}
       </section>
       <section>
+        <details className="schema-viewer">
+        <summary>운영 카탈로그 표 보기</summary>
         <SectionHeader
           title="운영 카탈로그 상태"
-          description="운영 검토를 위한 서버 활성 여부와 위험 수준입니다."
+          description="서버 활성 여부와 위험 수준의 전체 표입니다."
         />
         {servers.ok && serverItems.length > 0 ? (
           <ServerTable
@@ -255,6 +247,7 @@ export async function OperationsPageContent() {
         ) : (
           <ErrorState message={servers.error} />
         )}
+        </details>
       </section>
     </div>
   );
