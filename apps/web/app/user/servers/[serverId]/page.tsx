@@ -105,19 +105,28 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
         <StatusPill tone={visibilityTone(server.data.visibility)}>{formatVisibility(server.data.visibility)}</StatusPill>
         <StatusPill tone={server.data.quarantined ? "danger" : "neutral"}>{server.data.quarantined ? "격리됨" : "격리 안 됨"}</StatusPill>
       </div>
+      <div className="actions">
+        {hasAccess ? <Link className="button" href={`/user/client-config?serverId=${encodeURIComponent(server.data.id)}`}>클라이언트 설정 생성</Link> : <Link className="button" href={accessRequestHref}>접근 요청</Link>}
+        <Link className="button button--ghost" href="/user/catalog">Market으로 돌아가기</Link>
+      </div>
       <div className="detail-grid">
         <Surface>
-          <SectionHeader title="서버 프로필" description="사용자가 연결 전에 확인해야 하는 카탈로그 메타데이터입니다." />
+          <SectionHeader title="연결 요약" description="사용 전에 확인할 목적, 환경, 설치 정보를 먼저 보여줍니다." />
           <div className="grid">
-            <p><strong>서버 ID:</strong> {server.data.id}</p>
-            <p><strong>소유 팀:</strong> {server.data.ownerTeamId}</p>
             <p><strong>카테고리:</strong> {formatMarketCategory(server.data.category)}</p>
             <p><strong>태그:</strong> {tags.length > 0 ? tags.join(", ") : "태그 없음"}</p>
             <p><strong>환경:</strong> {formatEnvironment(server.data.environment)}</p>
             <p><strong>전송 방식:</strong> {formatTransport(server.data.transport)}</p>
             <p><strong>설치 방식:</strong> {installMethods.length > 0 ? installMethods.map(formatInstallMethod).join(", ") : "Gateway 생성기"}</p>
-            <p><strong>생성:</strong> {formatDate(server.data.createdAt)}</p>
-            <p><strong>업데이트:</strong> {formatDate(server.data.updatedAt)}</p>
+            <details className="schema-viewer">
+              <summary>운영 세부정보 보기</summary>
+              <div className="grid">
+                <p><strong>서버 ID:</strong> {server.data.id}</p>
+                <p><strong>소유 팀:</strong> {server.data.ownerTeamId}</p>
+                <p><strong>생성:</strong> {formatDate(server.data.createdAt)}</p>
+                <p><strong>업데이트:</strong> {formatDate(server.data.updatedAt)}</p>
+              </div>
+            </details>
           </div>
         </Surface>
         <Surface className="panel--accent">
