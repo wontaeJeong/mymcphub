@@ -245,6 +245,7 @@ export async function OperationsPageContent() {
             servers={serverItems}
             healthByServerId={healthByServerId}
             serverBasePath="/admin/servers"
+            audience="admin-summary"
           />
         ) : servers.ok ? (
           <EmptyState
