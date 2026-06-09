@@ -3,7 +3,7 @@
 ```text
 CONTEXT: Admin server screens combine catalog, registration, raw manifest/schema fields, enable/disable controls, versions, audit, tools, resources, and prompts in dense pages.
 
-TARGET ROUTES/FILES: apps/web/app/catalog/content.tsx, apps/web/components/server-registration-form.tsx, apps/web/app/servers/[serverId]/content.tsx.
+TARGET ROUTES/FILES: apps/web/app/catalog/content.tsx via apps/web/app/admin/servers/page.tsx, apps/web/components/server-registration-form.tsx, apps/web/app/servers/[serverId]/content.tsx via apps/web/app/admin/servers/[serverId]/page.tsx.
 
 UX GOAL: Make admin server management progressive: summary first, advanced technical details second, dangerous controls clearly separated.
 
@@ -26,4 +26,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/admin/servers`, `/admin/servers/[serverId]`
 ```
-

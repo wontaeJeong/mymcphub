@@ -3,7 +3,7 @@
 ```text
 CONTEXT: `/admin` and `/admin/operations` show many metrics and tables with weak visual priority for what needs immediate action.
 
-TARGET ROUTES/FILES: apps/web/app/admin/page.tsx, apps/web/app/operations/content.tsx, HealthTable, RolloutStatusTable, ServerTable usages.
+TARGET ROUTES/FILES: apps/web/app/admin/page.tsx, apps/web/app/operations/content.tsx via apps/web/app/admin/operations/page.tsx, HealthTable, RolloutStatusTable, ServerTable usages.
 
 UX GOAL: Make admin home a clear route hub and operations a prioritized incident/health dashboard.
 
@@ -26,4 +26,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/admin`, `/admin/operations`, desktop/tablet/mobile
 ```
-

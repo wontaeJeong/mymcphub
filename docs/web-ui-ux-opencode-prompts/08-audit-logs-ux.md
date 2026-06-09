@@ -3,7 +3,7 @@
 ```text
 CONTEXT: `/admin/audit` exposes hashes, trace IDs, masked JSON, export, pagination, and many filters at the same level.
 
-TARGET ROUTES/FILES: apps/web/app/audit/content.tsx, apps/web/app/audit/page-helpers.ts, AuditTable, ToolCallTable.
+TARGET ROUTES/FILES: apps/web/app/audit/content.tsx via apps/web/app/admin/audit/page.tsx, apps/web/app/audit/page-helpers.ts, AuditTable, ToolCallTable.
 
 UX GOAL: Make audit review summary-first, with advanced diagnostics available intentionally.
 
@@ -25,4 +25,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/admin/audit`, filters, export/detail disclosure
 ```
-
