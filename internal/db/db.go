@@ -124,7 +124,7 @@ type MemoryRepository struct {
 
 func NewMemoryRepository() *MemoryRepository {
 	r := &MemoryRepository{servers: map[string]Server{}, snapshots: map[string][]CapabilitySnapshot{}, health: map[string][]HealthCheck{}}
-	seed := Server{Slug: "filesystem-local", Name: "Filesystem Operations MCP", Description: "Local stdio server for controlled filesystem capability discovery", Transport: TransportStdio, HostingType: "local_stdio", OwnerTeam: "Platform Team", Contact: "platform@example.com", Environment: "shared", Status: "active", LivenessStatus: "unknown", StdioCommand: "npx", StdioArgs: []string{"-y", "@modelcontextprotocol/server-filesystem", "/workspace"}, Tags: []string{"local", "filesystem"}}
+	seed := Server{Slug: "filesystem-local", Name: "Filesystem Operations MCP", Description: "Local stdio server for controlled filesystem capability discovery", Transport: TransportStdio, HostingType: "local_stdio", OwnerTeam: "Platform Team", Contact: "platform-mcp-operations", Environment: "shared", Status: "active", LivenessStatus: "unknown", StdioCommand: "npx", StdioArgs: []string{"-y", "@modelcontextprotocol/server-filesystem", "/workspace"}, Tags: []string{"local", "filesystem"}}
 	_, _ = r.CreateServer(context.Background(), seed, "seed")
 	return r
 }

@@ -33,7 +33,7 @@
     {
       "username": "admin",
       "enabled": true,
-      "email": "admin@example.com",
+      "email": "admin@mcp-hub.local",
       "firstName": "Local",
       "lastName": "Admin",
       "credentials": [
@@ -48,7 +48,7 @@
     {
       "username": "readonly",
       "enabled": true,
-      "email": "readonly@example.com",
+      "email": "readonly@mcp-hub.local",
       "firstName": "Local",
       "lastName": "Readonly",
       "credentials": [

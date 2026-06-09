@@ -21,9 +21,10 @@ func TestSeedCatalogUsesProductionWording(t *testing.T) {
 			server.Name,
 			server.Description,
 			server.StdioCommand,
+			server.Contact,
 			strings.Join(server.Tags, " "),
 		}, " "))
-		for _, marker := range []string{"예시", "sample", "mock", "dev/mock"} {
+		for _, marker := range []string{"예시", "sample", "mock", "dev/mock", "example.com"} {
 			if strings.Contains(visible, marker) {
 				t.Fatalf("seed server %s contains non-production marker %q in visible catalog data: %s", server.Slug, marker, visible)
 			}

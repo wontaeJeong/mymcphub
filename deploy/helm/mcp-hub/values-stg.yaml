@@ -1,5 +1,5 @@
 image:
-  registry: registry.example.com
+  registry: registry.corp.internal
   repositoryPrefix: mcp-hub
   tag: latest
   pullPolicy: IfNotPresent
@@ -25,7 +25,7 @@ containerSecurityContext:
 config:
   authMode: oidc
   apiUrl: http://mcp-hub-api:4000
-  publicUrl: https://mcp-hub.example.com
+  publicUrl: https://mcp-hub.corp.internal
   workerInterval: 60s
   syncTimeout: 20s
   enableServerStdioExec: "false"
@@ -60,7 +60,7 @@ ingress:
   enabled: true
   className: nginx
   annotations: {}
-  host: mcp-hub.example.com
+  host: mcp-hub.corp.internal
   tls: []
 
 networkPolicy:

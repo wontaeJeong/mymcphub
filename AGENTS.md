@@ -10,7 +10,7 @@
 
 - Go owns runtime code: `apps/api`, `apps/worker`, `apps/cli`, `internal/*`, and development fixtures under `dev/*`.
 - TypeScript is Web-only: `apps/web` and `packages/ui`. Do not add TypeScript server/operator runtimes unless explicitly requested.
-- Active TypeScript workspace packages are only `apps/web` and `packages/ui` from `pnpm-workspace.yaml`; ignore generated/local artifacts such as `dist`, `.next`, `.turbo`, and `node_modules`.
+- Active TypeScript workspace packages are only `apps/web` and `packages/ui` from `pnpm-workspace.yaml`; ignore generated/local artifacts such as `dist`, `.next`, and `node_modules`.
 - Entrypoints are `apps/api/cmd/api`, `apps/worker/cmd/worker`, and `apps/cli/cmd/mcphubctl`.
 - Operator actions should go through the Control API, Web UI, or `mcphubctl`; scripts are CI helpers only.
 
