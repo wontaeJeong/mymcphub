@@ -3,7 +3,7 @@
 ```text
 CONTEXT: `/admin/approvals` places approve and reject forms inside table cells, creating dense repeated controls and possible decision mistakes.
 
-TARGET ROUTES/FILES: apps/web/app/approvals/content.tsx, apps/web/components/tables.tsx ApprovalTable.
+TARGET ROUTES/FILES: apps/web/app/approvals/content.tsx via apps/web/app/admin/approvals/page.tsx, apps/web/components/tables.tsx ApprovalTable.
 
 UX GOAL: Make approval review a clear decision workflow with readable context and separated actions.
 
@@ -25,4 +25,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/admin/approvals`
 ```
-
