@@ -197,7 +197,7 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
               <ServerMarketCard key={server.id} server={server} health={healthByServerId.get(server.id)} accessible={isServerAccessible(server, accessByServerId)} />
             ))}
           </div>
-        ) : servers.ok && filteredServers.length > 0 ? <ServerTable servers={filteredServers} healthByServerId={healthByServerId} serverBasePath={mode === "admin" ? "/admin/servers" : "/user/servers"} showMarketCuration={mode === "admin"} /> : servers.ok && serverItems.length > 0 ? <EmptyState title="일치하는 서버 없음" description="제어 플레인이 서버를 반환했지만 선택한 필터와 일치하는 항목이 없습니다." /> : servers.ok ? <EmptyState title="등록된 서버 없음" description="제어 플레인이 빈 카탈로그를 반환했습니다. UI는 시드 데이터를 주입하지 않습니다." /> : <ErrorState message={servers.error} />}
+        ) : servers.ok && filteredServers.length > 0 ? <ServerTable servers={filteredServers} healthByServerId={healthByServerId} serverBasePath={mode === "admin" ? "/admin/servers" : "/user/servers"} showMarketCuration={mode === "admin"} audience={mode === "admin" ? "admin-summary" : "user"} /> : servers.ok && serverItems.length > 0 ? <EmptyState title="일치하는 서버 없음" description="제어 플레인이 서버를 반환했지만 선택한 필터와 일치하는 항목이 없습니다." /> : servers.ok ? <EmptyState title="등록된 서버 없음" description="제어 플레인이 빈 카탈로그를 반환했습니다. UI는 시드 데이터를 주입하지 않습니다." /> : <ErrorState message={servers.error} />}
       </section>
       {mode === "admin" ? <ServerRegistrationForm /> : null}
     </div>
