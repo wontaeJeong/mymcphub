@@ -42,7 +42,7 @@ export async function AccessPageContent({
     <div className="page-stack">
       <PageHero eyebrow="접근 요청 및 권한" title="추측 없는 권한 흐름." description={mode === "admin" ? "실제 제어 플레인 엔드포인트로 현재 권한을 검토하고, 권한 생성과 회수를 수행합니다." : "내게 보이는 권한을 검토하고 접근 승인 요청을 제출합니다. 권한 생성과 회수는 관리자 전용 흐름에 남습니다."} />
       <section>
-        <SectionHeader title="현재 권한" description="/api/grants 데이터이며, 가능한 경우 서버 카탈로그와 로컬에서 결합합니다." />
+        <SectionHeader title="현재 권한" description="현재 권한을 서버 이름과 함께 표시합니다." />
         {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} actionSlot={mode === "admin" ? GrantControls : undefined} audience={mode === "user" ? "user" : "admin-summary"} /> : grants.ok ? <EmptyState title="권한 없음" description={mode === "user" ? "현재 사용자 또는 팀 식별자와 일치하는 권한이 없습니다." : "제어 플레인이 권한을 반환하지 않았습니다."} /> : <ErrorState message={grants.error} />}
       </section>
       {mode === "user" ? (
@@ -54,7 +54,7 @@ export async function AccessPageContent({
       <div className={mode === "admin" ? "form-grid" : "grid"}>
         <form className="form-card" action={createApprovalAction}>
           <h2>{mode === "user" ? "접근 요청" : "접근 승인 요청"}</h2>
-          <p>{mode === "user" ? "서버, 필요한 도구, 환경, 사유만 입력하면 현재 계정 정보로 승인 요청을 보냅니다." : "주체, 도구, 환경, 티켓, 만료, 사유를 정식 필드로 /api/approvals에 보내 승인 대기 요청을 생성합니다."}</p>
+          <p>{mode === "user" ? "서버, 필요한 도구, 환경, 사유만 입력하면 현재 계정 정보로 승인 요청을 보냅니다." : "주체, 도구, 환경, 티켓, 만료, 사유를 입력해 승인 대기 요청을 생성합니다."}</p>
           {servers.ok && serverItems.length > 0 ? (
             mode === "user" ? (
               <>
@@ -123,7 +123,7 @@ export async function AccessPageContent({
               </div>
               <div className="field">
                 <label htmlFor="approvalSubjectId">주체 ID</label>
-                <input id="approvalSubjectId" name="subjectId" required placeholder="사용자, 팀, 서비스 계정 UUID" />
+                <input id="approvalSubjectId" name="subjectId" required placeholder="사용자, 팀, 서비스 계정 식별자" />
               </div>
               <div className="field">
                 <label htmlFor="approvalServerId">서버</label>
@@ -133,7 +133,7 @@ export async function AccessPageContent({
               </div>
               <div className="field">
                 <label htmlFor="approvalProjectId">프로젝트 ID</label>
-                <input id="approvalProjectId" name="projectId" required placeholder="프로젝트 레코드의 UUID" />
+                <input id="approvalProjectId" name="projectId" required placeholder="프로젝트 식별자" />
               </div>
               <div className="field">
                 <label htmlFor="approvalRequestedTools">요청 도구</label>
@@ -149,7 +149,7 @@ export async function AccessPageContent({
               </div>
               <div className="field">
                 <label htmlFor="approvalRequestedExpiresAt">요청 만료</label>
-                <input id="approvalRequestedExpiresAt" name="requestedExpiresAt" placeholder="선택 사항인 ISO 시각" />
+                <input id="approvalRequestedExpiresAt" name="requestedExpiresAt" placeholder="예: 2026-06-30T09:00:00Z" />
               </div>
               <div className="field">
                 <label htmlFor="approvalReason">사유</label>
@@ -162,7 +162,7 @@ export async function AccessPageContent({
         </form>
         {mode === "admin" ? <form className="form-card" action={createGrantAction}>
           <h2>권한 생성</h2>
-          <p>이미 승인 권한이 있을 때 /api/grants로 접근 권한을 생성합니다.</p>
+          <p>이미 승인된 요청을 기준으로 접근 권한을 생성합니다.</p>
           {servers.ok && serverItems.length > 0 ? (
             <>
               <div className="form-grid">
@@ -185,7 +185,7 @@ export async function AccessPageContent({
                 </div>
               </div>
               <div className="field"><label htmlFor="subjectId">주체 ID</label><input id="subjectId" name="subjectId" required /></div>
-              <div className="field"><label htmlFor="grantProjectId">프로젝트 ID</label><input id="grantProjectId" name="projectId" required placeholder="프로젝트 레코드의 UUID" /></div>
+              <div className="field"><label htmlFor="grantProjectId">프로젝트 ID</label><input id="grantProjectId" name="projectId" required placeholder="프로젝트 식별자" /></div>
               <div className="field">
                 <label htmlFor="grantServerId">서버</label>
                 <select id="grantServerId" name="serverId" required>
@@ -194,7 +194,7 @@ export async function AccessPageContent({
               </div>
               <div className="field"><label htmlFor="allowedTools">허용 도구</label><input id="allowedTools" name="allowedTools" required placeholder="쉼표로 구분한 도구 이름" /></div>
               <div className="field"><label htmlFor="ticketUrl">티켓 URL</label><input id="ticketUrl" name="ticketUrl" type="url" placeholder="선택 사항인 승인 티켓" /></div>
-              <div className="field"><label htmlFor="expiresAt">만료 시각</label><input id="expiresAt" name="expiresAt" placeholder="선택 사항인 ISO 시각" /></div>
+              <div className="field"><label htmlFor="expiresAt">만료 시각</label><input id="expiresAt" name="expiresAt" placeholder="예: 2026-06-30T09:00:00Z" /></div>
               <div className="field"><label htmlFor="grantReason">사유</label><textarea id="grantReason" name="reason" required /></div>
               <div className="form-actions"><button className="button" type="submit">권한 생성</button></div>
             </>

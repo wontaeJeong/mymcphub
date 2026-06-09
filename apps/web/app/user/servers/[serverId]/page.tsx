@@ -168,7 +168,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
       </section>
       {tools.ok && toolItems.length > 0 ? (
         <section>
-          <SectionHeader title="정책 드라이런" description="기존 /api/policy/test-call을 사용해 dry-run 정책 결정, 스텝업 여부, 마스킹된 payload preview만 확인합니다." />
+          <SectionHeader title="정책 사전 점검" description="실제 도구 호출 없이 정책 결정, 추가 인증 여부, 마스킹된 입력 미리보기만 확인합니다." />
           <ToolTestLab options={toolTestOptions} />
         </section>
       ) : null}

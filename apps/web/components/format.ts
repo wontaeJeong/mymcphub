@@ -31,8 +31,13 @@ export function formatDate(value: string | undefined) {
   }
 
   return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short"
+    day: "numeric",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "numeric",
+    timeZone: "Asia/Seoul",
+    year: "numeric"
   }).format(new Date(value));
 }
 

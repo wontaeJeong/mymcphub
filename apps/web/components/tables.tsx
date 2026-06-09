@@ -516,14 +516,15 @@ export function RolloutStatusTable({
   return (
     <div className="table-wrap">
       <table>
+        <caption>서버 롤아웃 상태 요약</caption>
         <thead>
           <tr>
-            <th>서버</th>
-            <th>활성 버전</th>
-            <th>최신 롤아웃</th>
-            <th>상태</th>
-            <th>격리</th>
-            <th>업데이트</th>
+            <th scope="col">서버</th>
+            <th scope="col">활성 버전</th>
+            <th scope="col">최신 롤아웃</th>
+            <th scope="col">상태</th>
+            <th scope="col">격리</th>
+            <th scope="col">업데이트</th>
           </tr>
         </thead>
         <tbody>
@@ -669,14 +670,15 @@ export function ApprovalTable({
   return (
     <div className="table-wrap">
       <table>
+        <caption>승인 요청 목록</caption>
         <thead>
           <tr>
-            <th>주체</th>
-            <th>범위</th>
-            <th>요청</th>
-            <th>상태</th>
-            <th>시각</th>
-            <th>결정</th>
+            <th scope="col">주체</th>
+            <th scope="col">범위</th>
+            <th scope="col">요청</th>
+            <th scope="col">상태</th>
+            <th scope="col">시각</th>
+            <th scope="col">결정</th>
           </tr>
         </thead>
         <tbody>
@@ -1027,13 +1029,14 @@ export function ToolCallTable({
   return (
     <div className="table-wrap">
       <table>
+        <caption>도구 호출 이벤트 목록</caption>
         <thead>
           <tr>
-            <th>도구</th>
-            <th>서버</th>
-            <th>상태</th>
-            <th>지연 시간</th>
-            <th>생성</th>
+            <th scope="col">도구</th>
+            <th scope="col">서버</th>
+            <th scope="col">상태</th>
+            <th scope="col">지연 시간</th>
+            <th scope="col">생성</th>
           </tr>
         </thead>
         <tbody>
@@ -1076,15 +1079,16 @@ export function HealthTable({
   return (
     <div className="table-wrap">
       <table>
+        <caption>서버 상태 확인 목록</caption>
         <thead>
           <tr>
-            <th>서버</th>
-            <th>상태</th>
-            <th>지연 시간</th>
-            <th>백오프</th>
-            <th>오류</th>
-            <th>추적</th>
-            <th>확인 시각</th>
+            <th scope="col">서버</th>
+            <th scope="col">상태</th>
+            <th scope="col">지연 시간</th>
+            <th scope="col">백오프</th>
+            <th scope="col">오류</th>
+            <th scope="col">추적</th>
+            <th scope="col">확인 시각</th>
           </tr>
         </thead>
         <tbody>
