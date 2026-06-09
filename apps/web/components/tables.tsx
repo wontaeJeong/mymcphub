@@ -15,6 +15,10 @@ import type {
   ServerVersionStatus,
 } from "../lib/api";
 import {
+  accessToolKey,
+  type AccessStatus,
+} from "../lib/access-status";
+import {
   approvalTone,
   enabledTone,
   formatApprovalStatus,
@@ -129,19 +133,23 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
 export type ToolTableProps = Readonly<{
   tools: ApiMcpTool[];
   grantStatusByToolKey?: Map<string, string>;
+  accessStatusByToolKey?: Map<string, AccessStatus>;
   showSchema?: boolean;
   showAccess?: boolean;
   showAdminPlaceholder?: boolean;
   actionSlot?: (tool: ApiMcpTool) => ReactNode;
+  accessActionSlot?: (tool: ApiMcpTool, status: AccessStatus | undefined) => ReactNode;
 }>;
 
 export function ToolTable({
   tools,
   grantStatusByToolKey,
+  accessStatusByToolKey,
   showSchema = false,
   showAccess = false,
   showAdminPlaceholder = false,
   actionSlot,
+  accessActionSlot,
 }: ToolTableProps) {
   return (
     <div className="table-wrap">
@@ -160,7 +168,10 @@ export function ToolTable({
           </tr>
         </thead>
         <tbody>
-          {tools.map((tool) => (
+          {tools.map((tool) => {
+            const key = accessToolKey(tool);
+            const accessStatus = accessStatusByToolKey?.get(key);
+            return (
             <tr key={tool.id}>
               <td>
                 {tool.name}
@@ -169,9 +180,7 @@ export function ToolTable({
                 </p>
               </td>
               <td>
-                <StatusPill tone={riskTone(tool.riskLevel)}>
-                  {formatRiskLevel(tool.riskLevel)}
-                </StatusPill>
+                <ToolRiskCell tool={tool} />
               </td>
               <td>
                 <StatusPill tone={enabledTone(tool.enabled)}>
@@ -185,8 +194,11 @@ export function ToolTable({
               ) : null}
               {showAccess ? (
                 <td>
-                  {grantStatusByToolKey?.get(toolKey(tool)) ??
-                    "활성 권한이 없습니다"}
+                  <ToolAccessCell
+                    status={accessStatus}
+                    fallback={grantStatusByToolKey?.get(key)}
+                    action={accessActionSlot?.(tool, accessStatus)}
+                  />
                 </td>
               ) : null}
               <td>{formatDate(tool.discoveredAt)}</td>
@@ -201,11 +213,66 @@ export function ToolTable({
               ) : null}
               {actionSlot ? <td>{actionSlot(tool)}</td> : null}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
+}
+
+function ToolRiskCell({ tool }: Readonly<{ tool: ApiMcpTool }>) {
+  return (
+    <div className="grid">
+      <StatusPill tone={riskTone(tool.riskLevel)}>
+        {formatRiskLevel(tool.riskLevel)}
+      </StatusPill>
+      <p className="muted">{riskExplanation(tool.riskLevel)}</p>
+    </div>
+  );
+}
+
+function ToolAccessCell({
+  status,
+  fallback,
+  action,
+}: Readonly<{
+  status: AccessStatus | undefined;
+  fallback: string | undefined;
+  action: ReactNode;
+}>) {
+  if (!status) {
+    return <span>{fallback ?? "활성 권한이 없습니다"}</span>;
+  }
+
+  return (
+    <div className="grid">
+      <StatusPill tone={status.tone}>{status.label}</StatusPill>
+      <p className="muted">{status.actionHint}</p>
+      {status.wildcardGrant ? (
+        <p className="muted">
+          허용 도구 *는 특정 도구명 없이 이 서버의 도구 전체와 매칭됩니다.
+        </p>
+      ) : null}
+      {action}
+    </div>
+  );
+}
+
+function riskExplanation(riskLevel: ApiMcpTool["riskLevel"]) {
+  if (riskLevel === "critical") {
+    return "심각 위험 도구는 명시적 승인, 검토 의견, 필요 시 스텝업 확인이 필요합니다.";
+  }
+
+  if (riskLevel === "high") {
+    return "높은 위험 도구는 요청 사유와 만료 범위를 명확히 적어야 합니다.";
+  }
+
+  if (riskLevel === "medium") {
+    return "중간 위험 도구는 팀 또는 사용자 grant와 도구명이 일치해야 합니다.";
+  }
+
+  return "낮은 위험 도구도 활성 grant 또는 와일드카드 grant 범위 안에서만 허용됩니다.";
 }
 
 export function ServerVersionTable({
@@ -389,12 +456,35 @@ export function GrantTable({
   );
 }
 
+export type ApprovalDecisionContext = Readonly<{
+  serverDisplayName?: string;
+  serverCategory?: string;
+  serverEnvironment?: string;
+  serverRiskLevel?: ApiMcpServer["riskLevel"];
+  requestedToolRisks: ReadonlyArray<Readonly<{
+    toolName: string;
+    riskLevel?: ApiMcpTool["riskLevel"];
+    enabled?: boolean;
+  }>>;
+  grantOverlaps: ReadonlyArray<Readonly<{
+    grantId: string;
+    subjectId: string;
+    allowedTools: readonly string[];
+    wildcard: boolean;
+  }>>;
+  reviewCommentRequired: boolean;
+}>;
+
 export function ApprovalTable({
   approvals,
   actionSlot,
+  serverNameById,
+  contextByApprovalId,
 }: Readonly<{
   approvals: ApiApproval[];
   actionSlot?: (approval: ApiApproval) => ReactNode;
+  serverNameById?: Map<string, string>;
+  contextByApprovalId?: Map<string, ApprovalDecisionContext>;
 }>) {
   return (
     <div className="table-wrap">
@@ -412,6 +502,8 @@ export function ApprovalTable({
         <tbody>
           {approvals.map((approval) => {
             const ticketUrl = safeExternalUrl(approval.ticketUrl);
+            const context = contextByApprovalId?.get(approval.id);
+            const showDecisionContext = contextByApprovalId !== undefined;
 
             return (
               <tr key={approval.id}>
@@ -420,8 +512,12 @@ export function ApprovalTable({
                   <p className="muted">요청자 {approval.requesterId}</p>
                 </td>
                 <td>
-                  {approval.serverId}
+                  {context?.serverDisplayName ?? serverNameById?.get(approval.serverId) ?? approval.serverId}
+                  {context?.serverDisplayName ? (
+                    <p className="muted">{approval.serverId}</p>
+                  ) : null}
                   <p className="muted">프로젝트 {approval.projectId}</p>
+                  {showDecisionContext ? <ApprovalServerContext context={context} /> : null}
                 </td>
                 <td>
                   {approval.requestedAction}
@@ -441,6 +537,7 @@ export function ApprovalTable({
                       요청 만료 {formatDate(approval.requestedExpiresAt)}
                     </p>
                   ) : null}
+                  {showDecisionContext ? <ApprovalToolContext context={context} /> : null}
                   <p className="muted">{approval.reason}</p>
                 </td>
                 <td>
@@ -466,6 +563,66 @@ export function ApprovalTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ApprovalServerContext({
+  context,
+}: Readonly<{ context: ApprovalDecisionContext | undefined }>) {
+  if (!context) {
+    return <p className="muted">서버 컨텍스트를 결합하지 못했습니다.</p>;
+  }
+
+  return (
+    <div className="grid">
+      <div className="actions">
+        {context.serverRiskLevel ? (
+          <StatusPill tone={riskTone(context.serverRiskLevel)}>
+            {formatRiskLevel(context.serverRiskLevel)}
+          </StatusPill>
+        ) : null}
+        {context.serverEnvironment ? (
+          <StatusPill>{formatEnvironment(context.serverEnvironment)}</StatusPill>
+        ) : null}
+      </div>
+      <p className="muted">카테고리 {context.serverCategory ?? "확인 불가"}</p>
+      {context.grantOverlaps.length > 0 ? (
+        <p className="muted">
+          기존 grant {context.grantOverlaps.length}개와 요청 범위가 겹칩니다.
+          {context.grantOverlaps.some((grant) => grant.wildcard)
+            ? " 와일드카드 grant(*) 포함."
+            : ""}
+        </p>
+      ) : (
+        <p className="muted">현재 같은 주체/프로젝트/도구와 겹치는 grant가 없습니다.</p>
+      )}
+    </div>
+  );
+}
+
+function ApprovalToolContext({
+  context,
+}: Readonly<{ context: ApprovalDecisionContext | undefined }>) {
+  if (!context) {
+    return null;
+  }
+
+  return (
+    <div className="grid">
+      <div className="actions">
+        {context.requestedToolRisks.map((tool) => (
+          <StatusPill tone={tool.riskLevel ? riskTone(tool.riskLevel) : "neutral"} key={tool.toolName}>
+            {tool.toolName}: {tool.riskLevel ? formatRiskLevel(tool.riskLevel) : "위험도 확인 불가"}
+          </StatusPill>
+        ))}
+      </div>
+      {context.requestedToolRisks.some((tool) => tool.enabled === false) ? (
+        <p className="muted">비활성 도구가 포함되어 승인 전 활성화 상태를 확인해야 합니다.</p>
+      ) : null}
+      {context.reviewCommentRequired ? (
+        <p className="muted">높음/심각 위험 요청이므로 검토 의견을 남기는 것이 필요합니다.</p>
+      ) : null}
     </div>
   );
 }
@@ -814,10 +971,6 @@ function isSensitiveMetadataKey(key: string) {
     normalized.includes("credential") ||
     normalized.endsWith("key")
   );
-}
-
-function toolKey(tool: ApiMcpTool) {
-  return `${tool.serverId}:${tool.name}`;
 }
 
 function isSuccessfulToolCallStatus(status: string) {

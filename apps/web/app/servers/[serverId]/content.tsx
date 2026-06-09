@@ -27,6 +27,7 @@ import {
   ServerVersionTable,
   ToolTable,
 } from "../../../components/tables";
+import { ToolTestLab } from "../../../components/tool-test-lab";
 import type { ApiMcpServerVersion, ApiMcpTool } from "../../../lib/api";
 import {
   getServer,
@@ -37,7 +38,7 @@ import {
   listTools,
 } from "../../../lib/api";
 import { loadResult } from "../../../lib/result";
-import { buildGrantStatus } from "../../tools/page-helpers";
+import { buildGrantStatus, buildToolTestOptions } from "../../tools/page-helpers";
 import {
   selectActiveServerVersion,
   selectRecentServerAuditEvents,
@@ -94,6 +95,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
     toolItems,
     grants.ok ? grants.data.items : undefined,
   );
+  const toolTestOptions = buildToolTestOptions([server.data], toolItems);
 
   return (
     <div className="page-stack">
@@ -272,13 +274,18 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                 description="/api/servers/:serverId/tools로 발견한 도구, 스키마 표시, 권한 상태, 도구 활성화 제어입니다."
               />
               {tools.ok && toolItems.length > 0 ? (
-                <ToolTable
-                  tools={toolItems}
-                  grantStatusByToolKey={grantStatusByToolKey}
-                  showSchema
-                  showAccess
-                  actionSlot={ToolControls}
-                />
+                <>
+                  <ToolTable
+                    tools={toolItems}
+                    grantStatusByToolKey={grantStatusByToolKey}
+                    showSchema
+                    showAccess
+                    actionSlot={ToolControls}
+                  />
+                  <div className="grid">
+                    <ToolTestLab options={toolTestOptions} />
+                  </div>
+                </>
               ) : tools.ok ? (
                 <EmptyState
                   title="발견된 도구 없음"

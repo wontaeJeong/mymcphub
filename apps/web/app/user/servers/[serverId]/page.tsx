@@ -15,10 +15,19 @@ import {
 } from "../../../../components/format";
 import { ErrorState } from "../../../../components/states";
 import { GrantTable, ToolTable } from "../../../../components/tables";
+import { ToolTestLab } from "../../../../components/tool-test-lab";
 import { getCurrentSession } from "../../../../lib/auth/session";
-import { getServer, listGrants, listServerHealth, listTools } from "../../../../lib/api";
+import type { ApiMcpServer, ApiMcpTool } from "../../../../lib/api";
+import { getServer, listApprovals, listGrants, listServerHealth, listTools } from "../../../../lib/api";
+import {
+  buildAccessRequestHref,
+  buildToolAccessStatusMap,
+  evaluateAccessStatus,
+  isHighOrCriticalRisk,
+  type AccessStatus,
+} from "../../../../lib/access-status";
 import { loadResult } from "../../../../lib/result";
-import { buildGrantStatus } from "../../../tools/page-helpers";
+import { buildToolTestOptions } from "../../../tools/page-helpers";
 import { selectServerHealth } from "../../../servers/[serverId]/page-helpers";
 
 type UserServerDetailPageProps = Readonly<{
@@ -28,11 +37,12 @@ type UserServerDetailPageProps = Readonly<{
 export default async function UserServerDetailPage({ params }: UserServerDetailPageProps) {
   const { serverId } = await params;
   const session = await getCurrentSession();
-  const [server, tools, health, grants] = await Promise.all([
+  const [server, tools, health, grants, approvals] = await Promise.all([
     loadResult(getServer(serverId)),
     loadResult(listTools(serverId)),
     loadResult(listServerHealth()),
     loadResult(listGrants()),
+    loadResult(listApprovals()),
   ]);
 
   if (!server.ok) {
@@ -42,7 +52,21 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
   const latestHealth = health.ok ? selectServerHealth(health.data.items, serverId) : undefined;
   const toolItems = tools.ok ? tools.data.items : [];
   const visibleGrants = grants.ok ? grants.data.items.filter((grant) => grant.serverId === serverId && grant.enabled && (grant.subjectId === session?.principal.userId || session?.principal.teamIds.includes(grant.subjectId) || session?.principal.teams.includes(grant.subjectId))) : [];
-  const grantStatusByToolKey = buildGrantStatus(toolItems, visibleGrants);
+  const accessStatusByToolKey = buildToolAccessStatusMap(toolItems, {
+    server: server.data,
+    grants: grants.ok ? grants.data.items : undefined,
+    approvals: approvals.ok ? approvals.data.items : undefined,
+    session: session?.principal,
+    health: latestHealth,
+  });
+  const serverAccessStatus = evaluateAccessStatus({
+    server: server.data,
+    grants: grants.ok ? grants.data.items : undefined,
+    approvals: approvals.ok ? approvals.data.items : undefined,
+    session: session?.principal,
+    health: latestHealth,
+  });
+  const toolTestOptions = buildToolTestOptions([server.data], toolItems);
   const serverNameById = new Map([[server.data.id, server.data.displayName]]);
 
   return (
@@ -66,17 +90,68 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
             <StatusPill tone={riskTone(server.data.riskLevel)}>{formatRiskLevel(server.data.riskLevel)}</StatusPill>
             <StatusPill tone={enabledTone(server.data.enabled)}>{formatEnabled(server.data.enabled)}</StatusPill>
             {latestHealth ? <StatusPill tone={healthTone(latestHealth.status)}>{formatHealthStatus(latestHealth.status)}</StatusPill> : <StatusPill>상태 확인 불가</StatusPill>}
+            <StatusPill tone={serverAccessStatus.tone}>{serverAccessStatus.label}</StatusPill>
           </div>
+          <p className="muted">{serverAccessStatus.actionHint}</p>
+          {serverAccessStatus.status === "request_required" || serverAccessStatus.status === "unknown" ? (
+            <Link className="button" href={buildAccessRequestHref({ serverId: server.data.id, tools: toolItems.map((tool) => tool.name), environment: server.data.environment, reason: `${server.data.displayName} 서버 접근이 필요합니다.` })}>
+              서버 접근 요청
+            </Link>
+          ) : null}
         </Surface>
       </div>
       <section>
         <SectionHeader title="도구" description="현재 사용자 또는 팀 권한에 보이는 도구 스키마와 권한 상태입니다." />
-        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} grantStatusByToolKey={grantStatusByToolKey} showSchema showAccess /> : tools.ok ? <EmptyState title="발견된 도구 없음" description="서버는 존재하지만 제어 플레인이 도구를 반환하지 않았습니다." /> : <ErrorState message={tools.error} />}
+        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} accessStatusByToolKey={accessStatusByToolKey} showSchema showAccess accessActionSlot={(tool, status) => <UserToolAccessAction server={server.data} tool={tool} status={status} />} /> : tools.ok ? <EmptyState title="발견된 도구 없음" description="서버는 존재하지만 제어 플레인이 도구를 반환하지 않았습니다." /> : <ErrorState message={tools.error} />}
       </section>
+      {tools.ok && toolItems.length > 0 ? (
+        <section>
+          <SectionHeader title="정책 드라이런" description="기존 /api/policy/test-call을 사용해 dry-run 정책 결정, 스텝업 여부, 마스킹된 payload preview만 확인합니다." />
+          <ToolTestLab options={toolTestOptions} />
+        </section>
+      ) : null}
       <section>
         <SectionHeader title="이 서버의 내 권한" description="이 서버와 현재 세션 식별자에 맞는 권한만 표시합니다." />
         {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} /> : grants.ok ? <EmptyState title="일치하는 권한 없음" description="이 도구 중 하나를 사용해야 한다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
       </section>
+      {!approvals.ok ? <ErrorState title="승인 대기 상태 사용 불가" message={approvals.error} /> : null}
+    </div>
+  );
+}
+
+function UserToolAccessAction({
+  server,
+  tool,
+  status,
+}: Readonly<{
+  server: ApiMcpServer;
+  tool: ApiMcpTool;
+  status: AccessStatus | undefined;
+}>) {
+  if (!status) {
+    return null;
+  }
+
+  if (status.status === "accessible") {
+    return <Link className="button button--ghost" href="/user/client-config">클라이언트 설정으로 이동</Link>;
+  }
+
+  if (status.status === "pending_approval") {
+    return <p className="muted">이미 같은 서버/도구 승인 요청이 대기 중입니다.</p>;
+  }
+
+  if (status.status === "disabled" || status.status === "quarantined") {
+    return <p className="muted">관리자 조치 전에는 새 요청을 만들지 않습니다.</p>;
+  }
+
+  return (
+    <div className="grid">
+      {isHighOrCriticalRisk(tool.riskLevel) ? (
+        <p className="muted">높음/심각 위험 도구입니다. 요청 사유에 업무 범위, 기간, 승인 근거를 포함하세요.</p>
+      ) : null}
+      <Link className="button" href={buildAccessRequestHref({ serverId: server.id, toolName: tool.name, environment: server.environment, reason: `${server.displayName} / ${tool.name} 도구 접근이 필요합니다.` })}>
+        접근 요청
+      </Link>
     </div>
   );
 }
