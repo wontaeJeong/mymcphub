@@ -19,7 +19,7 @@ Coverage includes:
 - MCP attack-suite negatives for command-injection-shaped inputs, path traversal, secret leakage, DLP blocks, unauthorized tools, and prompt-injection metadata quarantine.
 - Web UI tests through pnpm workspace commands, including internal MCP Market catalog filters, category/tag parsing, optional metadata fallback, access request prefill, client-config preselect, approval decision context, and newest health selector ordering.
 - Schema drift checks through `scripts/ci/schemas.sh`.
-- Helm rendering through `tests/helm-template.sh`.
+- Helm rendering through `scripts/ci/helm-template.sh`.
 
 Focused Lane G commands:
 

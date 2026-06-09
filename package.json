@@ -31,7 +31,7 @@
     "test:unit": "go test ./internal/... && pnpm --filter @mcp-hub/ui test && pnpm --filter @mcp-hub/web test:unit",
     "test:integration": "go test ./apps/... ./tests/...",
     "test:e2e": "go test ./tests/e2e ./tests/security",
-    "helm:template": "bash tests/helm-template.sh",
+    "helm:template": "bash scripts/ci/helm-template.sh",
     "security:smoke": "pnpm security:mcp-manifests",
     "release:notes": "bash scripts/release/generate-notes.sh"
   },

@@ -108,7 +108,7 @@ render() {
   printf -- '- `go test ./...`\n'
   printf -- '- `pnpm --filter @mcp-hub/web test`\n'
   printf -- '- `scripts/ci/schemas.sh`\n'
-  printf -- '- `bash tests/helm-template.sh`\n'
+  printf -- '- `bash scripts/ci/helm-template.sh`\n'
   printf -- '- Gateway MCP smoke: initialize, `tools/list`, approved `tools/call`, auth deny, policy deny.\n'
 }
 

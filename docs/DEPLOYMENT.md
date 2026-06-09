@@ -7,7 +7,7 @@ Render locally:
 ```sh
 helm lint deploy/helm/mcp-hub
 helm template mcp-hub deploy/helm/mcp-hub --namespace mcp-hub
-bash tests/helm-template.sh
+bash scripts/ci/helm-template.sh
 ```
 
 Install or upgrade:

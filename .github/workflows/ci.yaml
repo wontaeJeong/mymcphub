@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
       - uses: imranismail/setup-kustomize@v2
-      - run: bash tests/helm-template.sh
+      - run: bash scripts/ci/helm-template.sh
 
   e2e-security:
     name: Go e2e and security negatives
