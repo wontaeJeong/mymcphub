@@ -108,38 +108,27 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <div className="detail-grid">
         <Surface>
           <SectionHeader
-            title="서버 프로필"
-            description="이 MCP 서버의 제어 플레인 메타데이터입니다."
+            title="서버 요약"
+            description="운영 판단에 필요한 상태를 먼저 보여주고 기술 세부정보는 펼쳐 확인합니다."
           />
           <div className="grid">
-            <p>
-              <strong>서버 ID:</strong> {server.data.id}
-            </p>
-            <p>
-              <strong>소유 팀:</strong> {server.data.ownerTeamId}
-            </p>
             <p>
               <strong>환경:</strong> {formatEnvironment(server.data.environment)}
             </p>
             <p>
               <strong>전송 방식:</strong> {formatTransport(server.data.transport)}
             </p>
-            <p>
-              <strong>업스트림 URL:</strong>{" "}
-              {server.data.upstreamUrl ??
-                "제어 플레인 API에서 확인할 수 없습니다"}
-            </p>
-            <p>
-              <strong>스키마 버전:</strong>{" "}
-              {server.data.schemaVersion ??
-                "제어 플레인 API에서 확인할 수 없습니다"}
-            </p>
-            <p>
-              <strong>생성:</strong> {formatDate(server.data.createdAt)}
-            </p>
-            <p>
-              <strong>업데이트:</strong> {formatDate(server.data.updatedAt)}
-            </p>
+            <details className="schema-viewer">
+              <summary>기술 세부정보 보기</summary>
+              <div className="grid">
+                <p><strong>서버 ID:</strong> {server.data.id}</p>
+                <p><strong>소유 팀:</strong> {server.data.ownerTeamId}</p>
+                <p><strong>업스트림 URL:</strong> {server.data.upstreamUrl ?? "확인 불가"}</p>
+                <p><strong>스키마 버전:</strong> {server.data.schemaVersion ?? "확인 불가"}</p>
+                <p><strong>생성:</strong> {formatDate(server.data.createdAt)}</p>
+                <p><strong>업데이트:</strong> {formatDate(server.data.updatedAt)}</p>
+              </div>
+            </details>
           </div>
         </Surface>
         <Surface className="panel--accent">
@@ -176,6 +165,10 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
             <div className="actions">
               <form action={enableServerAction}>
                 <input type="hidden" name="serverId" value={server.data.id} />
+                <label className="danger-confirm">
+                  <input type="checkbox" required disabled={server.data.enabled} />
+                  활성화하면 Gateway 경로에 다시 노출될 수 있음을 확인합니다.
+                </label>
                 <button
                   className="button"
                   type="submit"
@@ -186,6 +179,10 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
               </form>
               <form action={disableServerAction}>
                 <input type="hidden" name="serverId" value={server.data.id} />
+                <label className="danger-confirm">
+                  <input type="checkbox" required disabled={!server.data.enabled} />
+                  비활성화하면 기존 사용자의 연결이 중단될 수 있음을 확인합니다.
+                </label>
                 <button
                   className="button button--danger"
                   type="submit"
@@ -239,31 +236,25 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       ) : null}
       <section className="capability-section">
         <SectionHeader
-          title="도구, 리소스, 프롬프트"
-          description="제어 플레인 기능 탭은 실시간 도구 계약을 보여주고 Go API 엔드포인트가 아직 노출하지 않는 리소스와 프롬프트를 명시합니다."
+          title="도구와 추가 기능"
+          description="실시간 도구 계약을 우선 표시하고 아직 목록 데이터가 없는 기능은 보조 안내로만 보여줍니다."
         />
-        <div className="capability-tabs" role="tablist" aria-label="서버 기능">
+        <div className="capability-tabs" aria-label="서버 기능">
           <a
             className="capability-tab"
             href="#server-tools"
-            role="tab"
-            aria-selected="true"
           >
             도구
           </a>
           <a
             className="capability-tab"
             href="#server-resources"
-            role="tab"
-            aria-selected="false"
           >
             리소스
           </a>
           <a
             className="capability-tab"
             href="#server-prompts"
-            role="tab"
-            aria-selected="false"
           >
             프롬프트
           </a>
@@ -273,7 +264,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
             <Surface className="capability-panel">
               <SectionHeader
                 title="서버 도구"
-                description="/api/servers/:serverId/tools로 발견한 도구, 스키마 표시, 권한 상태, 도구 활성화 제어입니다."
+                description="발견한 도구, 스키마, 권한 상태, 도구 활성화 제어입니다."
               />
               {tools.ok && toolItems.length > 0 ? (
                 <>
@@ -303,11 +294,11 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
             <Surface className="capability-panel">
               <SectionHeader
                 title="리소스"
-                description="Gateway initialize는 리소스 기능을 알리지만, 이 Go 제어 플레인 계약은 아직 /resources list/read 엔드포인트를 노출하지 않습니다."
+                description="현재 목록 데이터가 없어 주 기능으로 노출하지 않습니다."
               />
               <EmptyState
                 title="리소스 엔드포인트가 노출되지 않음"
-                description="목 데이터에서 리소스를 렌더링하지 않습니다. 리소스 행을 Web에 나열하기 전에 제어 플레인 리소스 계약을 추가하세요."
+                description="리소스 목록 계약이 추가되면 이 보조 안내를 실제 목록으로 바꿉니다."
               />
             </Surface>
           </div>
@@ -315,11 +306,11 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
             <Surface className="capability-panel">
               <SectionHeader
                 title="프롬프트"
-                description="Gateway initialize는 프롬프트 기능을 알리지만, 이 Go 제어 플레인 계약은 아직 /prompts list/get 엔드포인트를 노출하지 않습니다."
+                description="현재 목록 데이터가 없어 주 기능으로 노출하지 않습니다."
               />
               <EmptyState
                 title="프롬프트 엔드포인트가 노출되지 않음"
-                description="목 데이터에서 프롬프트를 렌더링하지 않습니다. 프롬프트 행을 Web에 나열하기 전에 제어 플레인 프롬프트 계약을 추가하세요."
+                description="프롬프트 목록 계약이 추가되면 이 보조 안내를 실제 목록으로 바꿉니다."
               />
             </Surface>
           </div>
@@ -345,16 +336,14 @@ function ActiveVersionSummary({
           </StatusPill>
           <StatusPill>{version.version}</StatusPill>
         </div>
-        <p>
-          <strong>이미지:</strong> {formatVersionImage(version)}
-        </p>
-        <p>
-          <strong>설정 해시:</strong> {version.configHash ?? "기록 없음"}
-        </p>
-        <p>
-          <strong>도구 스키마 해시:</strong>{" "}
-          {version.toolSchemaHash ?? "기록 없음"}
-        </p>
+        <details className="schema-viewer">
+          <summary>이미지와 해시 보기</summary>
+          <div className="grid">
+            <p><strong>이미지:</strong> {formatVersionImage(version)}</p>
+            <p><strong>설정 해시:</strong> {version.configHash ?? "기록 없음"}</p>
+            <p><strong>도구 스키마 해시:</strong> {version.toolSchemaHash ?? "기록 없음"}</p>
+          </div>
+        </details>
         <p>
           <strong>생성:</strong> {formatDate(version.createdAt)}
         </p>
@@ -396,6 +385,10 @@ function ToolControls(tool: ApiMcpTool) {
       <form action={enableToolAction}>
         <input type="hidden" name="serverId" value={tool.serverId} />
         <input type="hidden" name="toolId" value={tool.id} />
+        <label className="danger-confirm">
+          <input type="checkbox" required disabled={tool.enabled} />
+          이 도구를 다시 노출합니다.
+        </label>
         <button className="button" type="submit" disabled={tool.enabled}>
           활성화
         </button>
@@ -403,6 +396,10 @@ function ToolControls(tool: ApiMcpTool) {
       <form action={disableToolAction}>
         <input type="hidden" name="serverId" value={tool.serverId} />
         <input type="hidden" name="toolId" value={tool.id} />
+        <label className="danger-confirm">
+          <input type="checkbox" required disabled={!tool.enabled} />
+          이 도구 호출을 중단합니다.
+        </label>
         <button
           className="button button--danger"
           type="submit"
