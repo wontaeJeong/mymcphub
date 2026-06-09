@@ -207,9 +207,10 @@ describe("prompt-12 required web pages", () => {
     expect(html).not.toContain("team-platform");
     expect(html).not.toContain("스트리밍 HTTP");
     expect(html).toContain("저하");
-    expect(html).toContain("활성");
+    expect(html).not.toContain("활성 여부");
     expect(adminHtml).toContain("prod-docs");
     expect(adminHtml).toContain("소유 팀 보기");
+    expect(adminHtml).toContain("활성");
   });
 
   it("covers server detail health, recent audit, and tool schema behavior", () => {

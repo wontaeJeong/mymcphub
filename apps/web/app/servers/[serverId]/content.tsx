@@ -21,6 +21,7 @@ import {
   healthTone,
   riskTone,
 } from "../../../components/format";
+import { EyeIcon, PowerIcon, ServerIcon } from "../../../components/icons";
 import { ServerMarketCurationForm } from "../../../components/server-market-curation-form";
 import { ErrorState } from "../../../components/states";
 import {
@@ -77,6 +78,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
         />
         <ErrorState message={server.error} />
         <Link className="button" href="/admin/servers">
+          <EyeIcon />
           카탈로그로 돌아가기
         </Link>
       </div>
@@ -131,10 +133,11 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
             </details>
           </div>
         </Surface>
-        <Surface className="panel--accent">
+        <Surface className="panel--accent danger-zone">
           <SectionHeader
             title="위험도 및 운영 제어"
             description="서버 활성 상태를 관리합니다."
+            action={<span className="heading-icon heading-icon--danger"><ServerIcon /></span>}
           />
           <div className="grid">
             <div className="actions">
@@ -174,7 +177,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                   type="submit"
                   disabled={server.data.enabled}
                 >
-                  서버 활성화
+                  <PowerIcon />서버 활성화
                 </button>
               </form>
               <form action={disableServerAction}>
@@ -188,7 +191,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                   type="submit"
                   disabled={!server.data.enabled}
                 >
-                  서버 비활성화
+                  <PowerIcon />서버 비활성화
                 </button>
               </form>
             </div>
@@ -345,8 +348,8 @@ function ToolControls(tool: ApiMcpTool) {
           <input type="checkbox" required disabled={tool.enabled} />
           이 도구를 다시 노출합니다.
         </label>
-        <button className="button" type="submit" disabled={tool.enabled}>
-          활성화
+        <button className="button button--compact" type="submit" disabled={tool.enabled}>
+          <PowerIcon />활성화
         </button>
       </form>
       <form action={disableToolAction}>
@@ -357,11 +360,11 @@ function ToolControls(tool: ApiMcpTool) {
           이 도구 호출을 중단합니다.
         </label>
         <button
-          className="button button--danger"
+          className="button button--danger button--compact"
           type="submit"
           disabled={!tool.enabled}
         >
-          비활성화
+          <PowerIcon />비활성화
         </button>
       </form>
     </div>

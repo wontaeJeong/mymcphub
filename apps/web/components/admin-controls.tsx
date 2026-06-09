@@ -6,6 +6,7 @@ import { EmptyState, Surface, StatusPill } from "@mcp-hub/ui";
 import { adminDisableServerAction, adminDisableToolAction, emergencyDenyAction, revokeServerGrantsAction } from "../app/actions";
 import { initialFormActionState } from "../app/action-state";
 import type { ApiMcpServer } from "../lib/api";
+import { AlertTriangleIcon, PowerIcon, ServerIcon, ToolIcon, TrashIcon } from "./icons";
 
 export type AdminToolOption = Readonly<{
   id: string;
@@ -25,9 +26,14 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
 
   return (
     <div className="page-stack">
-      <form className="form-card panel--accent" action={denyAction}>
-        <h2>전체 차단</h2>
-        <p>모든 Gateway 접근을 즉시 거부합니다.</p>
+      <form className="form-card panel--accent danger-zone" action={denyAction}>
+        <div className="form-card__heading">
+          <div className="heading-icon heading-icon--danger"><AlertTriangleIcon /></div>
+          <div>
+            <h2>전체 차단</h2>
+            <p>모든 Gateway 접근을 즉시 거부합니다.</p>
+          </div>
+        </div>
         <div className="field">
           <label htmlFor="reason">사유</label>
           <textarea id="reason" name="reason" required placeholder="인시던트 번호, 영향 범위, 결정 근거" />
@@ -37,7 +43,7 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
           전체 접근이 차단됨을 확인합니다.
         </label>
         <div className="form-actions">
-          <button className="button button--danger" type="submit" disabled={denyPending}>{denyPending ? "차단 중..." : "전체 차단"}</button>
+          <button className="button button--danger" type="submit" disabled={denyPending}><PowerIcon />{denyPending ? "차단 중..." : "전체 차단"}</button>
           {denyState.message ? <span className="muted">{denyState.message}</span> : null}
         </div>
       </form>
@@ -52,9 +58,14 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
         <h2>위험 작업</h2>
         <p className="muted">아래 조치는 선택한 서버, 도구, 권한 범위에 직접 영향을 줍니다. 대상 이름을 다시 확인한 뒤 실행하세요.</p>
         <div className="form-grid">
-          <form className="form-card" action={serverAction}>
-            <h2>서버 비활성화</h2>
-            <p>선택한 서버를 비활성화해 연결을 중단합니다.</p>
+          <form className="form-card danger-zone" action={serverAction}>
+            <div className="form-card__heading">
+              <div className="heading-icon heading-icon--danger"><ServerIcon /></div>
+              <div>
+                <h2>서버 비활성화</h2>
+                <p>선택한 서버를 비활성화해 연결을 중단합니다.</p>
+              </div>
+            </div>
             {enabledServers.length > 0 ? (
               <>
                 <div className="field">
@@ -74,15 +85,20 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
                   이 서버의 연결이 중단될 수 있음을 확인합니다.
                 </label>
                 <div className="form-actions">
-                  <button className="button button--danger" type="submit" disabled={serverPending}>{serverPending ? "비활성화 중..." : "서버 비활성화"}</button>
+                  <button className="button button--danger" type="submit" disabled={serverPending}><PowerIcon />{serverPending ? "비활성화 중..." : "서버 비활성화"}</button>
                   {serverState.message ? <span className="muted">{serverState.message}</span> : null}
                 </div>
               </>
             ) : <EmptyState title="활성 서버 없음" description="긴급 비활성화에 사용할 수 있는 활성 서버가 없습니다." />}
           </form>
-          <form className="form-card" action={toolAction}>
-            <h2>도구 비활성화</h2>
-            <p>선택한 도구 호출을 중단합니다.</p>
+          <form className="form-card danger-zone" action={toolAction}>
+            <div className="form-card__heading">
+              <div className="heading-icon heading-icon--danger"><ToolIcon /></div>
+              <div>
+                <h2>도구 비활성화</h2>
+                <p>선택한 도구 호출을 중단합니다.</p>
+              </div>
+            </div>
             {enabledTools.length > 0 ? (
               <>
                 <div className="field">
@@ -102,16 +118,21 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
                   이 도구 호출이 중단될 수 있음을 확인합니다.
                 </label>
                 <div className="form-actions">
-                  <button className="button button--danger" type="submit" disabled={toolPending}>{toolPending ? "비활성화 중..." : "도구 비활성화"}</button>
+                  <button className="button button--danger" type="submit" disabled={toolPending}><PowerIcon />{toolPending ? "비활성화 중..." : "도구 비활성화"}</button>
                   {toolState.message ? <span className="muted">{toolState.message}</span> : null}
                 </div>
               </>
             ) : <EmptyState title="활성 도구 없음" description="긴급 비활성화에 사용할 수 있는 활성 도구가 없습니다." />}
           </form>
         </div>
-        <form className="form-card" action={revokeAction}>
-          <h2>서버의 모든 권한 회수</h2>
-          <p>하나의 서버에 대한 모든 활성 권한을 즉시 회수합니다.</p>
+        <form className="form-card danger-zone" action={revokeAction}>
+          <div className="form-card__heading">
+            <div className="heading-icon heading-icon--danger"><TrashIcon /></div>
+            <div>
+              <h2>서버의 모든 권한 회수</h2>
+              <p>하나의 서버에 대한 모든 활성 권한을 즉시 회수합니다.</p>
+            </div>
+          </div>
           {servers.length > 0 ? (
             <>
               <div className="field">
@@ -131,7 +152,7 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
                   선택한 서버의 모든 권한을 회수합니다.
               </label>
               <div className="form-actions">
-                <button className="button button--danger" type="submit" disabled={revokePending}>{revokePending ? "회수 중..." : "서버 권한 회수"}</button>
+                <button className="button button--danger" type="submit" disabled={revokePending}><TrashIcon />{revokePending ? "회수 중..." : "서버 권한 회수"}</button>
                 {revokeState.message ? <span className="muted">{revokeState.message}</span> : null}
               </div>
             </>

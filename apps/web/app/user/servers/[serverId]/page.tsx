@@ -13,7 +13,7 @@ import {
   healthTone,
   riskTone,
 } from "../../../../components/format";
-import { InstallGuide } from "../../../../components/install-guide";
+import { EyeIcon, KeyIcon, ServerIcon, ShieldIcon } from "../../../../components/icons";
 import { ErrorState } from "../../../../components/states";
 import { GrantTable, ToolTable } from "../../../../components/tables";
 import { ToolTestLab } from "../../../../components/tool-test-lab";
@@ -31,7 +31,6 @@ import { loadResult } from "../../../../lib/result";
 import { selectServerHealth } from "../../../servers/[serverId]/page-helpers";
 import { buildToolTestOptions } from "../../../tools/page-helpers";
 import {
-  buildAccessRequestHref,
   buildRequestedTools,
   compactText,
   deriveServerSummary,
@@ -60,7 +59,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
   ]);
 
   if (!server.ok) {
-    return <div className="page-stack"><PageHero eyebrow="서버 정보" title="서버를 찾을 수 없습니다." description="서버 목록에서 다시 선택하세요." /><ErrorState message={server.error} /><Link className="button" href="/user/catalog">서버 찾기로 돌아가기</Link></div>;
+    return <div className="page-stack"><PageHero eyebrow="서버 정보" title="서버를 찾을 수 없습니다." description="서버 목록에서 다시 선택하세요." /><ErrorState message={server.error} /><Link className="button" href="/user/catalog"><EyeIcon />서버 찾기로 돌아가기</Link></div>;
   }
 
   const latestHealth = health.ok ? selectServerHealth(health.data.items, serverId) : undefined;
@@ -85,8 +84,6 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
   const summary = deriveServerSummary(server.data);
   const useCaseSummary = deriveUseCases(server.data, toolItems);
   const requestedTools = buildRequestedTools(toolItems);
-  const accessRequestHref = buildAccessRequestHref(server.data, requestedTools);
-  const hasAccess = serverAccessStatus.status === "accessible";
   const tags = compactText(server.data.tags);
   const prerequisites = compactText(server.data.prerequisites);
   const securityNotes = compactText(server.data.securityNotes);
@@ -95,7 +92,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
   return (
     <div className="page-stack">
       <PageHero eyebrow={server.data.slug} title={server.data.displayName} description={summary} />
-      <div className="actions">
+      <div className="actions status-strip">
         <StatusPill tone={trustTone(server.data.trustLevel)}>
           {formatTrustLevel(server.data.trustLevel)}
         </StatusPill>
@@ -105,19 +102,15 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
         <StatusPill tone={visibilityTone(server.data.visibility)}>{formatVisibility(server.data.visibility)}</StatusPill>
         <StatusPill tone={server.data.quarantined ? "danger" : "neutral"}>{server.data.quarantined ? "격리됨" : "격리 안 됨"}</StatusPill>
       </div>
-      <div className="actions">
-        {hasAccess ? <Link className="button" href={`/user/client-config?serverId=${encodeURIComponent(server.data.id)}`}>클라이언트 설정 생성</Link> : <Link className="button" href={accessRequestHref}>접근 요청</Link>}
-        <Link className="button button--ghost" href="/user/catalog">서버 찾기로 돌아가기</Link>
-      </div>
       <div className="detail-grid">
         <Surface>
-          <SectionHeader title="서버 정보" description="연결 전에 환경과 설치 정보를 확인하세요." />
+          <SectionHeader title="서버 정보" description="연결 전에 환경과 설치 정보를 확인하세요." action={<span className="heading-icon"><ServerIcon /></span>} />
           <div className="grid">
             <p><strong>카테고리:</strong> {formatMarketCategory(server.data.category)}</p>
             <p><strong>태그:</strong> {tags.length > 0 ? tags.join(", ") : "태그 없음"}</p>
             <p><strong>환경:</strong> {formatEnvironment(server.data.environment)}</p>
             <p><strong>전송 방식:</strong> {formatTransport(server.data.transport)}</p>
-            <p><strong>설치 방식:</strong> {installMethods.length > 0 ? installMethods.map(formatInstallMethod).join(", ") : "설정 생성기"}</p>
+            <p><strong>설치 방식:</strong> {installMethods.length > 0 ? installMethods.map(formatInstallMethod).join(", ") : "정보 없음"}</p>
             <details className="schema-viewer">
               <summary>운영 세부정보 보기</summary>
               <div className="grid">
@@ -130,7 +123,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
           </div>
         </Surface>
         <Surface className="panel--accent">
-          <SectionHeader title="내 권한" description="현재 사용할 수 있는지 확인합니다." />
+          <SectionHeader title="내 권한" description="현재 사용할 수 있는지 확인합니다." action={<span className="heading-icon"><ShieldIcon /></span>} />
           <div className="grid">
             <div className="actions">
               <StatusPill tone={riskTone(server.data.riskLevel)}>{formatRiskLevel(server.data.riskLevel)}</StatusPill>
@@ -144,6 +137,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
             <p className="muted">{serverAccessStatus.actionHint}</p>
             {serverAccessStatus.status === "request_required" || serverAccessStatus.status === "unknown" ? (
               <Link className="button" href={buildAccessStatusRequestHref({ serverId: server.data.id, tools: requestedTools, environment: server.data.environment, reason: `${server.data.displayName} 서버 접근이 필요합니다.` })}>
+                <KeyIcon />
                 서버 접근 요청
               </Link>
             ) : null}
@@ -173,7 +167,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
         </section>
       ) : null}
       <section>
-        <SectionHeader title="접근 요청" description="필요한 도구 권한을 요청하거나 현재 권한을 확인합니다." action={<Link className="button button--ghost" href={accessRequestHref}>{hasAccess ? "추가 도구 요청" : "접근 요청"}</Link>} />
+        <SectionHeader title="접근 요청" description="필요한 도구 권한을 요청하거나 현재 권한을 확인합니다." />
         {grants.ok && visibleGrants.length > 0 ? (
           <div className="grid">
             <Surface>
@@ -182,9 +176,8 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
             </Surface>
             <GrantTable grants={visibleGrants} serverNameById={serverNameById} audience="user" />
           </div>
-        ) : grants.ok ? <EmptyState title="권한이 없습니다" description="이 서버가 필요하다면 접근을 요청하세요." action={<Link className="button" href={accessRequestHref}>접근 요청</Link>} /> : <ErrorState message={grants.error} />}
+        ) : grants.ok ? <EmptyState title="권한이 없습니다" description="이 서버가 필요하다면 위 권한 카드에서 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
       </section>
-      <InstallGuide server={server.data} hasAccess={hasAccess} accessRequestHref={accessRequestHref} />
       <section>
         <SectionHeader title="연결 참고" description="연결 전 필요한 조건과 토큰 처리 방식을 확인하세요." />
         <div className="detail-grid">
@@ -211,7 +204,7 @@ function UserToolAccessAction({
   }
 
   if (status.status === "accessible") {
-    return <Link className="button button--ghost" href={`/user/client-config?serverId=${encodeURIComponent(server.id)}`}>클라이언트 설정으로 이동</Link>;
+    return <span className="muted">이 도구를 사용할 수 있습니다.</span>;
   }
 
   if (status.status === "pending_approval") {
@@ -227,7 +220,8 @@ function UserToolAccessAction({
       {isHighOrCriticalRisk(tool.riskLevel) ? (
         <p className="muted">높음/심각 위험 도구입니다. 요청 사유에 업무 범위, 기간, 승인 근거를 포함하세요.</p>
       ) : null}
-      <Link className="button" href={buildAccessStatusRequestHref({ serverId: server.id, toolName: tool.name, environment: server.environment, reason: `${server.displayName} / ${tool.name} 도구 접근이 필요합니다.` })}>
+      <Link className="button button--compact" href={buildAccessStatusRequestHref({ serverId: server.id, toolName: tool.name, environment: server.environment, reason: `${server.displayName} / ${tool.name} 도구 접근이 필요합니다.` })}>
+        <KeyIcon />
         접근 요청
       </Link>
     </div>

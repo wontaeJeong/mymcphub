@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { PageHero } from "../../components/chrome";
+import { ShieldIcon, UserIcon } from "../../components/icons";
 import { getPublicLoginProviders } from "../../lib/auth/config";
 import { defaultPathForSession } from "../../lib/auth/guards";
 import { getCurrentSession } from "../../lib/auth/session";
@@ -35,14 +36,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <input type="hidden" name="next" value={nextPath} />
             <div className="field"><label htmlFor="username">사용자 이름</label><input id="username" name="username" autoComplete="username" required /></div>
             <div className="field"><label htmlFor="password">비밀번호</label><input id="password" name="password" type="password" autoComplete="current-password" required /></div>
-            <div className="form-actions"><button className="button" type="submit">로그인</button></div>
+            <div className="form-actions"><button className="button" type="submit"><UserIcon />로그인</button></div>
           </form>
         ) : null}
         {oidcProviders.length > 0 ? (
           <section className="form-card">
             <h2>조직 계정</h2>
             <div className="actions">
-              {oidcProviders.map((provider) => <a className="button" href={`/auth/oidc/${provider.id}?next=${encodeURIComponent(nextPath)}`} key={provider.id}>{provider.displayName}로 계속</a>)}
+              {oidcProviders.map((provider) => <a className="button" href={`/auth/oidc/${provider.id}?next=${encodeURIComponent(nextPath)}`} key={provider.id}><ShieldIcon />{provider.displayName}로 계속</a>)}
             </div>
           </section>
         ) : null}
@@ -51,8 +52,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <h2>개발 로그인</h2>
             <p>개발 환경에서 화면을 확인할 때만 사용합니다.</p>
             <div className="actions">
-              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="user" /><button className="button button--ghost" type="submit">개발 사용자로 계속</button></form>
-              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="admin" /><button className="button" type="submit">개발 관리자로 계속</button></form>
+              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="user" /><button className="button button--ghost" type="submit"><UserIcon />개발 사용자로 계속</button></form>
+              <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="admin" /><button className="button" type="submit"><ShieldIcon />개발 관리자로 계속</button></form>
             </div>
           </section>
         ) : null}

@@ -10,14 +10,20 @@ import {
   marketTrustLevelOptions,
   marketVisibilityOptions,
 } from "../lib/market";
+import { PlusIcon, ServerIcon } from "./icons";
 
 export function ServerRegistrationForm() {
   const [state, formAction, pending] = useActionState(createServerAction, initialFormActionState);
 
   return (
     <form className="form-card" action={formAction}>
-      <h2>서버 등록</h2>
-      <p>서버 기본 정보를 등록합니다. 마켓 정보와 스키마는 필요 시 추가하세요.</p>
+      <div className="form-card__heading">
+        <div className="heading-icon"><ServerIcon /></div>
+        <div>
+          <h2>서버 등록</h2>
+          <p>서버 기본 정보를 등록합니다. 마켓 정보와 스키마는 필요 시 추가하세요.</p>
+        </div>
+      </div>
       <div className="form-grid">
         <div className="field">
           <label htmlFor="registerSlug">슬러그</label>
@@ -174,7 +180,7 @@ export function ServerRegistrationForm() {
         첫 번째 도구를 등록 후 바로 활성화합니다.
       </label>
       <div className="form-actions">
-        <button className="button" type="submit" disabled={pending}>{pending ? "등록 중..." : "서버 등록"}</button>
+        <button className="button" type="submit" disabled={pending}><PlusIcon />{pending ? "등록 중..." : "서버 등록"}</button>
         {state.message ? <span className="muted" role="status">{state.message}</span> : null}
       </div>
     </form>

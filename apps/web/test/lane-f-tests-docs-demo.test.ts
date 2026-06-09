@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { readAccessRequestDefaults, readAccessRequestPrefill } from "../app/access/page-helpers";
 import { buildApprovalDecisionContexts, splitApprovalQueue } from "../app/approvals/page-helpers";
-import { readClientConfigInitialValues } from "../app/client-config/page-helpers";
 import { getMarketTags, matchesCatalogFilters } from "../app/catalog/page-helpers";
 import { selectServerHealth } from "../app/servers/[serverId]/page-helpers";
 import { deriveServerSummary, deriveUseCases } from "../app/user/servers/[serverId]/page-helpers";
@@ -121,7 +120,7 @@ function buildSession(overrides: Partial<AuthContext> = {}): AuthContext {
 }
 
 describe("Lane F integrated market tests/docs helpers", () => {
-  it("connects catalog filtering with access and client-config query preselects", () => {
+  it("connects catalog filtering with access query preselects", () => {
     const server = buildServer();
     const accessByServerId = new Map([[server.id, true]]);
 
@@ -151,11 +150,6 @@ describe("Lane F integrated market tests/docs helpers", () => {
       serverId: server.id,
       requestedTools: "list_pods",
       environment: "prod",
-    });
-    expect(readClientConfigInitialValues({ serverId: server.id, client: "codex", profile: "demo" }, [server])).toEqual({
-      serverId: server.id,
-      client: "codex",
-      profile: "demo",
     });
   });
 

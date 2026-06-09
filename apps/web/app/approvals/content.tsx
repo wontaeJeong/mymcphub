@@ -3,6 +3,7 @@ import { EmptyState, StatusPill, Surface } from "@mcp-hub/ui";
 import { approveApprovalAction, rejectApprovalAction } from "../actions";
 import { PageHero, SectionHeader } from "../../components/chrome";
 import { formatDate, formatEnvironment, formatRiskLevel, riskTone } from "../../components/format";
+import { CheckCircleIcon, ExternalLinkIcon, XCircleIcon } from "../../components/icons";
 import { ErrorState } from "../../components/states";
 import { ApprovalTable, type ApprovalDecisionContext } from "../../components/tables";
 import type { ApiApproval } from "../../lib/api";
@@ -91,7 +92,7 @@ function ApprovalReviewCards({
                 <p><strong>주체:</strong> {approval.subjectType}</p>
                 <p><strong>요청 도구:</strong> {approval.requestedTools.length > 0 ? approval.requestedTools.join(", ") : "모든 도구"}</p>
                 <p><strong>만료 요청:</strong> {formatDate(approval.requestedExpiresAt)}</p>
-                {ticketUrl ? <p><a href={ticketUrl} target="_blank" rel="noreferrer">검토 티켓 열기</a></p> : null}
+                {ticketUrl ? <p><a className="inline-link" href={ticketUrl} target="_blank" rel="noreferrer">검토 티켓 열기<ExternalLinkIcon size={14} /></a></p> : null}
               </div>
               <div className="grid">
                 <p><strong>서버 카테고리:</strong> {context?.serverCategory ?? "정보 없음"}</p>
@@ -144,7 +145,7 @@ function ApprovalActions({
           <label htmlFor={`approveComment-${approval.id}`}>승인 근거</label>
           <textarea id={`approveComment-${approval.id}`} name="reviewComment" required={reviewCommentRequired} placeholder={reviewCommentRequired ? "높음/심각 위험 승인 근거" : "승인 근거"} />
         </div>
-        <button className="button" type="submit">승인하기</button>
+        <button className="button" type="submit"><CheckCircleIcon />승인하기</button>
       </form>
       <form className="grid" action={rejectApprovalAction}>
         <input type="hidden" name="approvalId" value={approval.id} />
@@ -152,7 +153,7 @@ function ApprovalActions({
           <label htmlFor={`rejectComment-${approval.id}`}>거절 사유</label>
           <textarea id={`rejectComment-${approval.id}`} name="reviewComment" required={reviewCommentRequired} placeholder={reviewCommentRequired ? "높음/심각 위험 거절 사유" : "거절 사유"} />
         </div>
-        <button className="button button--danger" type="submit">거절하기</button>
+        <button className="button button--danger" type="submit"><XCircleIcon />거절하기</button>
       </form>
       </div>
     </div>

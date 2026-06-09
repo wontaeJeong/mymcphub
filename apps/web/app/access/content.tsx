@@ -2,6 +2,7 @@ import { EmptyState } from "@mcp-hub/ui";
 
 import { createApprovalAction, createGrantAction, revokeGrantAction } from "../actions";
 import { PageHero, SectionHeader } from "../../components/chrome";
+import { CheckCircleIcon, KeyIcon, PlusIcon, ShieldIcon, TrashIcon } from "../../components/icons";
 import { ErrorState } from "../../components/states";
 import { ApprovalTable, GrantTable } from "../../components/tables";
 import type { ApiGrant } from "../../lib/api";
@@ -55,8 +56,13 @@ export async function AccessPageContent({
       ) : null}
       <div className={mode === "admin" ? "form-grid" : "grid"}>
         <form className="form-card" action={createApprovalAction}>
-          <h2>{mode === "user" ? "접근 요청" : "접근 승인 요청"}</h2>
-          <p>{mode === "user" ? "필요한 서버와 도구를 선택하고 사유를 입력하세요." : "주체, 도구, 환경, 티켓, 만료, 사유를 입력해 승인 요청을 생성합니다."}</p>
+          <div className="form-card__heading">
+            <div className="heading-icon"><KeyIcon /></div>
+            <div>
+              <h2>{mode === "user" ? "접근 요청" : "접근 승인 요청"}</h2>
+              <p>{mode === "user" ? "필요한 서버와 도구를 선택하고 사유를 입력하세요." : "주체, 도구, 환경, 티켓, 만료, 사유를 입력해 승인 요청을 생성합니다."}</p>
+            </div>
+          </div>
           {servers.ok && serverItems.length > 0 ? (
             mode === "user" ? (
               <>
@@ -100,7 +106,7 @@ export async function AccessPageContent({
                     <input id="approvalTicketUrl" name="ticketUrl" type="url" placeholder="선택 사항" />
                   </div>
                 </details>
-                <div className="form-actions"><button className="button" type="submit">접근 요청</button></div>
+                <div className="form-actions"><button className="button" type="submit"><KeyIcon />접근 요청</button></div>
               </>
             ) : (
               <>
@@ -157,14 +163,19 @@ export async function AccessPageContent({
                 <label htmlFor="approvalReason">사유</label>
                 <textarea id="approvalReason" name="reason" required defaultValue={prefill.reason} placeholder="업무상 필요 사유" />
               </div>
-              <div className="form-actions"><button className="button" type="submit">승인 요청 생성</button></div>
+              <div className="form-actions"><button className="button" type="submit"><PlusIcon />승인 요청 생성</button></div>
               </>
             )
           ) : servers.ok ? <EmptyState title="사용 가능한 서버 없음" description="승인 요청에는 카탈로그의 서버가 필요합니다." /> : <ErrorState message={servers.error} />}
         </form>
         {mode === "admin" ? <form className="form-card" action={createGrantAction}>
-          <h2>권한 생성</h2>
-          <p>이미 승인된 요청을 기준으로 접근 권한을 생성합니다.</p>
+          <div className="form-card__heading">
+            <div className="heading-icon"><ShieldIcon /></div>
+            <div>
+              <h2>권한 생성</h2>
+              <p>이미 승인된 요청을 기준으로 접근 권한을 생성합니다.</p>
+            </div>
+          </div>
           {servers.ok && serverItems.length > 0 ? (
             <>
               <div className="form-grid">
@@ -198,7 +209,7 @@ export async function AccessPageContent({
               <div className="field"><label htmlFor="ticketUrl">티켓 URL</label><input id="ticketUrl" name="ticketUrl" type="url" placeholder="선택 사항인 승인 티켓" /></div>
               <div className="field"><label htmlFor="expiresAt">만료 시각</label><input id="expiresAt" name="expiresAt" placeholder="예: 2026-06-30T09:00:00Z" /></div>
               <div className="field"><label htmlFor="grantReason">사유</label><textarea id="grantReason" name="reason" required /></div>
-              <div className="form-actions"><button className="button" type="submit">권한 생성</button></div>
+              <div className="form-actions"><button className="button" type="submit"><CheckCircleIcon />권한 생성</button></div>
             </>
           ) : servers.ok ? <EmptyState title="사용 가능한 서버 없음" description="권한 생성에는 카탈로그의 서버가 필요합니다." /> : <ErrorState message={servers.error} />}
         </form> : null}
@@ -211,7 +222,7 @@ function GrantControls(grant: ApiGrant) {
   return (
     <form action={revokeGrantAction}>
       <input type="hidden" name="grantId" value={grant.id} />
-      <button className="button button--danger" type="submit" disabled={!grant.enabled}>{grant.enabled ? "권한 회수" : "회수됨"}</button>
+      <button className="button button--danger button--compact" type="submit" disabled={!grant.enabled}><TrashIcon />{grant.enabled ? "권한 회수" : "회수됨"}</button>
     </form>
   );
 }

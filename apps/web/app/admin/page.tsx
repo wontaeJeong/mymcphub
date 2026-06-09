@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { EmptyState, MetricCard } from "@mcp-hub/ui";
 
 import { PageHero, SectionHeader } from "../../components/chrome";
+import { ActivityIcon, AlertTriangleIcon, DatabaseIcon, KeyIcon, ShieldIcon } from "../../components/icons";
 import { ErrorState } from "../../components/states";
 import { listApprovals, listAuditEvents, listServerHealth, listServers } from "../../lib/api";
 import { summarizeMarketCuration } from "../../lib/market";
@@ -44,11 +46,11 @@ export default async function AdminPage() {
       <section>
         <SectionHeader title="관리 작업" description="카탈로그, 승인 요청, 감사 이벤트, 운영 상태를 관리합니다." />
         <div className="card-grid">
-          <AdminLink href="/admin/servers" title="카탈로그 관리" description="서버 등록, 게시, 격리" />
-          <AdminLink href="/admin/approvals" title="승인 요청 검토" description="요청 사유와 도구 위험도 확인" />
-          <AdminLink href="/admin/audit" title="감사 이벤트" description="정책 결정과 추적 정보 확인" />
-          <AdminLink href="/admin/operations" title="운영 상태" description="상태 이상과 정책 거부 확인" />
-          <AdminLink href="/admin/emergency" title="긴급 조치" description="전체 차단과 권한 회수" />
+          <AdminLink href="/admin/servers" title="카탈로그 관리" description="서버 등록, 게시, 격리" icon={<DatabaseIcon />} />
+          <AdminLink href="/admin/approvals" title="승인 요청 검토" description="요청 사유와 도구 위험도 확인" icon={<ShieldIcon />} />
+          <AdminLink href="/admin/audit" title="감사 이벤트" description="정책 결정과 추적 정보 확인" icon={<KeyIcon />} />
+          <AdminLink href="/admin/operations" title="운영 상태" description="상태 이상과 정책 거부 확인" icon={<ActivityIcon />} />
+          <AdminLink href="/admin/emergency" title="긴급 조치" description="전체 차단과 권한 회수" icon={<AlertTriangleIcon />} />
           {serverItems.length === 0 ? <EmptyState title="서버 없음" description="관리자 서버 관리 페이지에서 서버를 등록하세요." /> : null}
         </div>
       </section>
@@ -56,6 +58,6 @@ export default async function AdminPage() {
   );
 }
 
-function AdminLink({ href, title, description }: Readonly<{ href: string; title: string; description: string }>) {
-  return <Link className="panel" href={href}><h2>{title}</h2><p>{description}</p></Link>;
+function AdminLink({ href, title, description, icon }: Readonly<{ href: string; title: string; description: string; icon: ReactNode }>) {
+  return <Link className="panel action-card" href={href}><span className="heading-icon">{icon}</span><span><h2>{title}</h2><p>{description}</p></span></Link>;
 }

@@ -16,7 +16,7 @@ The web app defaults to the local Control Plane API at `http://localhost:4000`. 
 
 ## Routes
 
-- User: `/user`, `/user/catalog`, `/user/access`, `/user/client-config`, `/user/servers/[serverId]`
+- User: `/user`, `/user/catalog`, `/user/access`, `/user/servers/[serverId]`
 - Admin: `/admin`, `/admin/servers`, `/admin/approvals`, `/admin/audit`, `/admin/operations`, `/admin/emergency`
 
 Unauthenticated users are sent to `/login`. Authenticated non-admin users get a clear forbidden state for admin pages.

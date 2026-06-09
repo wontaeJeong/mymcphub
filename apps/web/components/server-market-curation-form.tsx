@@ -18,6 +18,7 @@ import {
   marketVisibilityForServer,
 } from "../lib/market";
 import { formatDate } from "./format";
+import { AlertTriangleIcon, CheckCircleIcon, EditIcon, EyeIcon, XCircleIcon } from "./icons";
 
 export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpServer }>) {
   const [metadataState, metadataAction, metadataPending] = useActionState(updateServerMarketMetadataAction, initialFormActionState);
@@ -29,8 +30,13 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
     <section className="detail-grid" id="market-metadata">
       <form className="form-card" action={metadataAction}>
         <input type="hidden" name="serverId" value={server.id} />
-        <h2>마켓 메타데이터</h2>
-        <p>검색, 문서, 설치 안내에 사용할 정보를 관리합니다.</p>
+        <div className="form-card__heading">
+          <div className="heading-icon"><EditIcon /></div>
+          <div>
+            <h2>마켓 메타데이터</h2>
+            <p>검색, 문서, 설치 안내에 사용할 정보를 관리합니다.</p>
+          </div>
+        </div>
         <div className="form-grid">
           <div className="field">
             <label htmlFor="marketCategory">카테고리</label>
@@ -94,13 +100,18 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
           <p className="muted">현재: {formatInstallMethods(server.installMethods)}</p>
         </div>
         <div className="form-actions">
-          <button className="button" type="submit" disabled={metadataPending}>{metadataPending ? "저장 중..." : "메타데이터 저장"}</button>
+          <button className="button" type="submit" disabled={metadataPending}><CheckCircleIcon />{metadataPending ? "저장 중..." : "메타데이터 저장"}</button>
           {metadataState.message ? <span className="muted" role="status">{metadataState.message}</span> : null}
         </div>
       </form>
-      <Surface className="panel--accent">
-        <h2>게시 상태</h2>
-        <p>게시, 게시 해제, 격리, 격리 해제를 관리합니다.</p>
+      <Surface className="panel--accent danger-zone">
+        <div className="form-card__heading">
+          <div className="heading-icon heading-icon--danger"><AlertTriangleIcon /></div>
+          <div>
+            <h2>게시 상태</h2>
+            <p>게시, 게시 해제, 격리, 격리 해제를 관리합니다.</p>
+          </div>
+        </div>
         <div className="grid market-lifecycle-summary">
           <div className="actions">
             <StatusPill tone={visibility === "published" ? "success" : visibility === "quarantined" ? "danger" : "warning"}>{formatMarketVisibility(visibility)}</StatusPill>
@@ -122,10 +133,10 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
             카탈로그 노출과 접근 상태가 변경될 수 있습니다.
           </label>
           <div className="actions">
-            <button className="button" type="submit" name="marketAction" value="publish" disabled={lifecyclePending || visibility === "published" || visibility === "quarantined"}>게시하기</button>
-            <button className="button button--ghost" type="submit" name="marketAction" value="unpublish" disabled={lifecyclePending || visibility !== "published"}>게시 해제</button>
-            <button className="button button--danger" type="submit" name="marketAction" value="quarantine" disabled={lifecyclePending || visibility === "quarantined"}>격리하기</button>
-            <button className="button button--ghost" type="submit" name="marketAction" value="unquarantine" disabled={lifecyclePending || visibility !== "quarantined"}>격리 해제</button>
+            <button className="button" type="submit" name="marketAction" value="publish" disabled={lifecyclePending || visibility === "published" || visibility === "quarantined"}><EyeIcon />게시하기</button>
+            <button className="button button--ghost" type="submit" name="marketAction" value="unpublish" disabled={lifecyclePending || visibility !== "published"}><XCircleIcon />게시 해제</button>
+            <button className="button button--danger" type="submit" name="marketAction" value="quarantine" disabled={lifecyclePending || visibility === "quarantined"}><AlertTriangleIcon />격리하기</button>
+            <button className="button button--ghost" type="submit" name="marketAction" value="unquarantine" disabled={lifecyclePending || visibility !== "quarantined"}><CheckCircleIcon />격리 해제</button>
           </div>
           {lifecycleState.message ? <p className="muted" role="status">{lifecycleState.message}</p> : null}
         </form>

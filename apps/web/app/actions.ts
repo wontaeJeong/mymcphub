@@ -15,13 +15,11 @@ import {
   enableServer,
   enableTool,
   formatApiError,
-  generateClientConfig,
   rejectApproval,
   revokeGrant,
   revokeServerGrants,
   testPolicyCall,
   updateServer,
-  type ClientConfigKind,
   type Environment,
   type InstallMethod,
   type MarketCategory,
@@ -323,34 +321,6 @@ export async function adminDisableToolAction(_previousState: FormActionState, fo
   }
 }
 
-export async function generateClientConfigAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
-  await requireSessionForAction();
-  const serverId = readRequired(formData, "serverId");
-  const client = readClientConfigKind(formData);
-  const profile = readOptional(formData, "profile") ?? "local";
-  try {
-    const result = await generateClientConfig(serverId, client, profile);
-    const gatewayUrl = result.gatewayUrl ?? extractGatewayUrl(result.config);
-    return {
-      status: "success",
-      message: result.placeholder ? "클라이언트 설정 초안을 생성했습니다." : "클라이언트 설정을 생성했습니다.",
-      payload: JSON.stringify(result.config, null, 2),
-      selectedServerId: serverId,
-      selectedClient: client,
-      selectedProfile: profile,
-      gatewayUrl
-    };
-  } catch (error) {
-    return {
-      status: "error",
-      message: formatApiError(error),
-      selectedServerId: serverId,
-      selectedClient: client,
-      selectedProfile: profile
-    };
-  }
-}
-
 export async function testPolicyCallAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
   await requireSessionForAction();
   const toolTestRef = readRequired(formData, "toolTestRef");
@@ -605,15 +575,6 @@ function readSubjectType(formData: FormData) {
   throw new Error("subjectType이 올바르지 않습니다");
 }
 
-function readClientConfigKind(formData: FormData): ClientConfigKind {
-  const value = readRequired(formData, "client");
-  if (value === "generic" || value === "opencode" || value === "claude-code" || value === "codex" || value === "vscode") {
-    return value;
-  }
-
-  throw new Error("client가 올바르지 않습니다");
-}
-
 function requireConfirmation(formData: FormData, name: string) {
   if (formData.get(name) !== "on") {
     throw new Error("위험한 작업을 실행하기 전에 확인이 필요합니다.");
@@ -628,21 +589,6 @@ function readToolRef(formData: FormData): [string, string] {
   }
 
   return [serverId, toolId];
-}
-
-function extractGatewayUrl(config: Record<string, unknown>) {
-  const direct = readStringProperty(config, "gatewayUrl") ?? readStringProperty(config, "gatewayURL") ?? readStringProperty(config, "url");
-  if (direct) {
-    return direct;
-  }
-
-  const match = JSON.stringify(config).match(/https?:\/\/[^"\\\s]+/u);
-  return match ? match[0] : undefined;
-}
-
-function readStringProperty(value: Record<string, unknown>, property: string) {
-  const candidate = value[property];
-  return typeof candidate === "string" ? candidate : undefined;
 }
 
 async function requireSessionForAction() {
@@ -667,7 +613,6 @@ function revalidateServerSurfaces(serverId: string) {
   revalidatePath("/admin/servers");
   revalidatePath("/user/catalog");
   revalidatePath("/admin/operations");
-  revalidatePath("/user/client-config");
   revalidatePath("/admin");
   revalidatePath("/user");
 }

@@ -9,6 +9,7 @@ import type { ToolTestOption } from "../app/tools/page-helpers";
 import type { PolicyEffect } from "../lib/api";
 import { policyTone } from "./format";
 import { CopyButton } from "./copy-button";
+import { ActivityIcon } from "./icons";
 
 const sampleArguments = JSON.stringify({ query: "release runbook", token: "redacted-secret-placeholder" }, null, 2);
 
@@ -19,8 +20,13 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
 
   return (
     <form className="form-card test-lab" action={formAction}>
-      <h2>호출 가능 여부 확인</h2>
-      <p>실제 호출 전에 정책 결과와 마스킹된 입력을 확인합니다.</p>
+      <div className="form-card__heading">
+        <div className="heading-icon"><ActivityIcon /></div>
+        <div>
+          <h2>호출 가능 여부 확인</h2>
+          <p>실제 호출 전에 정책 결과와 마스킹된 입력을 확인합니다.</p>
+        </div>
+      </div>
       {options.length > 0 ? (
         <>
           <input type="hidden" name="dryRun" value="true" />
@@ -43,7 +49,7 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
             <textarea id="argumentsJson" name="argumentsJson" required defaultValue={sampleArguments} />
           </div>
           <div className="form-actions">
-            <button className="button" type="submit" disabled={pending}>{pending ? "확인 중..." : "호출 가능 여부 확인"}</button>
+            <button className="button" type="submit" disabled={pending}><ActivityIcon />{pending ? "확인 중..." : "호출 가능 여부 확인"}</button>
             {policyEffect ? <StatusPill tone={policyTone(policyEffect)}>{policyEffect}</StatusPill> : null}
             {state.message ? <span className="muted" role="status">{state.message}</span> : null}
           </div>

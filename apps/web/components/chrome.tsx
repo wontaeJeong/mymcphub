@@ -5,22 +5,22 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import type { WebSession } from "../lib/auth/session";
 
+import { ActivityIcon, AlertTriangleIcon, DatabaseIcon, KeyIcon, LogOutIcon, SearchIcon, ServerIcon, ShieldIcon, UserIcon } from "./icons";
 import { ThemeToggle } from "./theme-toggle";
 
 const userNavItems = [
-  ["사용자 홈", "/user"],
-  ["MCP Market", "/user/catalog"],
-  ["접근 권한", "/user/access"],
-  ["클라이언트 설정", "/user/client-config"]
+  ["사용자 홈", "/user", UserIcon],
+  ["서버 찾기", "/user/catalog", SearchIcon],
+  ["접근 권한", "/user/access", ShieldIcon]
 ] as const;
 
 const adminNavItems = [
-  ["운영 현황", "/admin"],
-  ["카탈로그 관리", "/admin/servers"],
-  ["승인 요청", "/admin/approvals"],
-  ["감사 로그", "/admin/audit"],
-  ["운영 상태", "/admin/operations"],
-  ["긴급 조치", "/admin/emergency"]
+  ["운영 현황", "/admin", ActivityIcon],
+  ["카탈로그 관리", "/admin/servers", DatabaseIcon],
+  ["승인 요청", "/admin/approvals", ShieldIcon],
+  ["감사 로그", "/admin/audit", KeyIcon],
+  ["운영 상태", "/admin/operations", ServerIcon],
+  ["긴급 조치", "/admin/emergency", AlertTriangleIcon]
 ] as const;
 
 export type AppShellProps = Readonly<{
@@ -36,17 +36,18 @@ export function AppShell({ children, section, session }: AppShellProps) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <p className="brand__eyebrow">{section === "admin" ? "Admin Console" : "MCP Market"}</p>
+          <p className="brand__eyebrow">{section === "admin" ? "Admin Console" : "User Console"}</p>
           <h1>MCP Hub</h1>
           <p>{section === "admin" ? "서버, 권한, 운영 상태를 관리합니다." : "필요한 MCP 서버를 찾고 연결합니다."}</p>
         </div>
         <ThemeToggle />
         <nav className="nav" aria-label="주요 탐색">
-          {navItems.map(([label, href]) => {
+          {navItems.map(([label, href, Icon]) => {
             const isActive = pathname === href || (href !== `/${section}` && pathname.startsWith(`${href}/`));
             return (
             <Link aria-current={isActive ? "page" : undefined} href={href} key={href}>
-              {label}
+              <Icon />
+              <span>{label}</span>
             </Link>
             );
           })}
@@ -59,9 +60,9 @@ export function AppShell({ children, section, session }: AppShellProps) {
             <summary>계정 세부정보 보기</summary>
             <p>{session.principal.email}</p>
           </details>
-          {session.principal.isPlatformAdmin ? <Link className="button button--ghost" href="/admin">관리자 영역</Link> : null}
+          {session.principal.isPlatformAdmin ? <Link className="button button--ghost button--compact" href="/admin"><ActivityIcon />관리자 영역</Link> : null}
           <form action="/auth/logout" method="post">
-            <button className="button button--ghost" type="submit">로그아웃</button>
+            <button className="button button--ghost button--compact" type="submit"><LogOutIcon />로그아웃</button>
           </form>
         </div>
       </aside>

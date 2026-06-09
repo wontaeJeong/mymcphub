@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { readAccessRequestDefaults } from "../app/access/page-helpers";
-import { readClientConfigInitialValues } from "../app/client-config/page-helpers";
 import { buildRolloutStatusRows } from "../app/operations/page-helpers";
 import { buildGrantStatus, buildToolTestOptions } from "../app/tools/page-helpers";
 import {
@@ -92,12 +91,9 @@ function buildHealth(overrides: Partial<ApiServerHealth> = {}): ApiServerHealth 
 }
 
 describe("Lane C Web contract helpers", () => {
-  it("reads client config and access preselect query values with safe fallbacks", () => {
+  it("reads access preselect query values with safe fallbacks", () => {
     const server = buildServer();
-    const fallbackServer = buildServer({ id: "server-fallback", slug: "fallback", displayName: "Fallback" });
 
-    expect(readClientConfigInitialValues({ serverId: server.id, client: "codex", profile: "prod" }, [server, fallbackServer])).toEqual({ serverId: server.id, client: "codex", profile: "prod" });
-    expect(readClientConfigInitialValues({ serverId: "missing", client: "unsupported", profile: " " }, [server])).toEqual({ serverId: server.id, client: "opencode", profile: "local" });
     expect(readAccessRequestDefaults({ serverId: server.id, requestedTools: "docs.search, docs.read", environment: "prod" }, [server])).toEqual({ serverId: server.id, requestedTools: "docs.search, docs.read", environment: "prod" });
     expect(readAccessRequestDefaults({ environment: "not-real" }, [server])).toEqual({ serverId: server.id, requestedTools: "", environment: "prod" });
   });

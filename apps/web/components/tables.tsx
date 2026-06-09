@@ -47,6 +47,7 @@ import {
   policyTone,
   riskTone,
 } from "./format";
+import { EditIcon, ExternalLinkIcon, EyeIcon, KeyIcon } from "./icons";
 
 export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
@@ -61,12 +62,13 @@ export type DisplayAudience = "user" | "admin-summary" | "admin-detail";
 export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers", showMarketCuration = false, audience }: ServerTableProps) {
   const tableAudience = audience ?? (showMarketCuration ? "admin-summary" : "user");
   const showSummaryDiagnostics = tableAudience !== "user";
+  const showEnabledColumn = tableAudience !== "user";
 
   return (
     <div className="table-wrap">
       <table>
         <caption>{tableAudience === "user" ? "MCP 서버 목록" : "서버 관리 목록"}</caption>
-        {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead showSummaryDiagnostics={showSummaryDiagnostics} />}
+        {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead showEnabledColumn={showEnabledColumn} showSummaryDiagnostics={showSummaryDiagnostics} />}
         <tbody>
           {servers.map((server) => {
             const health = healthByServerId?.get(server.id);
@@ -110,11 +112,11 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                     <StatusPill>상태 없음</StatusPill>
                   )}
                 </td>
-                <td>
+                {showEnabledColumn ? <td>
                   <StatusPill tone={enabledTone(server.enabled)}>
                     {formatEnabled(server.enabled)}
                   </StatusPill>
-                </td>
+                </td> : null}
                 {showSummaryDiagnostics ? <td>
                   <div className="actions">
                     <StatusPill
@@ -147,7 +149,7 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
   );
 }
 
-function ServerTableHead({ showSummaryDiagnostics }: Readonly<{ showSummaryDiagnostics: boolean }>) {
+function ServerTableHead({ showEnabledColumn, showSummaryDiagnostics }: Readonly<{ showEnabledColumn: boolean; showSummaryDiagnostics: boolean }>) {
   return (
     <thead>
       <tr>
@@ -158,7 +160,7 @@ function ServerTableHead({ showSummaryDiagnostics }: Readonly<{ showSummaryDiagn
         {showSummaryDiagnostics ? <th scope="col">전송 방식</th> : null}
         <th scope="col">위험도</th>
         <th scope="col">상태</th>
-        <th scope="col">활성 여부</th>
+        {showEnabledColumn ? <th scope="col">활성 여부</th> : null}
         {showSummaryDiagnostics ? <th scope="col">운영</th> : null}
         {showSummaryDiagnostics ? <th scope="col">업데이트</th> : null}
       </tr>
@@ -230,7 +232,7 @@ function MarketCurationTableRow({ server, health, serverBasePath, audience }: Re
           </StatusPill>
         </div>
         <p className="muted">{formatInstallMethods(server.installMethods)}</p>
-        {sourceUrl ? <p><a href={sourceUrl} target="_blank" rel="noreferrer">소스</a></p> : null}
+        {sourceUrl ? <p><a className="inline-link" href={sourceUrl} target="_blank" rel="noreferrer">소스<ExternalLinkIcon size={14} /></a></p> : null}
       </td>
       <td>
         {audience === "admin-detail" ? server.ownerTeamId : <TechnicalDetails summary="소유 팀 보기">{server.ownerTeamId}</TechnicalDetails>}
@@ -251,10 +253,10 @@ function MarketCurationTableRow({ server, health, serverBasePath, audience }: Re
         <StatusPill tone={riskTone(server.riskLevel)}>{formatRiskLevel(server.riskLevel)}</StatusPill>
       </td>
       <td>
-        <div className="actions">
-          <Link className="button button--ghost" href={`${serverBasePath}/${server.id}`}>상세</Link>
-          <Link className="button button--ghost" href={`${serverBasePath}/${server.id}#market-metadata`}>편집</Link>
-          <Link className="button button--ghost" href={`/admin/audit?server=${encodeURIComponent(server.id)}`}>감사</Link>
+        <div className="actions actions--compact">
+          <Link className="button button--ghost button--compact" href={`${serverBasePath}/${server.id}`}><EyeIcon />상세</Link>
+          <Link className="button button--ghost button--compact" href={`${serverBasePath}/${server.id}#market-metadata`}><EditIcon />편집</Link>
+          <Link className="button button--ghost button--compact" href={`/admin/audit?server=${encodeURIComponent(server.id)}`}><KeyIcon />감사</Link>
         </div>
       </td>
       <td>{formatDate(server.updatedAt)}</td>
@@ -938,12 +940,12 @@ export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<
                   <div className="grid">
                     <div className="copy-control">
                       <span className="muted">추적 ID</span>
-                      <CopyButton value={event.traceId} label="추적 ID 복사" />
+                      <CopyButton value={event.traceId} label="추적 ID 복사" compact />
                       <Link
-                        className="button button--ghost"
+                        className="button button--ghost button--compact"
                         href={`${auditBasePath}?trace_id=${encodeURIComponent(event.traceId)}`}
                       >
-                        추적 링크
+                        <KeyIcon />추적 링크
                       </Link>
                     </div>
                     <p>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">인자 해시 기록 없음</span>}</p>
@@ -1113,7 +1115,7 @@ export function HealthTable({
               <td>{check.errorMessage ?? "없음"}</td>
               <td>
                 {check.traceId ? (
-                  <CopyButton value={check.traceId} label="추적 ID 복사" />
+                  <CopyButton value={check.traceId} label="추적 ID 복사" compact />
                 ) : (
                   <span className="muted">해당 없음</span>
                 )}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { MoonIcon, SunIcon } from "./icons";
+
 type Theme = "light" | "dark";
 
 const storageKey = "mcp-hub-theme";
@@ -56,8 +58,7 @@ export function ThemeToggle() {
         setTheme(nextTheme);
       }}
     >
-      <span>테마</span>
-      <strong>{currentLabel}</strong>
+      {theme === "dark" ? <MoonIcon size={17} /> : <SunIcon size={17} />}
     </button>
   );
 }

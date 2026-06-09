@@ -338,21 +338,6 @@ export type ListResponse<Item> = {
   pageInfo?: PageInfo;
 };
 
-export type ClientConfigKind =
-  | "generic"
-  | "opencode"
-  | "claude-code"
-  | "codex"
-  | "vscode";
-
-export type ClientConfigResult = {
-  client: ClientConfigKind;
-  profile?: string;
-  placeholder: boolean;
-  gatewayUrl?: string;
-  config: Record<string, unknown>;
-};
-
 export type ApiPolicyDecision = {
   effect: PolicyEffect;
   allowed: boolean;
@@ -647,17 +632,6 @@ export async function createGrant(input: CreateGrantInput) {
   return apiRequest<ApiGrant>("/api/grants", {
     method: "POST",
     body: JSON.stringify(input),
-  });
-}
-
-export async function generateClientConfig(
-  serverId: string,
-  client: ClientConfigKind,
-  profile?: string,
-) {
-  return apiRequest<ClientConfigResult>("/api/client-config/generate", {
-    method: "POST",
-    body: JSON.stringify({ serverId, client, profile }),
   });
 }
 
