@@ -5,14 +5,27 @@ import { useActionState } from "react";
 import { generateClientConfigAction } from "../app/actions";
 import { initialFormActionState } from "../app/action-state";
 import { CopyButton } from "./copy-button";
-import type { ApiMcpServer } from "../lib/api";
+import type { ApiMcpServer, ClientConfigKind } from "../lib/api";
 
 export function ClientConfigForm({
   servers,
-}: Readonly<{ servers: ApiMcpServer[] }>) {
+  initialValues,
+}: Readonly<{
+  servers: ApiMcpServer[];
+  initialValues?: Readonly<{
+    serverId?: string;
+    client?: ClientConfigKind;
+    profile?: string;
+  }>;
+}>) {
   const [state, formAction, pending] = useActionState(
     generateClientConfigAction,
-    initialFormActionState,
+    {
+      ...initialFormActionState,
+      selectedServerId: initialValues?.serverId,
+      selectedClient: initialValues?.client,
+      selectedProfile: initialValues?.profile,
+    },
   );
   const selectedServer =
     servers.find((server) => server.id === state.selectedServerId) ?? servers[0];
@@ -29,7 +42,7 @@ export function ClientConfigForm({
       <div className="form-grid">
         <div className="field">
           <label htmlFor="serverId">MCP 서버</label>
-          <select id="serverId" name="serverId" required>
+          <select id="serverId" name="serverId" defaultValue={selectedServer?.id} required>
             {servers.map((server) => (
               <option value={server.id} key={server.id}>
                 {server.displayName}
@@ -39,7 +52,7 @@ export function ClientConfigForm({
         </div>
         <div className="field">
           <label htmlFor="client">클라이언트</label>
-          <select id="client" name="client" defaultValue="opencode" required>
+          <select id="client" name="client" defaultValue={selectedClient} required>
             <option value="generic">일반 원격 MCP</option>
             <option value="opencode">opencode</option>
             <option value="claude-code">Claude Code</option>

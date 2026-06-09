@@ -1,8 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { readAccessRequestDefaults } from "../app/access/page-helpers";
+import { readClientConfigInitialValues } from "../app/client-config/page-helpers";
 import { buildRolloutStatusRows } from "../app/operations/page-helpers";
 import { buildGrantStatus, buildToolTestOptions } from "../app/tools/page-helpers";
+import {
+  buildAccessRequestHref,
+  buildUserToolAccessStatus,
+  deriveServerSummary,
+  deriveUseCases,
+} from "../app/user/servers/[serverId]/page-helpers";
 import { RolloutStatusTable } from "../components/tables";
 import type { ApiGrant, ApiMcpServer, ApiMcpServerVersion, ApiMcpTool, ApiServerHealth } from "../lib/api";
 import { buildPolicyTestCallInput, buildPolicyTestDisplayPayload, parseToolTestRef, redactPolicyTestPayload } from "../lib/policy-test";
@@ -84,6 +92,16 @@ function buildHealth(overrides: Partial<ApiServerHealth> = {}): ApiServerHealth 
 }
 
 describe("Lane C Web contract helpers", () => {
+  it("reads client config and access preselect query values with safe fallbacks", () => {
+    const server = buildServer();
+    const fallbackServer = buildServer({ id: "server-fallback", slug: "fallback", displayName: "Fallback" });
+
+    expect(readClientConfigInitialValues({ serverId: server.id, client: "codex", profile: "prod" }, [server, fallbackServer])).toEqual({ serverId: server.id, client: "codex", profile: "prod" });
+    expect(readClientConfigInitialValues({ serverId: "missing", client: "unsupported", profile: " " }, [server])).toEqual({ serverId: server.id, client: "opencode", profile: "local" });
+    expect(readAccessRequestDefaults({ serverId: server.id, requestedTools: "docs.search, docs.read", environment: "prod" }, [server])).toEqual({ serverId: server.id, requestedTools: "docs.search, docs.read", environment: "prod" });
+    expect(readAccessRequestDefaults({ environment: "not-real" }, [server])).toEqual({ serverId: server.id, requestedTools: "", environment: "prod" });
+  });
+
   it("builds tool test lab options and grant status from Go API shapes", () => {
     const server = buildServer();
     const tool = buildTool();
@@ -96,6 +114,34 @@ describe("Lane C Web contract helpers", () => {
     expect(grantStatus.get("server-prod-docs:docs.search")).toBe("1개 활성 권한: 팀:team-platform");
     expect(noGrantStatus.get("server-prod-docs:docs.search")).toBe("활성 권한 없음");
     expect(unavailableGrantStatus.get("server-prod-docs:docs.search")).toBe("권한 상태 확인 불가");
+  });
+
+  it("builds user detail access statuses and request links", () => {
+    const server = buildServer();
+    const tool = buildTool();
+    const grantedStatus = buildUserToolAccessStatus(server, [tool], [buildGrant()]);
+    const requestStatus = buildUserToolAccessStatus(server, [tool], []);
+    const disabledToolStatus = buildUserToolAccessStatus(server, [buildTool({ enabled: false })], []);
+    const unknownStatus = buildUserToolAccessStatus(server, [tool], undefined);
+    const disabledServerStatus = buildUserToolAccessStatus(buildServer({ enabled: false }), [tool], [buildGrant()]);
+
+    expect(grantedStatus.get("server-prod-docs:docs.search")).toBe("사용 가능");
+    expect(requestStatus.get("server-prod-docs:docs.search")).toBe("접근 요청 필요");
+    expect(disabledToolStatus.get("server-prod-docs:docs.search")).toBe("사용 불가: 도구 비활성");
+    expect(unknownStatus.get("server-prod-docs:docs.search")).toBe("권한 상태 확인 불가");
+    expect(disabledServerStatus.get("server-prod-docs:docs.search")).toBe("사용 불가: 서버 비활성");
+    expect(buildAccessRequestHref(server, ["docs.search", "docs.read"])).toBe("/user/access?serverId=server-prod-docs&requestedTools=docs.search%2Cdocs.read&environment=prod");
+  });
+
+  it("derives optional market detail metadata without requiring Lane A fields", () => {
+    const tool = buildTool({ description: "Search incident runbooks" });
+
+    expect(deriveServerSummary(buildServer({ summary: "Find production docs", description: "Longer details" }))).toBe("Find production docs");
+    expect(deriveServerSummary(buildServer({ description: "Longer details" }))).toBe("Longer details");
+    expect(deriveServerSummary(buildServer())).toBe("공개된 서버 설명이 없습니다.");
+    expect(deriveUseCases(buildServer({ useCases: ["Investigate incidents", " "] }), [tool])).toEqual({ items: ["Investigate incidents"], source: "metadata" });
+    expect(deriveUseCases(buildServer(), [tool])).toEqual({ items: ["docs.search: Search incident runbooks"], source: "tools" });
+    expect(deriveUseCases(buildServer(), [buildTool({ description: undefined })])).toEqual({ items: [], source: "empty" });
   });
 
   it("creates dry-run policy test call payloads and redacts sensitive arguments", () => {

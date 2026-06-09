@@ -1,5 +1,9 @@
 import { ClientConfigPageContent } from "../../client-config/content";
 
-export default function UserClientConfigPage() {
-  return <ClientConfigPageContent />;
+type UserClientConfigPageProps = Readonly<{
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}>;
+
+export default function UserClientConfigPage({ searchParams }: UserClientConfigPageProps) {
+  return <ClientConfigPageContent searchParams={searchParams} />;
 }
