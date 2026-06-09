@@ -134,6 +134,28 @@ export type CreateServerInput = {
   tools: CreateServerToolInput[];
 };
 
+export type UpdateServerInput = {
+  displayName?: string;
+  description?: string;
+  enabled?: boolean;
+  category?: MarketCategory;
+  tags?: string[];
+  summary?: string;
+  useCases?: string[];
+  docsUrl?: string;
+  sourceUrl?: string;
+  iconUrl?: string;
+  installMethods?: InstallMethod[];
+  prerequisites?: string[];
+  securityNotes?: string[];
+  trustLevel?: MarketTrustLevel;
+  visibility?: MarketVisibility;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  publishedAt?: string;
+  reason?: string;
+};
+
 export type ApiMcpTool = {
   id: string;
   serverId: string;
@@ -421,6 +443,16 @@ export async function createServer(input: CreateServerInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function updateServer(serverId: string, input: UpdateServerInput) {
+  return apiRequest<ApiMcpServer>(
+    `/api/servers/${encodeURIComponent(serverId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function enableServer(serverId: string) {

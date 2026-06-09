@@ -21,6 +21,7 @@ import {
   healthTone,
   riskTone,
 } from "../../../components/format";
+import { ServerMarketCurationForm } from "../../../components/server-market-curation-form";
 import { ErrorState } from "../../../components/states";
 import {
   AuditTable,
@@ -197,6 +198,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
           </div>
         </Surface>
       </div>
+      <ServerMarketCurationForm server={server.data} />
       <section>
         <SectionHeader
           title="서버 버전"
