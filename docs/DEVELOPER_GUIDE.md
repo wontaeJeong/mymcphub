@@ -30,7 +30,7 @@ Use the fastest focused command for the surface you changed, then run the aggreg
 go test ./...
 pnpm --filter @mcp-hub/web test
 scripts/ci/schemas.sh
-bash tests/helm-template.sh
+bash scripts/ci/helm-template.sh
 ```
 
 Lane G adds offline suites under `tests/contract`, `tests/e2e`, `tests/load`, and `tests/migration`. These use `httptest`, shared fixtures, and the in-memory store, so they do not require Docker Compose or a running API/Gateway.

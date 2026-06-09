@@ -27,7 +27,7 @@
 - Focused Web checks: `pnpm --filter @mcp-hub/web test`, `typecheck`, `lint`, or `build`; use `@mcp-hub/ui` for the shared UI package.
 - `pnpm typecheck` runs UI then Web typechecks; `scripts/ci/web.sh` runs lint, typecheck, test, build for both workspaces.
 - `pnpm dev:smoke-test` expects the local stack and Compose infra to be running. Go tests under `tests/contract`, `tests/e2e`, `tests/load`, and `tests/migration` are offline `httptest`/in-memory suites.
-- `pnpm helm:template` requires both `helm` and `kustomize`; `bash tests/helm-template.sh` renders default/dev/stg/prod Helm values plus GitOps overlays. `scripts/ci/helm.sh` may skip locally if `helm` is missing.
+- `pnpm helm:template` requires both `helm` and `kustomize`; `bash scripts/ci/helm-template.sh` renders default/dev/stg/prod Helm values plus GitOps overlays. `scripts/ci/helm.sh` may skip locally if `helm` is missing.
 - Avoid `pnpm format` or `make fmt` unless requested: they format the whole repo.
 
 ## Contracts and generated files

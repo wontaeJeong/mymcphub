@@ -31,7 +31,7 @@ Run these after the final merge conflict is resolved:
 go test ./...
 pnpm --filter @mcp-hub/web test
 scripts/ci/schemas.sh
-bash tests/helm-template.sh
+bash scripts/ci/helm-template.sh
 ```
 
 Also run the release-note generator for the merged candidate:
