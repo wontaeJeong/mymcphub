@@ -34,7 +34,7 @@ docker build \
   --build-arg HTTP_PROXY="$HTTP_PROXY" \
   --build-arg HTTPS_PROXY="$HTTPS_PROXY" \
   --build-arg NO_PROXY="$NO_PROXY" \
-  -f apps/api/Dockerfile \
+  -f deploy/container/apps/api/Dockerfile \
   -t mcp-hub/api:dev .
 ```
 
