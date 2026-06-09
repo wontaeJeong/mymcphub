@@ -1,12 +1,12 @@
 # MCP Hub
 
-MCP Hub is an internal platform skeleton for managing MCP server catalog entries, a Go Control Plane API, a Go MCP Gateway data plane, Go worker jobs, a Go operator CLI, a TypeScript Next.js web console, and Go first-party MCP servers.
+MCP Hub is an internal platform skeleton for managing MCP server catalog entries, an internal MCP market/registry experience, a Go Control Plane API, a Go MCP Gateway data plane, Go worker jobs, a Go operator CLI, a TypeScript Next.js web operations console, and Go first-party MCP servers.
 
 ## Workspace Structure
 
 ```txt
 apps/
-  web/          TypeScript / Next.js operations console
+  web/          TypeScript / Next.js operations console and internal MCP market/registry UI
   api/          Go Control Plane API service
   gateway/      Go MCP Gateway service
   worker/       Go background worker service
@@ -43,7 +43,9 @@ Use `go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 health` to 
 
 ## MVP Demo
 
-Use [MVP Demo](docs/MVP_DEMO.md) for the end-to-end local demo order, expected Web screens, Gateway/CLI checks, fallback steps, and `make demo-check` validation target.
+Use [MVP Demo](docs/MVP_DEMO.md) for the end-to-end local demo order, internal MCP Market Web screens, Gateway/CLI checks, fallback steps, and `make demo-check` validation target.
+
+The Web UI separates user discovery/access/config generation from admin curation/governance/audit/operations. User routes help operators find internal MCP servers, inspect risk and install guidance, request access, and generate Gateway-routed client snippets. Admin routes curate market metadata, publish or quarantine entries, review approval context, and inspect audit/operations state.
 
 ## Operator Documentation
 

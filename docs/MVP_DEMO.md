@@ -4,7 +4,7 @@ Use this checklist when showing the current MCP Hub MVP end to end. It keeps the
 
 ## Goal
 
-Show that MCP Hub can run a local control plane, expose a protected Gateway, separate user and admin Web routes, generate client configuration, and reset local state without touching shared systems.
+Show that MCP Hub can run a local control plane, expose a protected Gateway, separate user and admin Web routes, provide an internal MCP Market/Registry workflow, generate client configuration, and reset local state without touching shared systems.
 
 ## Prerequisites
 
@@ -62,7 +62,7 @@ curl http://localhost:4000/healthz
 curl http://localhost:4000/api/servers
 ```
 
-Expected result: API health is `ok`, and the server catalog includes `k8s-readonly`.
+Expected result: API health is `ok`, and the server catalog includes `k8s-readonly` with market metadata such as category, tags, install methods, trust level, and visibility.
 
 ## 3. Demo The Web Surfaces
 
@@ -70,21 +70,25 @@ Open `http://localhost:3000`.
 
 Expected user flow:
 
-- Unauthenticated access redirects to `/login`.
-- The local `dev` provider is visible outside production.
-- Continuing as a dev user lands in `/user`.
-- `/user/catalog` shows enabled servers and tools.
-- `/user/access` shows visible grants and access request controls.
-- `/user/client-config` generates MCP client snippets.
-- A non-admin user visiting `/admin` sees the forbidden page.
+1. Unauthenticated access redirects to `/login`.
+2. The local `dev` provider is visible outside production.
+3. Continuing as a dev user lands in `/user`, where the MCP Market entry cards summarize discovery, access, and client-config actions.
+4. `/user/catalog` shows the internal MCP Market browse surface. Confirm search, category, tag, trust, access, visibility, health, and enabled filters. `/user/market` is not a separate route; use `/user/catalog` for market discovery.
+5. Open a server detail page such as `/user/servers/00000000-0000-4000-8000-000000000102` and confirm tools, risk, access status, install guidance, policy dry-run, prerequisites, and security notes.
+6. From the detail page, open an access request and confirm `/user/access` is prefilled with server, requested tools, environment, and reason.
+7. Open `/user/client-config`, choose the seeded server/client profile, and confirm the generated snippet routes through the Gateway with bearer auth.
+8. A non-admin user visiting `/admin` sees the forbidden page.
 
 Expected admin flow:
 
-- Continuing as a dev admin lands in `/admin`.
-- `/admin/servers` shows server operations.
-- `/admin/approvals` shows approval workflow controls.
-- `/admin/audit` and `/admin/operations` show audit and runtime views.
-- `/admin/emergency` shows emergency control surfaces.
+1. Continuing as a dev admin lands in `/admin`, where market status cards summarize published, draft/internal, missing metadata, and quarantined entries.
+2. `/admin/servers` shows the admin market curation table with category/tags, trust level, publish/visibility/quarantine state, docs/install completeness, owner, health, risk, detail, edit, and audit links. `/admin/market` is not a separate route; use `/admin/servers` for curation.
+3. Open a server detail page under `/admin/servers/{serverId}` and confirm publish, metadata, runtime, safety, and audit-worthy controls.
+4. `/admin/approvals` shows approval workflow controls with decision context: server category/environment/risk, requested tool risk, existing wildcard or overlapping grants, and review-comment requirements.
+5. `/admin/audit` and `/admin/operations` show audit, runtime, rollout, health, and quarantine state.
+6. `/admin/emergency` shows emergency control surfaces.
+
+Explicitly out of scope for the demo: advertising, sponsored placement, public ranking, popularity ranking, paid marketplace behavior, and skills marketplace behavior.
 
 Fallback if the browser session is stale: submit the logout form or clear the `mcp_hub_session` cookie, then start again from `/login`.
 
