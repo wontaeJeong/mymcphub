@@ -26,9 +26,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-page">
       <div className="auth-card">
-        <PageHero eyebrow="MCP Hub 로그인" title="신뢰할 로그인 방식을 선택하세요." description="서버 설정으로 활성화된 로그인 provider만 여기에 표시됩니다." />
+        <PageHero eyebrow="MCP Hub 로그인" title="허용된 로그인 방식을 선택하세요." description="조직에서 사용할 수 있도록 준비한 로그인 방식만 표시됩니다." />
         {error ? <div className="error-state"><strong>로그인 실패</strong><p>{error}</p></div> : null}
-        {providers.length === 0 ? <div className="error-state"><strong>설정된 로그인 provider 없음</strong><p>이 콘솔을 노출하기 전에 MCP_WEB_AUTH_ENABLED_PROVIDERS와 provider별 서버 환경 변수를 설정하세요.</p></div> : null}
+        {providers.length === 0 ? <div className="error-state"><strong>로그인 방식 준비 안 됨</strong><p>관리자에게 MCP Hub 로그인 설정 확인을 요청하세요.</p></div> : null}
         {localProvider ? (
           <form className="form-card" action="/auth/local" method="post">
             <h2>사용자 이름과 비밀번호로 로그인</h2>
@@ -40,7 +40,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
         {oidcProviders.length > 0 ? (
           <section className="form-card">
-            <h2>OIDC로 로그인</h2>
+            <h2>조직 계정으로 로그인</h2>
             <div className="actions">
               {oidcProviders.map((provider) => <a className="button" href={`/auth/oidc/${provider.id}?next=${encodeURIComponent(nextPath)}`} key={provider.id}>{provider.displayName}로 계속</a>)}
             </div>
@@ -48,8 +48,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
         {devProvider ? (
           <section className="form-card">
-            <h2>개발 로그인</h2>
-            <p>production 외 환경에서만 사용할 수 있으며 로컬 개발용입니다.</p>
+            <h2>로컬 점검용 로그인</h2>
+            <p>개발 환경에서 화면과 권한 흐름을 확인할 때만 사용합니다.</p>
             <div className="actions">
               <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="user" /><button className="button button--ghost" type="submit">개발 사용자로 계속</button></form>
               <form action="/auth/dev" method="post"><input type="hidden" name="next" value={nextPath} /><input type="hidden" name="role" value="admin" /><button className="button" type="submit">개발 관리자로 계속</button></form>
@@ -72,11 +72,11 @@ function loginErrorMessage(error: string | undefined) {
     case "rate_limited":
       return "실패한 시도가 너무 많습니다. 나중에 다시 시도하세요.";
     case "oidc_state_invalid":
-      return "OIDC state 검증에 실패했습니다. 로그인을 다시 시작하세요.";
+      return "로그인 요청 확인에 실패했습니다. 처음부터 다시 시도하세요.";
     case "oidc_callback_failed":
-      return "OIDC provider callback을 검증할 수 없습니다.";
+      return "조직 계정 확인에 실패했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.";
     case "provider_unavailable":
-      return "해당 로그인 provider가 활성화되어 있지 않습니다.";
+      return "선택한 로그인 방식은 현재 사용할 수 없습니다.";
     case "local_disabled":
     case "dev_disabled":
       return "해당 로그인 방식이 비활성화되어 있습니다.";
