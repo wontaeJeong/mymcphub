@@ -22,30 +22,30 @@ export default async function UserHomePage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="사용자 워크스페이스" title="MCP Market에서 바로 시작하세요." description="내부에 게시된 MCP 서버를 탐색하고, 접근이 필요한 항목을 요청한 뒤, 클라이언트 설정 생성으로 연결합니다." />
+      <PageHero eyebrow="MCP Market" title="서버를 찾고 연결하세요." description="필요한 서버를 찾고 접근 권한을 확인한 뒤 클라이언트 설정을 생성합니다." />
       <div className="metric-grid">
-        <MetricCard label="게시/활성 서버" value={marketSummary.publishedActiveServers} detail="Market 기본 노출 대상" tone="info" />
-        <MetricCard label="내 접근 가능" value={marketSummary.accessibleServers} detail={grants.ok ? "현재 세션 권한 기준" : "권한 API 확인 불가"} tone={marketSummary.accessibleServers > 0 ? "success" : "neutral"} />
+        <MetricCard label="연결 가능한 서버" value={marketSummary.publishedActiveServers} detail="사용 가능한 목록" tone="info" />
+        <MetricCard label="내 권한" value={marketSummary.accessibleServers} detail={grants.ok ? "현재 계정 기준" : "권한 정보 없음"} tone={marketSummary.accessibleServers > 0 ? "success" : "neutral"} />
         <MetricCard label="접근 요청 필요" value={marketSummary.requestRequiredServers} detail="활성·게시 서버 중 권한 없음" tone={marketSummary.requestRequiredServers > 0 ? "warning" : "success"} />
-        <MetricCard label="상태 이상" value={marketSummary.statusIssueServers} detail={health.ok ? "비정상·저하·확인 불가" : "상태 API 확인 불가"} tone={marketSummary.statusIssueServers > 0 ? "danger" : "success"} />
+        <MetricCard label="상태 이상" value={marketSummary.statusIssueServers} detail={health.ok ? "조치 필요" : "상태 정보 없음"} tone={marketSummary.statusIssueServers > 0 ? "danger" : "success"} />
       </div>
       {!servers.ok ? <ErrorState message={servers.error} /> : null}
       {!health.ok ? <ErrorState title="상태 정보 사용 불가" message={health.error} /> : null}
       <section>
-        <SectionHeader title="Market 작업" description="셀프서비스 페이지는 관리자 콘솔과 분리되어 있습니다." />
+        <SectionHeader title="시작하기" description="서버 찾기, 접근 요청, 설정 생성을 순서대로 진행하세요." />
         <div className="card-grid">
-          <UserLink href="/user/catalog" title="MCP Market 열기" description="카테고리, 태그, 신뢰 수준, 접근 상태로 서버를 탐색합니다." />
-          <UserLink href="/user/access" title="내 권한 보기" description="현재 접근 권한을 확인하고 필요한 서버 접근을 요청합니다." />
-          <UserLink href="/user/client-config" title="클라이언트 설정 생성" description="접근 가능한 서버를 MCP 클라이언트 snippet으로 연결합니다." />
+          <UserLink href="/user/catalog" title="서버 찾기" description="사용 가능한 MCP 서버를 검색합니다." />
+          <UserLink href="/user/access" title="접근 요청" description="필요한 서버와 도구 권한을 요청합니다." />
+          <UserLink href="/user/client-config" title="설정 생성" description="승인된 서버를 클라이언트에 연결합니다." />
         </div>
       </section>
       <section>
-        <SectionHeader title="MCP Market 미리보기" description="게시·내부 공개되고 활성화된 서버만 우선 노출합니다." action={<Link className="button" href="/user/catalog">MCP Market 열기</Link>} />
-        {servers.ok && serverItems.length > 0 ? <ServerTable servers={serverItems.slice(0, 5)} healthByServerId={healthByServerId} serverBasePath="/user/servers" /> : servers.ok ? <EmptyState title="활성 Market 서버 없음" description="제어 플레인이 기본 노출 대상 서버를 반환하지 않았습니다." /> : null}
+        <SectionHeader title="최근 서버" description="연결 가능한 서버를 먼저 확인하세요." action={<Link className="button" href="/user/catalog">서버 찾기</Link>} />
+        {servers.ok && serverItems.length > 0 ? <ServerTable servers={serverItems.slice(0, 5)} healthByServerId={healthByServerId} serverBasePath="/user/servers" /> : servers.ok ? <EmptyState title="등록된 서버가 없습니다" description="관리자에게 서버 등록을 요청하세요." /> : null}
       </section>
       <section>
-        <SectionHeader title="내 표시 권한" description="Web 세션의 현재 사용자 또는 팀 식별자와 일치하는 권한만 표시합니다." action={<Link className="button" href="/user/access">내 권한 보기</Link>} />
-        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} audience="user" /> : grants.ok ? <EmptyState title="표시 가능한 권한 없음" description="필요한 도구가 없다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
+        <SectionHeader title="내 권한" description="현재 사용할 수 있는 서버와 도구입니다." action={<Link className="button" href="/user/access">접근 권한 확인</Link>} />
+        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} audience="user" /> : grants.ok ? <EmptyState title="권한이 없습니다" description="필요한 서버가 있다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
       </section>
     </div>
   );

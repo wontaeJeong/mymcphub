@@ -26,30 +26,30 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
   return (
     <div className="page-stack">
       <form className="form-card panel--accent" action={denyAction}>
-        <h2>긴급 거부 활성화</h2>
-        <p>허브 전체 접근을 즉시 막아야 하는 인시던트에서 가장 먼저 사용하는 조치입니다.</p>
+        <h2>전체 차단</h2>
+        <p>모든 Gateway 접근을 즉시 거부합니다.</p>
         <div className="field">
           <label htmlFor="reason">사유</label>
           <textarea id="reason" name="reason" required placeholder="인시던트 번호, 영향 범위, 결정 근거" />
         </div>
         <label className="danger-confirm">
           <input type="checkbox" name="confirmEmergencyDeny" required />
-          활성화 중에는 게이트웨이 접근이 거부됨을 확인합니다.
+          전체 접근이 차단됨을 확인합니다.
         </label>
         <div className="form-actions">
-          <button className="button button--danger" type="submit" disabled={denyPending}>{denyPending ? "활성화 중..." : "긴급 거부 활성화"}</button>
+          <button className="button button--danger" type="submit" disabled={denyPending}>{denyPending ? "차단 중..." : "전체 차단"}</button>
           {denyState.message ? <span className="muted">{denyState.message}</span> : null}
         </div>
       </form>
       <Surface>
         <details className="schema-viewer">
-          <summary>긴급 거부 해제 안내</summary>
-          <p>현재 Web UI에는 긴급 거부를 해제하는 서버 동작이 연결되어 있지 않습니다. 해제 절차는 운영 런북에서 확인하고 감사 가능한 변경으로 진행하세요.</p>
-          <StatusPill tone="warning">해제 동작 없음</StatusPill>
+          <summary>전체 차단 해제</summary>
+          <p>해제 절차는 운영 런북에 따라 감사 가능한 변경으로 진행하세요.</p>
+          <StatusPill tone="warning">수동 해제 필요</StatusPill>
         </details>
       </Surface>
       <section>
-        <h2>위험 구역</h2>
+        <h2>위험 작업</h2>
         <p className="muted">아래 조치는 선택한 서버, 도구, 권한 범위에 직접 영향을 줍니다. 대상 이름을 다시 확인한 뒤 실행하세요.</p>
         <div className="form-grid">
           <form className="form-card" action={serverAction}>
@@ -128,7 +128,7 @@ export function AdminControls({ servers, tools }: Readonly<{ servers: ApiMcpServ
               </div>
               <label className="danger-confirm">
                 <input type="checkbox" name="confirmRevokeServerGrants" required />
-                선택한 서버의 모든 권한을 회수해야 함을 확인합니다.
+                  선택한 서버의 모든 권한을 회수합니다.
               </label>
               <div className="form-actions">
                 <button className="button button--danger" type="submit" disabled={revokePending}>{revokePending ? "회수 중..." : "서버 권한 회수"}</button>

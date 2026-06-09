@@ -30,7 +30,7 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
       <form className="form-card" action={metadataAction}>
         <input type="hidden" name="serverId" value={server.id} />
         <h2>마켓 메타데이터</h2>
-        <p>카테고리, 태그, 사용 사례, 문서, 설치 방법, 보안 메모를 운영 콘솔에서 저장합니다.</p>
+        <p>검색, 문서, 설치 안내에 사용할 정보를 관리합니다.</p>
         <div className="form-grid">
           <div className="field">
             <label htmlFor="marketCategory">카테고리</label>
@@ -99,8 +99,8 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
         </div>
       </form>
       <Surface className="panel--accent">
-        <h2>게시 수명주기</h2>
-        <p>게시, 비게시, 격리, 격리 해제는 모두 확인 체크박스와 사유가 필요한 위험 작업입니다.</p>
+        <h2>게시 상태</h2>
+        <p>게시, 게시 해제, 격리, 격리 해제를 관리합니다.</p>
         <div className="grid market-lifecycle-summary">
           <div className="actions">
             <StatusPill tone={visibility === "published" ? "success" : visibility === "quarantined" ? "danger" : "warning"}>{formatMarketVisibility(visibility)}</StatusPill>
@@ -114,17 +114,17 @@ export function ServerMarketCurationForm({ server }: Readonly<{ server: ApiMcpSe
         <form action={lifecycleAction} className="market-lifecycle-form">
           <input type="hidden" name="serverId" value={server.id} />
           <div className="field">
-            <label htmlFor="marketLifecycleReason">위험 작업 사유</label>
+            <label htmlFor="marketLifecycleReason">변경 사유</label>
             <textarea id="marketLifecycleReason" name="reason" required placeholder="게시, 비게시, 격리 또는 격리 해제 사유" />
           </div>
           <label className="danger-confirm">
             <input type="checkbox" name="confirmMarketLifecycle" required />
-            이 작업이 카탈로그 노출과 Gateway 접근 상태에 영향을 줄 수 있음을 확인합니다.
+            카탈로그 노출과 접근 상태가 변경될 수 있습니다.
           </label>
           <div className="actions">
-            <button className="button" type="submit" name="marketAction" value="publish" disabled={lifecyclePending || visibility === "published" || visibility === "quarantined"}>게시</button>
+            <button className="button" type="submit" name="marketAction" value="publish" disabled={lifecyclePending || visibility === "published" || visibility === "quarantined"}>게시하기</button>
             <button className="button button--ghost" type="submit" name="marketAction" value="unpublish" disabled={lifecyclePending || visibility !== "published"}>게시 해제</button>
-            <button className="button button--danger" type="submit" name="marketAction" value="quarantine" disabled={lifecyclePending || visibility === "quarantined"}>격리</button>
+            <button className="button button--danger" type="submit" name="marketAction" value="quarantine" disabled={lifecyclePending || visibility === "quarantined"}>격리하기</button>
             <button className="button button--ghost" type="submit" name="marketAction" value="unquarantine" disabled={lifecyclePending || visibility !== "quarantined"}>격리 해제</button>
           </div>
           {lifecycleState.message ? <p className="muted" role="status">{lifecycleState.message}</p> : null}

@@ -23,8 +23,8 @@ export function DashboardSummary({
 }: DashboardSummaryProps) {
   return (
     <section className="metric-grid" aria-label="MCP Hub 대시보드 요약">
-      <MetricCard label="등록된 서버" value={registeredServers} detail="제어 플레인 카탈로그 수" tone="info" />
-      <MetricCard label="활성 서버" value={enabledServers} detail="게이트웨이 사용 가능" tone={enabledServers > 0 ? "success" : "neutral"} />
+      <MetricCard label="등록된 서버" value={registeredServers} detail="카탈로그 전체" tone="info" />
+      <MetricCard label="활성 서버" value={enabledServers} detail="Gateway 사용 가능" tone={enabledServers > 0 ? "success" : "neutral"} />
       <MetricCard label="비활성 서버" value={disabledServers} detail="카탈로그에서 차단됨" tone={disabledServers > 0 ? "warning" : "success"} />
       <MetricCard label="높음 또는 심각 도구" value={highCriticalTools} detail="현재 도구 위험 수준" tone={highCriticalTools > 0 ? "danger" : "success"} />
       <MetricCard label="최근 거부된 호출" value={recentDeniedCalls} detail="거부된 감사 결정" tone={recentDeniedCalls > 0 ? "warning" : "success"} />

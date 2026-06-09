@@ -15,12 +15,12 @@ const userNavItems = [
 ] as const;
 
 const adminNavItems = [
-  ["관리자 홈", "/admin"],
+  ["운영 현황", "/admin"],
   ["카탈로그 관리", "/admin/servers"],
-  ["승인 대기열", "/admin/approvals"],
+  ["승인 요청", "/admin/approvals"],
   ["감사 로그", "/admin/audit"],
   ["운영 상태", "/admin/operations"],
-  ["긴급 제어", "/admin/emergency"]
+  ["긴급 조치", "/admin/emergency"]
 ] as const;
 
 export type AppShellProps = Readonly<{
@@ -36,9 +36,9 @@ export function AppShell({ children, section, session }: AppShellProps) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <p className="brand__eyebrow">{section === "admin" ? "관리 플레인" : "사용자 워크스페이스"}</p>
+          <p className="brand__eyebrow">{section === "admin" ? "Admin Console" : "MCP Market"}</p>
           <h1>MCP Hub</h1>
-          <p>{section === "admin" ? "승인, 감사, 운영, 긴급 대응을 한곳에서 확인합니다." : "서버 탐색, 접근 요청, 클라이언트 설정을 빠르게 진행합니다."}</p>
+          <p>{section === "admin" ? "서버, 권한, 운영 상태를 관리합니다." : "필요한 MCP 서버를 찾고 연결합니다."}</p>
         </div>
         <ThemeToggle />
         <nav className="nav" aria-label="주요 탐색">
@@ -74,8 +74,8 @@ export function ForbiddenPanel() {
   return (
     <div className="error-state">
       <p className="eyebrow">403</p>
-      <h1>관리자 승인이 필요한 화면입니다.</h1>
-      <p>현재 계정으로는 이 관리자 화면을 열 수 없습니다. 필요한 작업이 있다면 플랫폼 관리자에게 접근 권한을 요청하세요.</p>
+      <h1>관리자 권한이 필요합니다.</h1>
+      <p>이 화면은 플랫폼 관리자만 접근할 수 있습니다.</p>
     </div>
   );
 }

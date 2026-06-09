@@ -294,7 +294,7 @@ export async function adminDisableServerAction(_previousState: FormActionState, 
     revalidateServerSurfaces(serverId);
     return {
       status: "success",
-      message: `${serverId} 서버를 제어 플레인 API로 비활성화했습니다.`
+      message: `${serverId} 서버를 비활성화했습니다.`
     };
   } catch (error) {
     return {
@@ -333,7 +333,7 @@ export async function generateClientConfigAction(_previousState: FormActionState
     const gatewayUrl = result.gatewayUrl ?? extractGatewayUrl(result.config);
     return {
       status: "success",
-      message: result.placeholder ? "제어 플레인 API에서 플레이스홀더 클라이언트 설정을 생성했습니다." : "제어 플레인 API에서 클라이언트 설정을 생성했습니다.",
+      message: result.placeholder ? "클라이언트 설정 초안을 생성했습니다." : "클라이언트 설정을 생성했습니다.",
       payload: JSON.stringify(result.config, null, 2),
       selectedServerId: serverId,
       selectedClient: client,

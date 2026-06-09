@@ -16,7 +16,7 @@ export const koreanGlossary = {
   dryRun: "사전 점검",
   stepUp: "추가 인증",
   api: "API",
-  controlPlane: "제어 플레인",
+  controlPlane: "관리 API",
   gateway: "게이트웨이",
   uuid: "UUID",
   iso: "ISO 시간",
@@ -70,7 +70,7 @@ export function formatHealthStatus(status: string) {
     return "비정상";
   }
 
-  return "확인 불가";
+  return "상태 없음";
 }
 
 export function formatPolicyEffect(effect: PolicyEffect) {

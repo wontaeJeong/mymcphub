@@ -65,7 +65,7 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
   return (
     <div className="table-wrap">
       <table>
-        <caption>{tableAudience === "user" ? "사용자용 MCP 서버 요약" : "관리자용 MCP 서버 요약"}</caption>
+        <caption>{tableAudience === "user" ? "MCP 서버 목록" : "서버 관리 목록"}</caption>
         {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead showSummaryDiagnostics={showSummaryDiagnostics} />}
         <tbody>
           {servers.map((server) => {
@@ -107,7 +107,7 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                       {formatHealthStatus(health.status)}
                     </StatusPill>
                   ) : (
-                    <StatusPill>확인 불가</StatusPill>
+                    <StatusPill>상태 없음</StatusPill>
                   )}
                 </td>
                 <td>
@@ -175,10 +175,10 @@ function MarketCurationTableHead() {
         <th scope="col">신뢰 수준</th>
         <th scope="col">게시/격리</th>
         <th scope="col">문서/설치</th>
-        <th scope="col">운영 소유</th>
+        <th scope="col">소유 팀</th>
         <th scope="col">환경/상태</th>
         <th scope="col">위험도</th>
-        <th scope="col">빠른 링크</th>
+        <th scope="col">작업</th>
         <th scope="col">업데이트</th>
       </tr>
     </thead>
@@ -242,7 +242,7 @@ function MarketCurationTableRow({ server, health, serverBasePath, audience }: Re
           {health ? (
             <StatusPill tone={healthTone(health.status)}>{formatHealthStatus(health.status)}</StatusPill>
           ) : (
-            <StatusPill>확인 불가</StatusPill>
+            <StatusPill>상태 없음</StatusPill>
           )}
           <StatusPill tone={enabledTone(server.enabled)}>{formatEnabled(server.enabled)}</StatusPill>
         </div>
@@ -329,7 +329,7 @@ export function ToolTable({
   return (
     <div className="table-wrap">
       <table>
-        <caption>{audience === "user" ? "사용자용 도구와 접근 상태" : "관리자용 도구 진단"}</caption>
+        <caption>{audience === "user" ? "도구와 접근 상태" : "도구 관리 목록"}</caption>
         <thead>
           <tr>
             <th scope="col">도구</th>
@@ -352,7 +352,7 @@ export function ToolTable({
               <td>
                 {tool.name}
                 <p className="muted">
-                  {tool.description ?? "서버가 공개한 설명이 없습니다."}
+                  {tool.description ?? "설명이 등록되지 않았습니다."}
                 </p>
               </td>
               <td>
@@ -383,7 +383,7 @@ export function ToolTable({
                 <td>
                   <StatusPill tone="info">API 대기</StatusPill>
                   <p className="muted">
-                    관리자 테스트 호출 API가 제공되면 이 영역에서 연결합니다.
+                    테스트 호출 기능이 준비되면 연결됩니다.
                   </p>
                 </td>
               ) : null}
@@ -445,10 +445,10 @@ function riskExplanation(riskLevel: ApiMcpTool["riskLevel"]) {
   }
 
   if (riskLevel === "medium") {
-    return "중간 위험 도구는 팀 또는 사용자 grant와 도구명이 일치해야 합니다.";
+    return "중간 위험 도구는 팀 또는 사용자 권한과 도구명이 일치해야 합니다.";
   }
 
-  return "낮은 위험 도구도 활성 grant 또는 와일드카드 grant 범위 안에서만 허용됩니다.";
+  return "낮은 위험 도구도 활성 권한 범위 안에서만 허용됩니다.";
 }
 
 export function ServerVersionTable({
@@ -562,7 +562,7 @@ export function RolloutStatusTable({
                     {formatHealthStatus(row.health.status)}
                   </StatusPill>
                 ) : (
-                  <StatusPill>상태 확인 불가</StatusPill>
+                  <StatusPill>상태 없음</StatusPill>
                 )}
               </td>
               <td>
@@ -768,16 +768,16 @@ function ApprovalServerContext({
           <StatusPill>{formatEnvironment(context.serverEnvironment)}</StatusPill>
         ) : null}
       </div>
-      <p className="muted">카테고리 {context.serverCategory ?? "확인 불가"}</p>
+      <p className="muted">카테고리 {context.serverCategory ?? "정보 없음"}</p>
       {context.grantOverlaps.length > 0 ? (
         <p className="muted">
-          기존 grant {context.grantOverlaps.length}개와 요청 범위가 겹칩니다.
+          기존 권한 {context.grantOverlaps.length}개와 요청 범위가 겹칩니다.
           {context.grantOverlaps.some((grant) => grant.wildcard)
-            ? " 와일드카드 grant(*) 포함."
+            ? " 전체 도구 권한(*) 포함."
             : ""}
         </p>
       ) : (
-        <p className="muted">현재 같은 주체/프로젝트/도구와 겹치는 grant가 없습니다.</p>
+        <p className="muted">현재 같은 주체/프로젝트/도구와 겹치는 권한이 없습니다.</p>
       )}
     </div>
   );
@@ -795,7 +795,7 @@ function ApprovalToolContext({
       <div className="actions">
         {context.requestedToolRisks.map((tool) => (
           <StatusPill tone={tool.riskLevel ? riskTone(tool.riskLevel) : "neutral"} key={tool.toolName}>
-            {tool.toolName}: {tool.riskLevel ? formatRiskLevel(tool.riskLevel) : "위험도 확인 불가"}
+            {tool.toolName}: {tool.riskLevel ? formatRiskLevel(tool.riskLevel) : "위험도 정보 없음"}
           </StatusPill>
         ))}
       </div>
@@ -1130,7 +1130,7 @@ export function HealthTable({
 function SchemaViewer({ tool }: Readonly<{ tool: ApiMcpTool }>) {
   const schema = tool.inputSchema ?? tool.inputSchemaJson;
   if (schema === undefined) {
-    return <span className="muted">제어 플레인 API에서 확인할 수 없습니다</span>;
+    return <span className="muted">스키마 정보 없음</span>;
   }
 
   return (

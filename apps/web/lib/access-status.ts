@@ -65,9 +65,9 @@ export function evaluateAccessStatus({
   if (!server) {
     return buildStatus(
       "unknown",
-      "상태 확인 불가",
+      "상태 없음",
       "neutral",
-      "서버 메타데이터가 없어 접근 가능 여부를 계산할 수 없습니다.",
+      "서버 정보가 없어 접근 가능 여부를 확인할 수 없습니다.",
     );
   }
 
@@ -103,16 +103,16 @@ export function evaluateAccessStatus({
       "unknown",
       "세션 확인 필요",
       "neutral",
-      "현재 사용자 또는 팀 식별자를 확인할 수 없어 권한을 계산하지 못했습니다.",
+      "현재 계정 정보를 확인할 수 없어 권한을 확인하지 못했습니다.",
     );
   }
 
   if (!grants) {
     return buildStatus(
       "unknown",
-      "권한 확인 불가",
+      "권한 정보 없음",
       "neutral",
-      "권한 API 결과가 없어 접근 가능 여부를 계산하지 못했습니다.",
+      "권한 정보를 불러오지 못했습니다.",
     );
   }
 
@@ -127,14 +127,14 @@ export function evaluateAccessStatus({
     );
     const grantLabel = tool ? "사용 가능" : "일부 도구 사용 가능";
     const wildcardHint = wildcardGrant
-      ? " 와일드카드 grant(*)가 이 서버의 도구 범위를 허용합니다."
+      ? " 전체 도구 권한(*)이 적용됩니다."
       : "";
 
     return {
       status: "accessible",
       label: grantLabel,
       tone: "success",
-      actionHint: `${matchingGrants.length}개 활성 grant가 현재 주체, 프로젝트, 환경, 도구 범위와 일치합니다.${wildcardHint}${healthHint(health)}`,
+      actionHint: `${matchingGrants.length}개 활성 권한이 현재 계정, 프로젝트, 환경, 도구 범위와 일치합니다.${wildcardHint}${healthHint(health)}`,
       matchedGrantIds: matchingGrants.map((grant) => grant.id),
       pendingApprovalIds: [],
       wildcardGrant,
@@ -158,7 +158,7 @@ export function evaluateAccessStatus({
       status: "pending_approval",
       label: "승인 대기 중",
       tone: "warning",
-      actionHint: `${matchingApprovals.length}개 승인 요청이 이미 대기 중입니다. 중복 요청 대신 승인 대기열을 확인하세요.${healthHint(health)}`,
+      actionHint: `${matchingApprovals.length}개 승인 요청이 이미 대기 중입니다. 중복 요청 대신 승인 상태를 확인하세요.${healthHint(health)}`,
       matchedGrantIds: [],
       pendingApprovalIds: matchingApprovals.map((approval) => approval.id),
       wildcardGrant: false,
@@ -167,11 +167,11 @@ export function evaluateAccessStatus({
 
   return buildStatus(
     "request_required",
-    "요청 필요",
+    "권한 필요",
     "warning",
     approvals
-      ? `일치하는 활성 grant 또는 대기 중인 승인 요청이 없습니다.${healthHint(health)}`
-      : `일치하는 활성 grant가 없습니다. 승인 대기 상태 API 결과는 확인하지 못했습니다.${healthHint(health)}`,
+      ? `일치하는 활성 권한 또는 대기 중인 승인 요청이 없습니다.${healthHint(health)}`
+      : `일치하는 활성 권한이 없습니다. 승인 대기 상태를 확인하지 못했습니다.${healthHint(health)}`,
   );
 }
 

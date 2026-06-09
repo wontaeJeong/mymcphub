@@ -271,8 +271,8 @@ describe("prompt-12 required web pages", () => {
     const emptyHtml = renderToStaticMarkup(emptyPage);
 
     expect(emptyHtml).toContain("Production Docs");
-    expect(emptyHtml).toContain("서버 버전 없음");
-    expect(emptyHtml).toContain("발견된 도구 없음");
+    expect(emptyHtml).toContain("서버 버전이 없습니다");
+    expect(emptyHtml).toContain("등록된 도구가 없습니다");
 
     stubServerDetailFetch({ type: "error" });
     const errorPage = await ServerDetailPage({ params: Promise.resolve({ serverId: "server-prod-docs" }) });
@@ -281,7 +281,7 @@ describe("prompt-12 required web pages", () => {
     expect(errorHtml).toContain("Production Docs");
     expect(errorHtml).toContain("서버 버전 사용 불가");
     expect(errorHtml).toContain("Versions endpoint unavailable (503)");
-    expect(errorHtml).toContain("발견된 도구 없음");
+    expect(errorHtml).toContain("등록된 도구가 없습니다");
   });
 
   it("covers approval queue partitioning and decision rendering", () => {

@@ -72,8 +72,8 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <div className="page-stack">
         <PageHero
           eyebrow="서버 상세"
-          title="서버를 사용할 수 없습니다."
-          description="제어 플레인이 이 MCP 서버를 반환하지 못했습니다."
+          title="서버를 찾을 수 없습니다."
+          description="카탈로그에서 다시 선택하세요."
         />
         <ErrorState message={server.error} />
         <Link className="button" href="/admin/servers">
@@ -103,7 +103,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <PageHero
         eyebrow={server.data.slug}
         title={server.data.displayName}
-        description={server.data.description ?? "공개된 서버 설명이 없습니다."}
+        description={server.data.description ?? "설명이 등록되지 않았습니다."}
       />
       <div className="detail-grid">
         <Surface>
@@ -123,8 +123,8 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
               <div className="grid">
                 <p><strong>서버 ID:</strong> {server.data.id}</p>
                 <p><strong>소유 팀:</strong> {server.data.ownerTeamId}</p>
-                <p><strong>업스트림 URL:</strong> {server.data.upstreamUrl ?? "확인 불가"}</p>
-                <p><strong>스키마 버전:</strong> {server.data.schemaVersion ?? "확인 불가"}</p>
+                <p><strong>업스트림 URL:</strong> {server.data.upstreamUrl ?? "정보 없음"}</p>
+                <p><strong>스키마 버전:</strong> {server.data.schemaVersion ?? "정보 없음"}</p>
                 <p><strong>생성:</strong> {formatDate(server.data.createdAt)}</p>
                 <p><strong>업데이트:</strong> {formatDate(server.data.updatedAt)}</p>
               </div>
@@ -133,8 +133,8 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
         </Surface>
         <Surface className="panel--accent">
           <SectionHeader
-            title="위험도 및 제어"
-            description="기존 제어 플레인 엔드포인트로 이 서버를 활성화하거나 비활성화합니다."
+            title="위험도 및 운영 제어"
+            description="서버 활성 상태를 관리합니다."
           />
           <div className="grid">
             <div className="actions">
@@ -149,7 +149,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                   {formatHealthStatus(latestHealth.status)}
                 </StatusPill>
               ) : (
-                <StatusPill>상태 확인 불가</StatusPill>
+                <StatusPill>상태 없음</StatusPill>
               )}
             </div>
             {latestHealth ? (
@@ -198,7 +198,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <ServerMarketCurationForm server={server.data} />
       <section>
         <SectionHeader
-          title="서버 버전"
+            title="서버 버전"
           description="읽기 전용 릴리스 상태입니다."
         />
         {versions.ok && activeVersion ? (
@@ -208,8 +208,8 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
           </div>
         ) : versions.ok ? (
           <EmptyState
-            title="서버 버전 없음"
-            description="제어 플레인이 이 서버의 버전을 반환하지 않았습니다."
+             title="서버 버전이 없습니다"
+             description="등록된 버전 정보가 없습니다."
           />
         ) : (
           <ErrorState title="서버 버전 사용 불가" message={versions.error} />
@@ -236,35 +236,15 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       ) : null}
       <section className="capability-section">
         <SectionHeader
-          title="도구와 추가 기능"
-          description="실시간 도구 계약을 우선 표시하고 아직 목록 데이터가 없는 기능은 보조 안내로만 보여줍니다."
+          title="도구 관리"
+          description="도구 스키마, 권한 상태, 활성화 제어를 확인합니다."
         />
-        <div className="capability-tabs" aria-label="서버 기능">
-          <a
-            className="capability-tab"
-            href="#server-tools"
-          >
-            도구
-          </a>
-          <a
-            className="capability-tab"
-            href="#server-resources"
-          >
-            리소스
-          </a>
-          <a
-            className="capability-tab"
-            href="#server-prompts"
-          >
-            프롬프트
-          </a>
-        </div>
         <div className="grid capability-panels">
           <div id="server-tools">
             <Surface className="capability-panel">
               <SectionHeader
-                title="서버 도구"
-                description="발견한 도구, 스키마, 권한 상태, 도구 활성화 제어입니다."
+                 title="서버 도구"
+                 description="등록된 도구와 운영 상태입니다."
               />
               {tools.ok && toolItems.length > 0 ? (
                 <>
@@ -282,36 +262,12 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                 </>
               ) : tools.ok ? (
                 <EmptyState
-                  title="발견된 도구 없음"
-                  description="서버는 존재하지만 제어 플레인이 도구를 반환하지 않았습니다."
+                  title="등록된 도구가 없습니다"
+                  description="도구를 등록하면 여기에 표시됩니다."
                 />
               ) : (
                 <ErrorState message={tools.error} />
               )}
-            </Surface>
-          </div>
-          <div id="server-resources">
-            <Surface className="capability-panel">
-              <SectionHeader
-                title="리소스"
-                description="현재 목록 데이터가 없어 주 기능으로 노출하지 않습니다."
-              />
-              <EmptyState
-                title="리소스 엔드포인트가 노출되지 않음"
-                description="리소스 목록 계약이 추가되면 이 보조 안내를 실제 목록으로 바꿉니다."
-              />
-            </Surface>
-          </div>
-          <div id="server-prompts">
-            <Surface className="capability-panel">
-              <SectionHeader
-                title="프롬프트"
-                description="현재 목록 데이터가 없어 주 기능으로 노출하지 않습니다."
-              />
-              <EmptyState
-                title="프롬프트 엔드포인트가 노출되지 않음"
-                description="프롬프트 목록 계약이 추가되면 이 보조 안내를 실제 목록으로 바꿉니다."
-              />
             </Surface>
           </div>
         </div>

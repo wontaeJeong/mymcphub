@@ -19,8 +19,8 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
 
   return (
     <form className="form-card test-lab" action={formAction}>
-      <h2>도구 드라이런 테스트 랩</h2>
-      <p>도구 호출 예시를 만들어 정책 결과와 마스킹된 인자만 사전 점검합니다. 실제 업스트림 서버는 호출하지 않습니다.</p>
+      <h2>호출 가능 여부 확인</h2>
+      <p>실제 호출 전에 정책 결과와 마스킹된 입력을 확인합니다.</p>
       {options.length > 0 ? (
         <>
           <input type="hidden" name="dryRun" value="true" />
@@ -35,7 +35,7 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
             </div>
             <label className="danger-confirm test-lab__step-up">
               <input type="checkbox" name="stepUp" />
-              심각 위험 드라이런에 스텝업 확인 신호를 포함합니다.
+              심각 위험 확인에 추가 인증 신호를 포함합니다.
             </label>
           </div>
           <div className="field">
@@ -43,18 +43,18 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
             <textarea id="argumentsJson" name="argumentsJson" required defaultValue={sampleArguments} />
           </div>
           <div className="form-actions">
-            <button className="button" type="submit" disabled={pending}>{pending ? "드라이런 실행 중..." : "정책 드라이런 실행"}</button>
+            <button className="button" type="submit" disabled={pending}>{pending ? "확인 중..." : "호출 가능 여부 확인"}</button>
             {policyEffect ? <StatusPill tone={policyTone(policyEffect)}>{policyEffect}</StatusPill> : null}
             {state.message ? <span className="muted" role="status">{state.message}</span> : null}
           </div>
           {state.payload ? (
             <div className="grid">
-              <CopyButton value={state.payload} label="드라이런 결과 복사" />
+               <CopyButton value={state.payload} label="결과 복사" />
               <pre className="code-block">{state.payload}</pre>
             </div>
           ) : null}
         </>
-      ) : <EmptyState title="사용 가능한 도구 없음" description="드라이런 페이로드를 만들려면 제어 플레인 도구가 하나 이상 필요합니다." />}
+      ) : <EmptyState title="사용 가능한 도구가 없습니다" description="등록된 도구가 있으면 호출 가능 여부를 확인할 수 있습니다." />}
     </form>
   );
 }
