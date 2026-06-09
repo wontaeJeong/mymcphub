@@ -52,20 +52,20 @@ type Server struct {
 type ServerPatch struct{ Server }
 
 type CapabilitySnapshot struct {
-	ID              string                   `json:"id"`
-	ServerID        string                   `json:"serverId"`
-	Source          string                   `json:"source"`
-	ProtocolVersion string                   `json:"protocolVersion"`
-	ServerInfo      map[string]interface{}   `json:"serverInfo"`
-	Capabilities    map[string]interface{}   `json:"capabilities"`
-	Tools           []map[string]interface{} `json:"tools"`
-	Resources       []map[string]interface{} `json:"resources"`
-	Prompts         []map[string]interface{} `json:"prompts"`
-	RawInitialize   map[string]interface{}   `json:"rawInitialize"`
-	SnapshotHash    string                   `json:"snapshotHash"`
-	CapturedAt      time.Time                `json:"capturedAt"`
-	CreatedBy       string                   `json:"createdBy"`
-	Warnings        []string                 `json:"warnings,omitempty"`
+	ID              string           `json:"id"`
+	ServerID        string           `json:"serverId"`
+	Source          string           `json:"source"`
+	ProtocolVersion string           `json:"protocolVersion"`
+	ServerInfo      map[string]any   `json:"serverInfo"`
+	Capabilities    map[string]any   `json:"capabilities"`
+	Tools           []map[string]any `json:"tools"`
+	Resources       []map[string]any `json:"resources"`
+	Prompts         []map[string]any `json:"prompts"`
+	RawInitialize   map[string]any   `json:"rawInitialize"`
+	SnapshotHash    string           `json:"snapshotHash"`
+	CapturedAt      time.Time        `json:"capturedAt"`
+	CreatedBy       string           `json:"createdBy"`
+	Warnings        []string         `json:"warnings,omitempty"`
 }
 
 type HealthCheck struct {
@@ -77,12 +77,12 @@ type HealthCheck struct {
 	ErrorMessage string    `json:"errorMessage,omitempty"`
 }
 type AuditEvent struct {
-	ID        string                 `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Actor     string                 `json:"actor"`
-	Action    string                 `json:"action"`
-	ServerID  string                 `json:"serverId,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata"`
+	ID        string         `json:"id"`
+	Timestamp time.Time      `json:"timestamp"`
+	Actor     string         `json:"actor"`
+	Action    string         `json:"action"`
+	ServerID  string         `json:"serverId,omitempty"`
+	Metadata  map[string]any `json:"metadata"`
 }
 type Summary struct {
 	Total          int `json:"total"`
@@ -124,7 +124,7 @@ type MemoryRepository struct {
 
 func NewMemoryRepository() *MemoryRepository {
 	r := &MemoryRepository{servers: map[string]Server{}, snapshots: map[string][]CapabilitySnapshot{}, health: map[string][]HealthCheck{}}
-	seed := Server{Slug: "filesystem-local", Name: "Filesystem Local MCP", Description: "로컬 stdio MCP 예시", Transport: TransportStdio, HostingType: "local_stdio", OwnerTeam: "Platform Team", Contact: "platform@example.com", Environment: "shared", Status: "active", LivenessStatus: "unknown", StdioCommand: "dev/mock-mcp/stdio", Tags: []string{"local", "sample"}}
+	seed := Server{Slug: "filesystem-local", Name: "Filesystem Operations MCP", Description: "Local stdio server for controlled filesystem capability discovery", Transport: TransportStdio, HostingType: "local_stdio", OwnerTeam: "Platform Team", Contact: "platform@example.com", Environment: "shared", Status: "active", LivenessStatus: "unknown", StdioCommand: "npx", StdioArgs: []string{"-y", "@modelcontextprotocol/server-filesystem", "/workspace"}, Tags: []string{"local", "filesystem"}}
 	_, _ = r.CreateServer(context.Background(), seed, "seed")
 	return r
 }
@@ -252,7 +252,7 @@ func (r *MemoryRepository) CreateServer(_ context.Context, s Server, actor strin
 	s.CreatedAt = now
 	s.UpdatedAt = now
 	r.servers[s.ID] = s
-	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "server.created", ServerID: s.ID, Metadata: map[string]interface{}{"slug": s.Slug}}}, r.audit...)
+	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "server.created", ServerID: s.ID, Metadata: map[string]any{"slug": s.Slug}}}, r.audit...)
 	return s, nil
 }
 func (r *MemoryRepository) PatchServer(_ context.Context, id string, p ServerPatch, actor string) (Server, error) {
@@ -265,7 +265,7 @@ func (r *MemoryRepository) PatchServer(_ context.Context, id string, p ServerPat
 	apply(&s, p.Server)
 	s.UpdatedAt = time.Now().UTC()
 	r.servers[s.ID] = s
-	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: s.UpdatedAt, Actor: actor, Action: "server.updated", ServerID: s.ID, Metadata: map[string]interface{}{"slug": s.Slug}}}, r.audit...)
+	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: s.UpdatedAt, Actor: actor, Action: "server.updated", ServerID: s.ID, Metadata: map[string]any{"slug": s.Slug}}}, r.audit...)
 	return s, nil
 }
 func apply(s *Server, p Server) {
@@ -323,7 +323,7 @@ func (r *MemoryRepository) DeleteServer(_ context.Context, id, actor string) err
 		return err
 	}
 	delete(r.servers, s.ID)
-	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: time.Now().UTC(), Actor: actor, Action: "server.deleted", ServerID: s.ID, Metadata: map[string]interface{}{"slug": s.Slug}}}, r.audit...)
+	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: time.Now().UTC(), Actor: actor, Action: "server.deleted", ServerID: s.ID, Metadata: map[string]any{"slug": s.Slug}}}, r.audit...)
 	return nil
 }
 func (r *MemoryRepository) SaveSnapshot(_ context.Context, id string, snap CapabilitySnapshot, actor string) (CapabilitySnapshot, error) {
@@ -358,7 +358,7 @@ func (r *MemoryRepository) SaveSnapshot(_ context.Context, id string, snap Capab
 	s.SnapshotHash = snap.SnapshotHash
 	s.UpdatedAt = now
 	r.servers[s.ID] = s
-	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "snapshot.saved", ServerID: s.ID, Metadata: map[string]interface{}{"hash": snap.SnapshotHash, "source": snap.Source}}}, r.audit...)
+	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "snapshot.saved", ServerID: s.ID, Metadata: map[string]any{"hash": snap.SnapshotHash, "source": snap.Source}}}, r.audit...)
 	return snap, nil
 }
 func (r *MemoryRepository) LatestSnapshot(_ context.Context, id string) (CapabilitySnapshot, error) {
@@ -431,11 +431,11 @@ func (r *MemoryRepository) MarkSyncFailed(_ context.Context, id, message, actor 
 	s.LastSyncAt = &now
 	s.UpdatedAt = now
 	r.servers[s.ID] = s
-	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "sync.failed", ServerID: s.ID, Metadata: map[string]interface{}{"error": s.LastSyncError}}}, r.audit...)
+	r.audit = append([]AuditEvent{{ID: NewID(), Timestamp: now, Actor: actor, Action: "sync.failed", ServerID: s.ID, Metadata: map[string]any{"error": s.LastSyncError}}}, r.audit...)
 	return nil
 }
 func SnapshotHash(s CapabilitySnapshot) string {
-	b, _ := json.Marshal([]interface{}{s.ProtocolVersion, s.ServerInfo, s.Capabilities, s.Tools, s.Resources, s.Prompts, s.RawInitialize})
+	b, _ := json.Marshal([]any{s.ProtocolVersion, s.ServerInfo, s.Capabilities, s.Tools, s.Resources, s.Prompts, s.RawInitialize})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }

@@ -1,6 +1,6 @@
 # MCP Hub docs
 
-MVP docs:
+Operating docs:
 
 - [Architecture](ARCHITECTURE.md)
 - [API](API.md)

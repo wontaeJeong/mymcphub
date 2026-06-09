@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: MCP Hub MVP API
+  title: MCP Hub API
   version: 0.1.0
 paths:
   /healthz: { get: { summary: Health check, responses: { '200': { description: ok } } } }

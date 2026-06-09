@@ -1,6 +1,6 @@
 apiVersion: v2
 name: mcp-hub
-description: Helm chart for the MCP Hub MVP web, API, and worker services.
+description: Helm chart for the MCP Hub web, API, and worker services.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

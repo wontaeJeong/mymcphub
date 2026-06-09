@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -43,12 +44,14 @@ func Run(args []string, out, errw io.Writer) error {
 		return help(out)
 	}
 	switch args[0] {
+	case "help", "--help", "-h":
+		return help(out)
 	case "login":
 		return login(args[1:], out)
 	case "logout":
 		return logout(out)
 	case "whoami":
-		return print(out, output, map[string]interface{}{"apiUrl": c.APIURL, "authenticated": c.Token != ""})
+		return print(out, output, map[string]any{"apiUrl": c.APIURL, "authenticated": c.Token != ""})
 	case "health":
 		return request(c, http.MethodGet, "/healthz", nil, out)
 	case "version":
@@ -252,12 +255,12 @@ func parseManifest(v string) (db.Server, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		if strings.HasSuffix(line, ":") {
-			section = strings.TrimSuffix(line, ":")
+		if suffix, ok := strings.CutSuffix(line, ":"); ok {
+			section = suffix
 			continue
 		}
-		if strings.HasPrefix(line, "-") {
-			val := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+		if suffix, ok := strings.CutPrefix(line, "-"); ok {
+			val := strings.TrimSpace(suffix)
 			if section == "args" || section == "stdio.args" {
 				s.StdioArgs = append(s.StdioArgs, val)
 			}
@@ -316,21 +319,14 @@ func valueAfter(args []string, key string) string {
 	}
 	return ""
 }
-func has(args []string, key string) bool {
-	for _, a := range args {
-		if a == key {
-			return true
-		}
-	}
-	return false
-}
+func has(args []string, key string) bool { return slices.Contains(args, key) }
 func env(k, f string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
 	}
 	return f
 }
-func print(out io.Writer, output string, v interface{}) error {
+func print(out io.Writer, _ string, v any) error {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	_, err := fmt.Fprintln(out, string(b))
 	return err

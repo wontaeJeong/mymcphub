@@ -13,5 +13,3 @@ curl -X POST http://localhost:4100/jobs/run \
 See also:
 
 - [Local Development](../../docs/LOCAL_DEV.md)
-- [MVP Demo](../../docs/MVP_DEMO.md)
-- [Worker](../../docs/WORKER.md)

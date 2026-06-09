@@ -235,10 +235,10 @@ func validate(s db.Server) error {
 	}
 	return nil
 }
-func write(w http.ResponseWriter, r *http.Request, v interface{}, err error) {
+func write(w http.ResponseWriter, r *http.Request, v any, err error) {
 	writeStatus(w, r, 200, v, err)
 }
-func writeStatus(w http.ResponseWriter, r *http.Request, status int, v interface{}, err error) {
+func writeStatus(w http.ResponseWriter, r *http.Request, status int, v any, err error) {
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			httpx.WriteError(w, 404, "NOT_FOUND", "resource not found", auth.TraceID(r), nil)
@@ -265,12 +265,12 @@ func parts(path, prefix string) []string {
 	}
 	return strings.Split(rest, "/")
 }
-func OpenAPIDocument() map[string]interface{} {
-	paths := map[string]interface{}{}
+func OpenAPIDocument() map[string]any {
+	paths := map[string]any{}
 	for _, p := range []string{"/healthz", "/readyz", "/api/catalog/summary", "/api/servers", "/api/servers/{serverId}", "/api/servers/{serverId}/capability-snapshot", "/api/servers/{serverId}/health", "/api/admin/servers", "/api/admin/servers/{serverId}", "/api/admin/servers/{serverId}/sync", "/api/admin/servers/{serverId}/snapshots", "/api/admin/audit-events"} {
-		paths[p] = map[string]interface{}{}
+		paths[p] = map[string]any{}
 	}
-	return map[string]interface{}{"openapi": "3.1.0", "info": map[string]string{"title": "MCP Hub MVP API", "version": "0.1.0"}, "paths": paths}
+	return map[string]any{"openapi": "3.1.0", "info": map[string]string{"title": "MCP Hub API", "version": "0.1.0"}, "paths": paths}
 }
 func WriteOpenAPI(w http.ResponseWriter) { _ = json.NewEncoder(w).Encode(OpenAPIDocument()) }
 func init()                              { log.SetFlags(log.LstdFlags | log.LUTC) }

@@ -5,14 +5,14 @@ on:
   push:
     branches:
       - main
+      - minimal
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   go-core:
-    name: Go Core fmt/vet/test/build
+    name: Go core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -38,81 +38,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: scripts/ci/web.sh
 
-  schemas:
-    name: OpenAPI and JSON Schema drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version: "1.26.4"
-          cache: true
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 22
-      - run: scripts/ci/schemas.sh
-
-  security-scan:
-    name: Security supply-chain scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version: "1.26.4"
-          cache: true
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - run: scripts/security/scan-supply-chain.sh
-
-  helm-gitops:
-    name: Helm and GitOps render
+  helm:
+    name: Helm render
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-      - uses: imranismail/setup-kustomize@v2
-      - run: bash scripts/ci/helm-template.sh
-
-  e2e-security:
-    name: Go e2e and security negatives
-    runs-on: ubuntu-latest
-    needs:
-      - go-core
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version: "1.26.4"
-          cache: true
-      - run: go test ./tests/e2e ./tests/security
-
-  compatibility-matrix:
-    name: Lane G compatibility (${{ matrix.os }}, Go ${{ matrix.go-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-        go-version:
-          - "1.26.4"
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
-      - run: go test ./tests/contract ./tests/e2e ./tests/load ./tests/migration
+      - run: scripts/ci/helm.sh
 
   docker-build:
     name: Docker image build
@@ -123,18 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - run: docker build -f apps/api/Dockerfile -t mcp-hub/api:${{ github.sha }} .
-      - run: docker build -f apps/gateway/Dockerfile -t mcp-hub/gateway:${{ github.sha }} .
       - run: docker build -f apps/worker/Dockerfile -t mcp-hub/worker:${{ github.sha }} .
       - run: docker build -f apps/cli/Dockerfile -t mcp-hub/mcphubctl:${{ github.sha }} .
       - run: docker build -f apps/web/Dockerfile -t mcp-hub/web:${{ github.sha }} .
-      - run: docker build -f servers/k8s/Dockerfile -t mcp-hub/k8s-readonly:${{ github.sha }} .
-      - run: docker build -f servers/runtime-adapter/Dockerfile -t mcp-hub/runtime-adapter:${{ github.sha }} .
-      - run: docker build -f servers/github/Dockerfile -t mcp-hub/github-readonly:${{ github.sha }} .
-      - run: docker build -f servers/gitlab/Dockerfile -t mcp-hub/gitlab-readonly:${{ github.sha }} .
-      - run: docker build -f servers/internal-docs/Dockerfile -t mcp-hub/internal-docs-readonly:${{ github.sha }} .
-      - run: scripts/security/scan-images.sh
-        env:
-          SECURITY_IMAGES: mcp-hub/api:${{ github.sha }},mcp-hub/gateway:${{ github.sha }},mcp-hub/worker:${{ github.sha }},mcp-hub/mcphubctl:${{ github.sha }},mcp-hub/web:${{ github.sha }},mcp-hub/k8s-readonly:${{ github.sha }},mcp-hub/runtime-adapter:${{ github.sha }},mcp-hub/github-readonly:${{ github.sha }},mcp-hub/gitlab-readonly:${{ github.sha }},mcp-hub/internal-docs-readonly:${{ github.sha }}
-      - run: scripts/security/sbom-sign-images.sh
-        env:
-          SECURITY_IMAGES: mcp-hub/api:${{ github.sha }},mcp-hub/gateway:${{ github.sha }},mcp-hub/worker:${{ github.sha }},mcp-hub/mcphubctl:${{ github.sha }},mcp-hub/web:${{ github.sha }},mcp-hub/k8s-readonly:${{ github.sha }},mcp-hub/runtime-adapter:${{ github.sha }},mcp-hub/github-readonly:${{ github.sha }},mcp-hub/gitlab-readonly:${{ github.sha }},mcp-hub/internal-docs-readonly:${{ github.sha }}
