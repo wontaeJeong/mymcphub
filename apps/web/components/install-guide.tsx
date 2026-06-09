@@ -21,27 +21,27 @@ const clientGuides: ReadonlyArray<{
   {
     kind: "opencode",
     label: "opencode",
-    description: "원격 MCP 서버 항목과 bearer header를 포함한 mcp 설정을 생성합니다.",
+    description: "opencode용 원격 MCP 설정을 생성합니다.",
   },
   {
     kind: "claude-code",
     label: "Claude Code",
-    description: "Claude Code remote MCP 형식에 맞춘 placeholder 설정을 생성합니다.",
+    description: "Claude Code에 붙여 넣을 설정을 생성합니다.",
   },
   {
     kind: "codex",
     label: "Codex",
-    description: "Codex에서 확인할 수 있는 remote MCP 서버 설정을 생성합니다.",
+    description: "Codex용 원격 MCP 설정을 생성합니다.",
   },
   {
     kind: "vscode",
     label: "VS Code",
-    description: "VS Code MCP client profile에 붙여 넣을 remote server 설정을 생성합니다.",
+    description: "VS Code 클라이언트 설정을 생성합니다.",
   },
   {
     kind: "generic",
     label: "일반 원격 MCP",
-    description: "URL, streamable HTTP transport, bearer token 요구사항만 포함한 범용 설정입니다.",
+    description: "URL과 토큰 요구사항만 포함한 범용 설정입니다.",
   },
 ];
 
@@ -52,12 +52,12 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
   return (
     <Surface>
       <SectionHeader
-        title="설치 / 클라이언트 설정"
-        description="Gateway를 통해 opencode, Claude Code, Codex, VS Code 또는 일반 원격 MCP 클라이언트 설정을 생성합니다."
+        title="클라이언트 연결"
+        description="사용할 클라이언트를 선택해 설정을 생성합니다."
         action={
-          <Link className="button button--ghost" href={clientConfigHref(server.id, "opencode")}>
-            전체 생성기로 이동
-          </Link>
+          hasAccess ? <Link className="button button--ghost" href={clientConfigHref(server.id, "opencode")}>
+            설정 생성기로 이동
+          </Link> : undefined
         }
       />
       <div className="grid">
@@ -68,7 +68,7 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
           <p>
             <strong>Gateway URL:</strong>{" "}
             <span className="muted">
-              정확한 호스트와 전체 URL은 설정을 생성한 뒤 확인합니다.
+              전체 URL은 설정 생성 후 확인합니다.
             </span>
           </p>
           <p>
@@ -77,7 +77,7 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
           <p>
             <strong>토큰:</strong>{" "}
             <span className="muted">
-              클라이언트에는 MCPHUB_TOKEN 같은 환경 변수로 bearer token을 주입하고, 설정 JSON이나 로그에 원문 토큰을 저장하지 마세요.
+              토큰은 환경 변수로 주입하세요. 설정 파일이나 로그에 저장하지 마세요.
             </span>
           </p>
           <p>
@@ -85,37 +85,39 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
             <code>mcp inspector &lt;생성된 gatewayUrl&gt;</code>
           </p>
         </div>
-        <div className="card-grid">
-          {clientGuides.map((client) => (
-            <Surface key={client.kind}>
-              <h3>{client.label}</h3>
-              <p className="muted">{client.description}</p>
-              <Link className="button button--ghost" href={clientConfigHref(server.id, client.kind)}>
-                {client.label} 선택
-              </Link>
-            </Surface>
-          ))}
-        </div>
         {!server.enabled || server.quarantined ? (
           <EmptyState
-            title="설정 생성 전 서버 상태 확인 필요"
-            description="비활성 또는 격리된 서버는 Gateway에서 사용할 수 없습니다. 운영 상태가 복구된 뒤 클라이언트 설정을 생성하세요."
+            title="서버 상태 확인 필요"
+            description="비활성 또는 격리된 서버는 설정을 생성할 수 없습니다."
           />
-        ) : canGenerate ? (
-          <ClientConfigForm
-            servers={[server]}
-            initialValues={{ serverId: server.id, client: "opencode", profile: "local" }}
-          />
-        ) : (
+        ) : !canGenerate ? (
           <EmptyState
-            title="접근 요청 후 설정을 생성하세요"
-            description="현재 세션에 이 서버 권한이 없습니다. 먼저 접근 승인 요청을 제출한 뒤 생성된 게이트웨이 URL과 설정을 사용하세요."
+            title="접근 승인 후 설정을 생성할 수 있습니다"
+            description="이 서버를 연결하려면 먼저 접근을 요청하세요."
             action={
               <Link className="button" href={accessRequestHref}>
-                접근 요청 열기
+                접근 요청
               </Link>
             }
           />
+        ) : (
+          <>
+            <div className="card-grid">
+              {clientGuides.map((client) => (
+                <Surface key={client.kind}>
+                  <h3>{client.label}</h3>
+                  <p className="muted">{client.description}</p>
+                  <Link className="button button--ghost" href={clientConfigHref(server.id, client.kind)}>
+                    {client.label} 설정 생성
+                  </Link>
+                </Surface>
+              ))}
+            </div>
+            <ClientConfigForm
+              servers={[server]}
+              initialValues={{ serverId: server.id, client: "opencode", profile: "local" }}
+            />
+          </>
         )}
       </div>
     </Surface>

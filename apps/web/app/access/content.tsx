@@ -29,6 +29,8 @@ export async function AccessPageContent({
     approvalsPromise,
   ]);
   const serverItems = servers.ok ? servers.data.items : [];
+  const selectedServer = serverItems.find((server) => server.id === prefill.serverId) ?? serverItems[0];
+  const defaultEnvironment = prefill.environment || selectedServer?.environment || "dev";
   const serverNameById = new Map(serverItems.map((server) => [server.id, server.displayName]));
   const visibleGrants = grants.ok && mode === "user" ? grants.data.items.filter((grant) => grant.subjectId === session?.principal.userId || session?.principal.teamIds.includes(grant.subjectId) || session?.principal.teams.includes(grant.subjectId)) : grants.ok ? grants.data.items : [];
   const visibleApprovals = approvals.ok && mode === "user"
@@ -40,21 +42,21 @@ export async function AccessPageContent({
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="접근 요청 및 권한" title="추측 없는 권한 흐름." description={mode === "admin" ? "실제 제어 플레인 엔드포인트로 현재 권한을 검토하고, 권한 생성과 회수를 수행합니다." : "내게 보이는 권한을 검토하고 접근 승인 요청을 제출합니다. 권한 생성과 회수는 관리자 전용 흐름에 남습니다."} />
+      <PageHero eyebrow={mode === "admin" ? "권한 관리" : "접근 권한"} title={mode === "admin" ? "접근 권한 관리" : "접근 권한"} description={mode === "admin" ? "권한을 검토하고 승인된 요청을 기준으로 권한을 부여합니다." : "내 권한과 승인 대기 상태를 확인하고 필요한 접근을 요청합니다."} />
       <section>
-        <SectionHeader title="현재 권한" description="현재 권한을 서버 이름과 함께 표시합니다." />
-        {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} actionSlot={mode === "admin" ? GrantControls : undefined} audience={mode === "user" ? "user" : "admin-summary"} /> : grants.ok ? <EmptyState title="권한 없음" description={mode === "user" ? "현재 사용자 또는 팀 식별자와 일치하는 권한이 없습니다." : "제어 플레인이 권한을 반환하지 않았습니다."} /> : <ErrorState message={grants.error} />}
+        <SectionHeader title="현재 권한" description="사용 가능한 서버와 도구를 확인합니다." />
+        {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} actionSlot={mode === "admin" ? GrantControls : undefined} audience={mode === "user" ? "user" : "admin-summary"} /> : grants.ok ? <EmptyState title="권한 없음" description={mode === "user" ? "필요한 서버가 있다면 접근을 요청하세요." : "등록된 권한이 없습니다."} /> : <ErrorState message={grants.error} />}
       </section>
       {mode === "user" ? (
         <section>
-          <SectionHeader title="승인 대기 상태" description="현재 사용자 또는 팀과 일치하는 pending approval만 표시해 같은 server/tool 요청을 반복하지 않도록 합니다." />
-          {approvals.ok && pendingApprovals.length > 0 ? <ApprovalTable approvals={pendingApprovals} serverNameById={serverNameById} /> : approvals.ok ? <EmptyState title="승인 대기 없음" description="표시 가능한 대기 승인 요청이 없습니다. 필요한 서버와 도구를 아래 양식에서 요청하세요." /> : <ErrorState title="승인 대기 상태 확인 불가" message={approvals.error} />}
+          <SectionHeader title="승인 대기 중" description="검토 중인 접근 요청입니다." />
+          {approvals.ok && pendingApprovals.length > 0 ? <ApprovalTable approvals={pendingApprovals} serverNameById={serverNameById} /> : approvals.ok ? <EmptyState title="승인 대기 중인 요청이 없습니다" description="필요한 서버와 도구를 아래에서 요청하세요." /> : <ErrorState title="승인 대기 상태를 확인할 수 없습니다" message={approvals.error} />}
         </section>
       ) : null}
       <div className={mode === "admin" ? "form-grid" : "grid"}>
         <form className="form-card" action={createApprovalAction}>
           <h2>{mode === "user" ? "접근 요청" : "접근 승인 요청"}</h2>
-          <p>{mode === "user" ? "서버, 필요한 도구, 환경, 사유만 입력하면 현재 계정 정보로 승인 요청을 보냅니다." : "주체, 도구, 환경, 티켓, 만료, 사유를 입력해 승인 대기 요청을 생성합니다."}</p>
+          <p>{mode === "user" ? "필요한 서버와 도구를 선택하고 사유를 입력하세요." : "주체, 도구, 환경, 티켓, 만료, 사유를 입력해 승인 요청을 생성합니다."}</p>
           {servers.ok && serverItems.length > 0 ? (
             mode === "user" ? (
               <>
@@ -65,13 +67,13 @@ export async function AccessPageContent({
                 <div className="form-grid">
                   <div className="field">
                     <label htmlFor="approvalServerId">서버</label>
-                    <select id="approvalServerId" name="serverId" required defaultValue={prefill.serverId || undefined}>
-                      {serverItems.map((server) => <option value={server.id} key={server.id}>{server.displayName}</option>)}
+                    <select id="approvalServerId" name="serverId" required defaultValue={selectedServer?.id}>
+                      {serverItems.map((server) => <option value={server.id} key={server.id}>{server.displayName} · {server.environment}</option>)}
                     </select>
                   </div>
                   <div className="field">
                     <label htmlFor="approvalEnvironment">환경</label>
-                    <select id="approvalEnvironment" name="environment" required defaultValue={prefill.environment || "dev"}>
+                    <select id="approvalEnvironment" name="environment" required defaultValue={defaultEnvironment}>
                       <option value="dev">개발</option>
                       <option value="stg">스테이징</option>
                       <option value="prod">운영</option>
@@ -80,7 +82,7 @@ export async function AccessPageContent({
                   </div>
                 </div>
                 <div className="field">
-                  <label htmlFor="approvalRequestedTools">필요한 도구</label>
+                  <label htmlFor="approvalRequestedTools">요청할 도구</label>
                   <input id="approvalRequestedTools" name="requestedTools" required defaultValue={prefill.requestedTools} placeholder="예: docs.search 또는 전체 도구 *" />
                 </div>
                 <div className="field">
@@ -98,7 +100,7 @@ export async function AccessPageContent({
                     <input id="approvalTicketUrl" name="ticketUrl" type="url" placeholder="선택 사항" />
                   </div>
                 </details>
-                <div className="form-actions"><button className="button" type="submit">승인 요청 제출</button></div>
+                <div className="form-actions"><button className="button" type="submit">접근 요청</button></div>
               </>
             ) : (
               <>
@@ -155,7 +157,7 @@ export async function AccessPageContent({
                 <label htmlFor="approvalReason">사유</label>
                 <textarea id="approvalReason" name="reason" required defaultValue={prefill.reason} placeholder="업무상 필요 사유" />
               </div>
-              <div className="form-actions"><button className="button" type="submit">승인 요청 제출</button></div>
+              <div className="form-actions"><button className="button" type="submit">승인 요청 생성</button></div>
               </>
             )
           ) : servers.ok ? <EmptyState title="사용 가능한 서버 없음" description="승인 요청에는 카탈로그의 서버가 필요합니다." /> : <ErrorState message={servers.error} />}

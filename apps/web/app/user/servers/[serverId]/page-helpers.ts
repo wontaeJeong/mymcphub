@@ -41,7 +41,7 @@ export function buildUserToolAccessStatus(
     }
 
     if (!grants) {
-      statuses.set(toolKey(tool), "권한 상태 확인 불가");
+      statuses.set(toolKey(tool), "권한 정보 없음");
       continue;
     }
 
@@ -49,7 +49,7 @@ export function buildUserToolAccessStatus(
       toolKey(tool),
       grants.some((grant) => grantAllowsTool(grant, tool))
         ? "사용 가능"
-        : "접근 요청 필요",
+        : "권한 필요",
     );
   }
 

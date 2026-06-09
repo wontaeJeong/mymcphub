@@ -15,7 +15,7 @@ export function buildGrantStatus(tools: ApiMcpTool[], grants: Pick<ApiGrant, "se
   const statuses = new Map<string, string>();
   for (const tool of tools) {
     if (!grants) {
-      statuses.set(`${tool.serverId}:${tool.name}`, "권한 상태 확인 불가");
+      statuses.set(`${tool.serverId}:${tool.name}`, "권한 정보 없음");
       continue;
     }
 

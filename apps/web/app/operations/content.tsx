@@ -69,13 +69,13 @@ export async function OperationsPageContent() {
   return (
     <div className="page-stack">
       <PageHero
-        eyebrow="상태 및 운영"
-        title="인시던트 신호를 먼저 보세요."
-        description="상태 이상, 거부 호출, 격리, 비활성 서버를 먼저 확인하고 상세 표는 필요할 때 펼칩니다."
+        eyebrow="운영 상태"
+        title="운영 상태"
+        description="상태 이상, 정책 거부, 격리 및 비활성 서버를 확인합니다."
       />
       <div className="card-grid">
         <Surface>
-          <SectionHeader title="장애" />
+          <SectionHeader title="상태 이상" />
           <p>{incidentCount}</p>
         </Surface>
         <Surface>
@@ -83,7 +83,7 @@ export async function OperationsPageContent() {
           <p>{deniedToolCalls}</p>
         </Surface>
         <Surface>
-          <SectionHeader title="격리됨" />
+          <SectionHeader title="격리 서버" />
           <p>{serverItems.filter((server) => server.quarantined).length}</p>
         </Surface>
         <Surface>
@@ -93,8 +93,8 @@ export async function OperationsPageContent() {
       </div>
       {versionErrors.length > 0 ? (
         <ErrorState
-          title="롤아웃 버전을 일부 사용할 수 없음"
-          message={`${versionErrors.length}개 서버 버전 요청이 롤아웃 상태를 구성하는 동안 실패했습니다.`}
+          title="롤아웃 정보를 일부 확인할 수 없습니다"
+          message={`${versionErrors.length}개 서버의 버전 정보를 불러오지 못했습니다.`}
         />
       ) : null}
       <section>
@@ -134,7 +134,7 @@ export async function OperationsPageContent() {
           </div>
         ) : denied.ok ? (
           <EmptyState
-            title="거부 호출 없음"
+            title="정책 거부 없음"
             description="현재 감사 범위에서 거부된 도구 호출이 없습니다."
           />
         ) : (
@@ -143,17 +143,17 @@ export async function OperationsPageContent() {
       </section>
       <section>
         <details className="schema-viewer">
-        <summary>롤아웃 및 격리 상태 보기</summary>
+        <summary>롤아웃 상태</summary>
         <SectionHeader
-          title="롤아웃 및 격리 상태"
+           title="롤아웃 상태"
           description="활성 버전, 롤아웃 최신성, 격리 상태를 함께 표시합니다."
         />
         {servers.ok && rolloutRows.length > 0 ? (
           <RolloutStatusTable rows={rolloutRows} serverBasePath="/admin/servers" />
         ) : servers.ok ? (
           <EmptyState
-            title="롤아웃 행 없음"
-            description="롤아웃 상태를 표시하려면 먼저 서버를 등록하세요."
+             title="롤아웃 상태가 없습니다"
+             description="서버를 등록하면 롤아웃 상태가 표시됩니다."
           />
         ) : (
           <ErrorState message={servers.error} />
@@ -162,7 +162,7 @@ export async function OperationsPageContent() {
       </section>
       <section>
         <details className="schema-viewer">
-        <summary>사용량 집계 보기</summary>
+        <summary>사용량</summary>
         <SectionHeader
           title="사용량 집계"
           description={`일별 호출 ${totalToolCalls}건의 상위 집계입니다.`}
@@ -203,8 +203,8 @@ export async function OperationsPageContent() {
           </div>
         ) : usage.ok ? (
           <EmptyState
-            title="사용량 행 없음"
-            description="Gateway 트래픽이 기록되면 도구 호출 감사 이벤트가 여기에 표시됩니다."
+             title="사용량 데이터가 없습니다"
+             description="도구 호출이 기록되면 사용량이 표시됩니다."
           />
         ) : (
           <ErrorState message={usage.error} />
@@ -214,14 +214,14 @@ export async function OperationsPageContent() {
       <section>
         <SectionHeader
           title="서버 상태"
-          description="상태 워커가 반환한 최신 상태입니다."
+          description="최근 상태 확인 결과입니다."
         />
         {health.ok && healthItems.length > 0 ? (
           <HealthTable checks={healthItems} serverNameById={serverNameById} />
         ) : health.ok ? (
           <EmptyState
-            title="상태 확인 없음"
-            description="제어 플레인이 상태 확인을 반환하지 않았습니다."
+            title="상태 확인 결과가 없습니다"
+            description="아직 상태 확인 결과가 없습니다."
           />
         ) : (
           <ErrorState message={health.error} />
@@ -229,7 +229,7 @@ export async function OperationsPageContent() {
       </section>
       <section>
         <details className="schema-viewer">
-        <summary>운영 카탈로그 표 보기</summary>
+        <summary>서버 목록</summary>
         <SectionHeader
           title="운영 카탈로그 상태"
           description="서버 활성 여부와 위험 수준의 전체 표입니다."
@@ -244,7 +244,7 @@ export async function OperationsPageContent() {
         ) : servers.ok ? (
           <EmptyState
             title="서버 없음"
-            description="제어 플레인이 카탈로그 항목을 반환하지 않았습니다."
+             description="등록된 서버가 없습니다."
           />
         ) : (
           <ErrorState message={servers.error} />

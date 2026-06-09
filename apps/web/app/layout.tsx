@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "MCP Hub 운영 콘솔",
-  description: "MCP Hub 제어 플레인 운영 콘솔입니다."
+  description: "MCP 서버 탐색과 운영을 위한 내부 콘솔입니다."
 };
 
 const themeScript = `

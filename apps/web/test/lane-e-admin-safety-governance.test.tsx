@@ -157,7 +157,7 @@ describe("Lane E safety governance UX helpers", () => {
 
     expect(accessible.status).toBe("accessible");
     expect(accessible.wildcardGrant).toBe(true);
-    expect(accessible.actionHint).toContain("와일드카드 grant(*)");
+    expect(accessible.actionHint).toContain("전체 도구 권한(*)");
     expect(pending.status).toBe("pending_approval");
     expect(pending.label).toBe("승인 대기 중");
     expect(disabled.status).toBe("disabled");
@@ -203,7 +203,7 @@ describe("Lane E safety governance UX helpers", () => {
     });
     expect(href).toContain("/user/access?");
     expect(href).toContain("toolName=docs.search");
-    expect(html).toContain("요청 필요");
+    expect(html).toContain("권한 필요");
     expect(html).toContain("높은 위험 도구");
     expect(html).toContain("접근 요청");
   });
@@ -231,7 +231,7 @@ describe("Lane E safety governance UX helpers", () => {
     expect(context?.grantOverlaps[0]?.wildcard).toBe(true);
     expect(html).toContain("Production Docs");
     expect(html).toContain("심각");
-    expect(html).toContain("와일드카드 grant(*) 포함");
+    expect(html).toContain("전체 도구 권한(*) 포함");
     expect(html).toContain("높음/심각 위험 요청");
   });
 });

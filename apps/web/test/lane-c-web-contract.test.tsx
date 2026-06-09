@@ -113,7 +113,7 @@ describe("Lane C Web contract helpers", () => {
     expect(options).toEqual([{ value: "server-prod-docs::prod-docs::docs.search", label: "Production Docs · docs.search", serverId: "server-prod-docs", serverSlug: "prod-docs", toolName: "docs.search", riskLevel: "high", enabled: true }]);
     expect(grantStatus.get("server-prod-docs:docs.search")).toBe("1개 활성 권한: 팀:team-platform");
     expect(noGrantStatus.get("server-prod-docs:docs.search")).toBe("활성 권한 없음");
-    expect(unavailableGrantStatus.get("server-prod-docs:docs.search")).toBe("권한 상태 확인 불가");
+    expect(unavailableGrantStatus.get("server-prod-docs:docs.search")).toBe("권한 정보 없음");
   });
 
   it("builds user detail access statuses and request links", () => {
@@ -126,9 +126,9 @@ describe("Lane C Web contract helpers", () => {
     const disabledServerStatus = buildUserToolAccessStatus(buildServer({ enabled: false }), [tool], [buildGrant()]);
 
     expect(grantedStatus.get("server-prod-docs:docs.search")).toBe("사용 가능");
-    expect(requestStatus.get("server-prod-docs:docs.search")).toBe("접근 요청 필요");
+    expect(requestStatus.get("server-prod-docs:docs.search")).toBe("권한 필요");
     expect(disabledToolStatus.get("server-prod-docs:docs.search")).toBe("사용 불가: 도구 비활성");
-    expect(unknownStatus.get("server-prod-docs:docs.search")).toBe("권한 상태 확인 불가");
+    expect(unknownStatus.get("server-prod-docs:docs.search")).toBe("권한 정보 없음");
     expect(disabledServerStatus.get("server-prod-docs:docs.search")).toBe("사용 불가: 서버 비활성");
     expect(buildAccessRequestHref(server, ["docs.search", "docs.read"])).toBe("/user/access?serverId=server-prod-docs&requestedTools=docs.search%2Cdocs.read&environment=prod");
   });

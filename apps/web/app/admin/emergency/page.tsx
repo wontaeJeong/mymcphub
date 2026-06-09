@@ -18,7 +18,7 @@ export default async function EmergencyPage() {
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="관리자 긴급 제어" title="전체 차단과 대상별 조치를 구분하세요." description="허브 전체 긴급 거부를 먼저 판단하고, 서버·도구·권한 조치는 위험 구역에서 대상 확인 후 실행합니다." />
+      <PageHero eyebrow="위험 작업" title="긴급 조치" description="전체 차단, 서버 비활성화, 도구 비활성화, 권한 회수를 실행합니다." />
       {servers.ok ? <AdminControls servers={serverItems} tools={tools} /> : <ErrorState message={servers.error} />}
     </div>
   );
