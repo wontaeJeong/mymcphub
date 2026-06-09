@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ApiGrant, ApiMcpServer, ApiServerHealth, AuthContext } from "../../lib/api";
+import type { ApiGrant, ApiMcpServer, ApiServerHealth, AuthContext } from "../lib/api";
 import {
   buildMarketSections,
   buildMarketSummary,
@@ -11,7 +11,7 @@ import {
   getMarketTrustLevel,
   getMarketVisibility,
   matchesCatalogFilters,
-} from "./page-helpers";
+} from "../app/catalog/page-helpers";
 
 const createdAt = "2026-06-07T09:00:00.000Z";
 const updatedAt = "2026-06-07T10:00:00.000Z";
