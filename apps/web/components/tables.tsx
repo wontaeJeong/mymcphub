@@ -911,7 +911,7 @@ export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<
           {events.map((event) => (
             <tr key={event.id}>
               <td>
-                {event.eventType}
+                <StatusPill tone={auditEventTone(event.eventType)}>{auditEventLabel(event.eventType)}</StatusPill>
                 <p className="muted">
                   {event.toolName ?? event.serverId ?? "허브 범위"}
                 </p>
@@ -987,6 +987,34 @@ function AuditExecution({ event }: Readonly<{ event: ApiAuditEvent }>) {
       {event.errorCode ? <p className="muted">오류 {event.errorCode}</p> : null}
     </div>
   );
+}
+
+function auditEventLabel(eventType: string) {
+  if (eventType.startsWith("tool.")) {
+    return "도구 호출";
+  }
+
+  if (eventType.startsWith("admin.")) {
+    return "관리자 작업";
+  }
+
+  if (eventType.startsWith("policy.")) {
+    return "정책 이벤트";
+  }
+
+  return eventType;
+}
+
+function auditEventTone(eventType: string): StatusTone {
+  if (eventType.startsWith("tool.")) {
+    return "info";
+  }
+
+  if (eventType.startsWith("admin.")) {
+    return "warning";
+  }
+
+  return "neutral";
 }
 
 export function ToolCallTable({

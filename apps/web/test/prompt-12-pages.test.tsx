@@ -330,7 +330,19 @@ describe("prompt-12 required web pages", () => {
       risk_level: "high",
       trace_id: "trace-prod-docs"
     });
-    expect(nextHref).toBe("/admin/audit?server=prod-docs&tool=docs.search&event_type=tool.call&policy_decision=needs_approval&risk_level=high&trace_id=trace-prod-docs&limit=25&status=fail&cursor=cursor-next");
+    const nextUrl = new URL(nextHref, "http://localhost");
+    expect(nextUrl.pathname).toBe("/admin/audit");
+    expect(Object.fromEntries(nextUrl.searchParams)).toMatchObject({
+      server: "prod-docs",
+      tool: "docs.search",
+      event_type: "tool.call",
+      policy_decision: "needs_approval",
+      risk_level: "high",
+      trace_id: "trace-prod-docs",
+      limit: "25",
+      status: "fail",
+      cursor: "cursor-next"
+    });
     expect(filteredCalls).toEqual([matchingCall]);
 
     const auditHtml = renderToStaticMarkup(<AuditTable events={[buildAuditEvent()]} />);
