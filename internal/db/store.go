@@ -294,6 +294,9 @@ func (s *Store) loadSnapshotLocked() error {
 	s.secretBindings = cloneSlice(state.SecretBindings)
 	s.schemaSnapshots = cloneSlice(state.SchemaSnapshots)
 	s.schemaDiffs = cloneSlice(state.SchemaDiffs)
+	for i := range s.servers {
+		normalizeServerMarketDefaults(&s.servers[i], Now())
+	}
 	s.backfillSeedDataLocked()
 	return nil
 }
@@ -384,10 +387,20 @@ func (s *Store) CreateServer(input MCPServer, tools []MCPTool, auth AuthContext,
 	if input.RiskLevel == "" {
 		input.RiskLevel = RiskLow
 	}
+	visibilityProvided := input.Visibility != ""
 	if !validEnvironment(input.Environment) || !validTransport(input.Transport) || !validRisk(input.RiskLevel) {
 		return MCPServer{}, fmt.Errorf("%w: environment, transport, or riskLevel is invalid", ErrValidation)
 	}
-	input.Published = input.Enabled
+	if !visibilityProvided {
+		input.Published = input.Enabled
+	}
+	normalizeServerMarketDefaults(&input, now)
+	if visibilityProvided {
+		applyMarketVisibility(&input, now)
+	}
+	if !validMarketMetadata(input) {
+		return MCPServer{}, fmt.Errorf("%w: market metadata is invalid", ErrValidation)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.teamIndexLocked(input.OwnerTeamID) < 0 {
@@ -451,21 +464,98 @@ func (s *Store) PatchServer(id string, patch map[string]interface{}, auth AuthCo
 	if idx < 0 {
 		return MCPServer{}, ErrNotFound
 	}
+	server := s.servers[idx]
+	visibilityPatched := false
 	if v, ok := patch["displayName"].(string); ok {
-		s.servers[idx].DisplayName = v
+		server.DisplayName = v
 	}
 	if v, ok := patch["description"].(string); ok {
-		s.servers[idx].Description = v
+		server.Description = v
 	}
 	if v, ok := patch["enabled"].(bool); ok {
-		s.servers[idx].Enabled = v
+		server.Enabled = v
 	}
 	if v, ok := intValue(patch["timeoutMs"]); ok {
-		s.servers[idx].TimeoutMS = v
+		server.TimeoutMS = v
 	}
-	s.servers[idx].UpdatedAt = Now()
-	s.recordAuditLocked(auth, traceID, "mcp_server.updated", id, "", PolicyAllow, s.servers[idx].RiskLevel, patch)
-	return s.servers[idx], nil
+	if v, ok := patch["category"].(string); ok {
+		server.Category = MarketCategory(v)
+	}
+	if _, exists := patch["tags"]; exists {
+		values, ok := stringSlice(patch["tags"])
+		if !ok {
+			return MCPServer{}, fmt.Errorf("%w: tags must be a string array", ErrValidation)
+		}
+		server.Tags = values
+	}
+	if v, ok := patch["summary"].(string); ok {
+		server.Summary = v
+	}
+	if _, exists := patch["useCases"]; exists {
+		values, ok := stringSlice(patch["useCases"])
+		if !ok {
+			return MCPServer{}, fmt.Errorf("%w: useCases must be a string array", ErrValidation)
+		}
+		server.UseCases = values
+	}
+	if v, ok := patch["docsUrl"].(string); ok {
+		server.DocsURL = v
+	}
+	if v, ok := patch["sourceUrl"].(string); ok {
+		server.SourceURL = v
+	}
+	if v, ok := patch["iconUrl"].(string); ok {
+		server.IconURL = v
+	}
+	if _, exists := patch["installMethods"]; exists {
+		values, ok := installMethodSlice(patch["installMethods"])
+		if !ok {
+			return MCPServer{}, fmt.Errorf("%w: installMethods must be a string array", ErrValidation)
+		}
+		server.InstallMethods = values
+	}
+	if _, exists := patch["prerequisites"]; exists {
+		values, ok := stringSlice(patch["prerequisites"])
+		if !ok {
+			return MCPServer{}, fmt.Errorf("%w: prerequisites must be a string array", ErrValidation)
+		}
+		server.Prerequisites = values
+	}
+	if _, exists := patch["securityNotes"]; exists {
+		values, ok := stringSlice(patch["securityNotes"])
+		if !ok {
+			return MCPServer{}, fmt.Errorf("%w: securityNotes must be a string array", ErrValidation)
+		}
+		server.SecurityNotes = values
+	}
+	if v, ok := patch["trustLevel"].(string); ok {
+		server.TrustLevel = MarketTrustLevel(v)
+	}
+	if v, ok := patch["visibility"].(string); ok {
+		server.Visibility = MarketVisibility(v)
+		visibilityPatched = true
+	}
+	if v, ok := patch["reviewedBy"].(string); ok {
+		server.ReviewedBy = v
+	}
+	if v, ok := patch["reviewedAt"].(string); ok {
+		server.ReviewedAt = v
+	}
+	if v, ok := patch["publishedAt"].(string); ok {
+		server.PublishedAt = v
+	}
+	now := Now()
+	normalizeServerMarketDefaults(&server, now)
+	if visibilityPatched {
+		applyMarketVisibility(&server, now)
+	}
+	if !validMarketMetadata(server) {
+		return MCPServer{}, fmt.Errorf("%w: market metadata is invalid", ErrValidation)
+	}
+	server.UpdatedAt = now
+	s.servers[idx] = server
+	s.recordAuditLocked(auth, traceID, "mcp_server.updated", id, "", PolicyAllow, server.RiskLevel, patch)
+	return server, nil
 }
 
 func (s *Store) SetServerState(id string, action string, auth AuthContext, traceID string) (MCPServer, error) {
@@ -478,19 +568,18 @@ func (s *Store) SetServerState(id string, action string, auth AuthContext, trace
 	server := &s.servers[idx]
 	switch action {
 	case "enable", "publish":
-		server.Enabled = true
-		server.Published = true
-		server.Quarantined = false
+		server.Visibility = MarketVisibilityPublished
 	case "disable", "unpublish":
-		server.Enabled = false
-		server.Published = false
+		server.Visibility = MarketVisibilityHidden
 	case "quarantine":
-		server.Enabled = false
-		server.Quarantined = true
+		server.Visibility = MarketVisibilityQuarantined
 	default:
 		return MCPServer{}, fmt.Errorf("%w: unsupported server action", ErrValidation)
 	}
-	server.UpdatedAt = Now()
+	now := Now()
+	applyMarketVisibility(server, now)
+	normalizeServerMarketDefaults(server, now)
+	server.UpdatedAt = now
 	s.recordAuditLocked(auth, traceID, "mcp_server."+action, id, "", PolicyAllow, server.RiskLevel, nil)
 	return *server, nil
 }
@@ -1517,7 +1606,29 @@ func sanitizeAuditEvent(event AuditEvent) AuditEvent {
 }
 
 func seedServer(id, slug, display, description string, transport ServerTransport, risk RiskLevel, upstream string, now string) MCPServer {
-	return MCPServer{ID: id, Slug: slug, DisplayName: display, Description: description, OwnerTeamID: PlatformTeamID, Environment: EnvironmentDev, Transport: transport, UpstreamURL: upstream, Enabled: true, Published: true, RiskLevel: risk, CreatedAt: now, UpdatedAt: now}
+	server := MCPServer{ID: id, Slug: slug, DisplayName: display, Description: description, OwnerTeamID: PlatformTeamID, Environment: EnvironmentDev, Transport: transport, UpstreamURL: upstream, Enabled: true, Published: true, RiskLevel: risk, CreatedAt: now, UpdatedAt: now}
+	if id == K8sReadonlyID {
+		applyK8sReadonlyMarketMetadata(&server, now)
+	} else {
+		normalizeServerMarketDefaults(&server, now)
+	}
+	return server
+}
+
+func applyK8sReadonlyMarketMetadata(server *MCPServer, now string) {
+	server.Category = MarketCategoryCloudInfra
+	server.Tags = []string{"kubernetes", "readonly", "ops"}
+	server.Summary = "Read Kubernetes namespaces and pods through the MCP Gateway."
+	server.UseCases = []string{"Namespace and pod lookup", "Incident investigation", "Cluster inventory"}
+	server.InstallMethods = []InstallMethod{InstallMethodGateway}
+	server.Prerequisites = []string{"Access grant for Kubernetes read-only tools"}
+	server.SecurityNotes = []string{"Gateway policy and redaction checks run before upstream Kubernetes calls."}
+	server.TrustLevel = MarketTrustPlatformSupported
+	server.Visibility = MarketVisibilityPublished
+	server.ReviewedBy = AdminUserID
+	server.ReviewedAt = now
+	server.PublishedAt = now
+	applyMarketVisibility(server, now)
 }
 func seedVersion(serverID, now string) MCPServerVersion {
 	return MCPServerVersion{ID: NewID(), ServerID: serverID, Version: "1.0.0", Status: "active", ConfigHash: "seed-config-" + serverID, ToolSchemaHash: "seed-tool-schema-" + serverID, CreatedAt: now, UpdatedAt: now, ActivatedAt: now}
@@ -1547,6 +1658,76 @@ func NewID() string {
 
 func cloneSlice[T any](in []T) []T { out := make([]T, len(in)); copy(out, in); return out }
 
+func normalizeServerMarketDefaults(server *MCPServer, now string) {
+	if server.Category == "" {
+		server.Category = MarketCategoryOther
+	}
+	if server.Tags == nil {
+		server.Tags = []string{}
+	}
+	if strings.TrimSpace(server.Summary) == "" {
+		server.Summary = firstNonEmptyString(server.Description, server.DisplayName)
+	}
+	if server.UseCases == nil {
+		server.UseCases = []string{}
+	}
+	if len(server.InstallMethods) == 0 {
+		server.InstallMethods = []InstallMethod{InstallMethodGateway}
+	}
+	if server.Prerequisites == nil {
+		server.Prerequisites = []string{}
+	}
+	if server.SecurityNotes == nil {
+		server.SecurityNotes = []string{}
+	}
+	if server.TrustLevel == "" {
+		server.TrustLevel = MarketTrustCommunity
+	}
+	if server.Visibility == "" {
+		server.Visibility = deriveMarketVisibility(*server)
+	}
+	if server.Visibility == MarketVisibilityPublished && strings.TrimSpace(server.PublishedAt) == "" {
+		server.PublishedAt = firstNonEmptyString(server.CreatedAt, now)
+	}
+}
+
+func deriveMarketVisibility(server MCPServer) MarketVisibility {
+	if server.Quarantined {
+		return MarketVisibilityQuarantined
+	}
+	if server.Published {
+		return MarketVisibilityPublished
+	}
+	if server.Enabled {
+		return MarketVisibilityInternal
+	}
+	return MarketVisibilityHidden
+}
+
+func applyMarketVisibility(server *MCPServer, now string) {
+	switch server.Visibility {
+	case MarketVisibilityPublished:
+		server.Enabled = true
+		server.Published = true
+		server.Quarantined = false
+		if strings.TrimSpace(server.PublishedAt) == "" {
+			server.PublishedAt = firstNonEmptyString(server.CreatedAt, now)
+		}
+	case MarketVisibilityQuarantined:
+		server.Enabled = false
+		server.Published = false
+		server.Quarantined = true
+	case MarketVisibilityInternal:
+		server.Enabled = true
+		server.Published = false
+		server.Quarantined = false
+	case MarketVisibilityDraft, MarketVisibilityHidden:
+		server.Enabled = false
+		server.Published = false
+		server.Quarantined = false
+	}
+}
+
 func stringSlice(value interface{}) ([]string, bool) {
 	raw, ok := value.([]interface{})
 	if !ok {
@@ -1562,6 +1743,18 @@ func stringSlice(value interface{}) ([]string, bool) {
 			return nil, false
 		}
 		out = append(out, text)
+	}
+	return out, true
+}
+
+func installMethodSlice(value interface{}) ([]InstallMethod, bool) {
+	values, ok := stringSlice(value)
+	if !ok {
+		return nil, false
+	}
+	out := make([]InstallMethod, 0, len(values))
+	for _, value := range values {
+		out = append(out, InstallMethod(value))
 	}
 	return out, true
 }

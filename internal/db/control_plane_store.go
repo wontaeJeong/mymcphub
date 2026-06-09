@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -634,11 +635,17 @@ func normalizeListOptions(options ListOptions) ListOptions {
 }
 
 func matchesServerFilters(server MCPServer, filters map[string]string) bool {
-	checks := map[string]string{"environment": string(server.Environment), "risk_level": string(server.RiskLevel), "owner_team_id": server.OwnerTeamID, "transport": string(server.Transport)}
+	checks := map[string]string{"environment": string(server.Environment), "risk_level": string(server.RiskLevel), "owner_team_id": server.OwnerTeamID, "transport": string(server.Transport), "category": string(server.Category), "trust_level": string(server.TrustLevel), "visibility": string(server.Visibility)}
 	for key, actual := range checks {
 		if expected := strings.TrimSpace(filters[key]); expected != "" && expected != actual {
 			return false
 		}
+	}
+	if tag := strings.TrimSpace(filters["tag"]); tag != "" && !containsString(server.Tags, tag) {
+		return false
+	}
+	if method := strings.TrimSpace(filters["install_method"]); method != "" && !containsInstallMethod(server.InstallMethods, InstallMethod(method)) {
+		return false
 	}
 	if enabled := strings.TrimSpace(filters["enabled"]); enabled != "" && enabled != fmt.Sprint(server.Enabled) {
 		return false
@@ -647,7 +654,7 @@ func matchesServerFilters(server MCPServer, filters map[string]string) bool {
 		return false
 	}
 	if query := strings.ToLower(strings.TrimSpace(filters["q"])); query != "" {
-		text := strings.ToLower(server.Slug + " " + server.DisplayName + " " + server.Description)
+		text := strings.ToLower(strings.Join(append([]string{server.Slug, server.DisplayName, server.Description, server.Summary}, append(server.Tags, server.UseCases...)...), " "))
 		if !strings.Contains(text, query) {
 			return false
 		}
@@ -797,6 +804,94 @@ func validRisk(value RiskLevel) bool {
 	}
 }
 
+func validMarketCategory(value MarketCategory) bool {
+	switch value {
+	case MarketCategoryDeveloperTools, MarketCategoryAPIDevelopment, MarketCategoryDataDatabase, MarketCategoryCloudInfra, MarketCategoryObservability, MarketCategorySecurityTesting, MarketCategoryKnowledgeDocs, MarketCategoryProductivityWorkflow, MarketCategoryBrowserAutomation, MarketCategoryDesignTools, MarketCategoryOther:
+		return true
+	default:
+		return false
+	}
+}
+
+func validInstallMethod(value InstallMethod) bool {
+	switch value {
+	case InstallMethodRemoteHTTP, InstallMethodStdio, InstallMethodDocker, InstallMethodGateway:
+		return true
+	default:
+		return false
+	}
+}
+
+func validMarketTrustLevel(value MarketTrustLevel) bool {
+	switch value {
+	case MarketTrustCommunity, MarketTrustVerified, MarketTrustOfficial, MarketTrustPlatformSupported:
+		return true
+	default:
+		return false
+	}
+}
+
+func validMarketVisibility(value MarketVisibility) bool {
+	switch value {
+	case MarketVisibilityDraft, MarketVisibilityInternal, MarketVisibilityPublished, MarketVisibilityHidden, MarketVisibilityQuarantined:
+		return true
+	default:
+		return false
+	}
+}
+
+func validMarketMetadata(server MCPServer) bool {
+	if !validMarketCategory(server.Category) || !validMarketTrustLevel(server.TrustLevel) || !validMarketVisibility(server.Visibility) {
+		return false
+	}
+	for _, method := range server.InstallMethods {
+		if !validInstallMethod(method) {
+			return false
+		}
+	}
+	if hasBlankString(server.Tags) || hasBlankString(server.UseCases) || hasBlankString(server.Prerequisites) || hasBlankString(server.SecurityNotes) {
+		return false
+	}
+	return validOptionalURL(server.DocsURL) && validOptionalURL(server.SourceURL) && validOptionalURL(server.IconURL) && validOptionalTime(server.ReviewedAt) && validOptionalTime(server.PublishedAt)
+}
+
+func validOptionalURL(value string) bool {
+	if strings.TrimSpace(value) == "" {
+		return true
+	}
+	parsed, err := url.ParseRequestURI(value)
+	return err == nil && parsed.Scheme != "" && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
+}
+
+func hasBlankString(values []string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func validOptionalTime(value string) bool {
+	if strings.TrimSpace(value) == "" {
+		return true
+	}
+	if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return true
+	}
+	_, err := time.Parse(time.RFC3339, value)
+	return err == nil
+}
+
+func containsInstallMethod(values []InstallMethod, target InstallMethod) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func firstNonEmptyString(value, fallback string) string {
 	if strings.TrimSpace(value) != "" {
 		return value
@@ -923,6 +1018,9 @@ func (s *Store) backfillSeedDataLocked() {
 	}
 	if len(s.schemaSnapshots) == 0 && s.serverIndexLocked(K8sReadonlyID) >= 0 {
 		s.recordSchemaSnapshotLocked(K8sReadonlyID, "backfill")
+	}
+	if idx := s.serverIndexLocked(K8sReadonlyID); idx >= 0 && s.servers[idx].Category == MarketCategoryOther && len(s.servers[idx].Tags) == 0 {
+		applyK8sReadonlyMarketMetadata(&s.servers[idx], now)
 	}
 }
 

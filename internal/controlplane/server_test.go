@@ -35,6 +35,50 @@ func TestControlPlaneListsServersAndRecordsMutationAudit(t *testing.T) {
 	}
 }
 
+func TestControlPlaneServerMarketMetadataDefaultsAndValidation(t *testing.T) {
+	server := NewServer(db.NewSeedStore(), config.Load(4000))
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/servers?category=cloud_infra&tag=kubernetes&trust_level=platform_supported&visibility=published&install_method=gateway&q=incident", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected filtered market list 200, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+	var list struct {
+		Items []db.MCPServer `json:"items"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &list); err != nil {
+		t.Fatalf("decode server list: %v", err)
+	}
+	if len(list.Items) != 1 || list.Items[0].Category != db.MarketCategoryCloudInfra || list.Items[0].TrustLevel != db.MarketTrustPlatformSupported || list.Items[0].Visibility != db.MarketVisibilityPublished {
+		t.Fatalf("expected k8s market metadata in filtered list, got %#v", list.Items)
+	}
+
+	create := map[string]interface{}{
+		"slug":        "docs-market",
+		"displayName": "Docs Market",
+		"ownerTeamId": db.PlatformTeamID,
+		"enabled":     true,
+		"tools":       []map[string]interface{}{{"name": "search", "enabled": true, "inputSchema": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}, "additionalProperties": false}}},
+	}
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPost, "/api/servers", create))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected create 201, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+	var created db.MCPServer
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created server: %v", err)
+	}
+	if created.Category != db.MarketCategoryOther || len(created.Tags) != 0 || created.Summary != "Docs Market" || len(created.InstallMethods) != 1 || created.InstallMethods[0] != db.InstallMethodGateway || created.TrustLevel != db.MarketTrustCommunity || created.Visibility != db.MarketVisibilityPublished {
+		t.Fatalf("expected default market metadata on create, got %#v", created)
+	}
+
+	recorder = httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, requestJSON(t, http.MethodPatch, "/api/servers/"+created.ID, map[string]interface{}{"category": "paid"}))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid market metadata 400, got %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestControlPlaneRequiresAdminForMutation(t *testing.T) {
 	t.Setenv("MCP_AUTH_MODE", "oidc")
 	server := NewServer(db.NewSeedStore(), config.Load(4000))
