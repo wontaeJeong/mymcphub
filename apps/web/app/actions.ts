@@ -84,7 +84,7 @@ export async function createApprovalAction(formData: FormData) {
       environment: readEnvironment(formData),
       reason: readRequired(formData, "reason"),
       ticketUrl: readOptional(formData, "ticketUrl"),
-      requestedExpiresAt: readOptional(formData, "requestedExpiresAt"),
+      requestedExpiresAt: readDateEndOfDay(formData, "requestedExpiresOn") ?? readOptional(formData, "requestedExpiresAt"),
       requestedAction: readRequired(formData, "requestedAction")
     });
     revalidatePath("/user/access");
@@ -436,6 +436,15 @@ function readOptional(formData: FormData, name: string) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readDateEndOfDay(formData: FormData, name: string) {
+  const value = readOptional(formData, name);
+  if (!value) {
+    return undefined;
+  }
+
+  return `${value}T23:59:59.000Z`;
 }
 
 function readCsv(formData: FormData, name: string) {

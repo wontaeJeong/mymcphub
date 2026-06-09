@@ -53,10 +53,55 @@ export async function AccessPageContent({
       ) : null}
       <div className={mode === "admin" ? "form-grid" : "grid"}>
         <form className="form-card" action={createApprovalAction}>
-          <h2>접근 승인 요청</h2>
-          <p>주체, 도구, 환경, 티켓, 만료, 사유를 정식 필드로 /api/approvals에 보내 승인 대기 요청을 생성합니다.</p>
+          <h2>{mode === "user" ? "접근 요청" : "접근 승인 요청"}</h2>
+          <p>{mode === "user" ? "서버, 필요한 도구, 환경, 사유만 입력하면 현재 계정 정보로 승인 요청을 보냅니다." : "주체, 도구, 환경, 티켓, 만료, 사유를 정식 필드로 /api/approvals에 보내 승인 대기 요청을 생성합니다."}</p>
           {servers.ok && serverItems.length > 0 ? (
-            <>
+            mode === "user" ? (
+              <>
+                <input type="hidden" name="subjectType" value="user" />
+                <input type="hidden" name="subjectId" value={session?.principal.userId ?? ""} />
+                <input type="hidden" name="projectId" value={session?.principal.projectId ?? ""} />
+                <input type="hidden" name="requestedAction" value="grant_access" />
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="approvalServerId">서버</label>
+                    <select id="approvalServerId" name="serverId" required defaultValue={prefill.serverId || undefined}>
+                      {serverItems.map((server) => <option value={server.id} key={server.id}>{server.displayName}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="approvalEnvironment">환경</label>
+                    <select id="approvalEnvironment" name="environment" required defaultValue={prefill.environment || "dev"}>
+                      <option value="dev">개발</option>
+                      <option value="stg">스테이징</option>
+                      <option value="prod">운영</option>
+                      <option value="shared">공용</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="approvalRequestedTools">필요한 도구</label>
+                  <input id="approvalRequestedTools" name="requestedTools" required defaultValue={prefill.requestedTools} placeholder="예: docs.search 또는 전체 도구 *" />
+                </div>
+                <div className="field">
+                  <label htmlFor="approvalRequestedExpiresOn">만료 날짜(선택)</label>
+                  <input id="approvalRequestedExpiresOn" name="requestedExpiresOn" type="date" />
+                </div>
+                <div className="field">
+                  <label htmlFor="approvalReason">사유</label>
+                  <textarea id="approvalReason" name="reason" required defaultValue={prefill.reason} placeholder="어떤 업무에 어떤 도구가 필요한지 적어 주세요." />
+                </div>
+                <details className="schema-viewer">
+                  <summary>티켓 링크 추가</summary>
+                  <div className="field">
+                    <label htmlFor="approvalTicketUrl">티켓 URL</label>
+                    <input id="approvalTicketUrl" name="ticketUrl" type="url" placeholder="선택 사항" />
+                  </div>
+                </details>
+                <div className="form-actions"><button className="button" type="submit">승인 요청 제출</button></div>
+              </>
+            ) : (
+              <>
               <div className="form-grid">
                 <div className="field">
                   <label htmlFor="approvalSubjectType">주체 유형</label>
@@ -78,7 +123,7 @@ export async function AccessPageContent({
               </div>
               <div className="field">
                 <label htmlFor="approvalSubjectId">주체 ID</label>
-                <input id="approvalSubjectId" name="subjectId" required defaultValue={mode === "user" ? session?.principal.userId : undefined} readOnly={mode === "user"} placeholder="사용자, 팀, 서비스 계정 UUID" />
+                <input id="approvalSubjectId" name="subjectId" required placeholder="사용자, 팀, 서비스 계정 UUID" />
               </div>
               <div className="field">
                 <label htmlFor="approvalServerId">서버</label>
@@ -88,7 +133,7 @@ export async function AccessPageContent({
               </div>
               <div className="field">
                 <label htmlFor="approvalProjectId">프로젝트 ID</label>
-                <input id="approvalProjectId" name="projectId" required defaultValue={mode === "user" ? session?.principal.projectId : undefined} placeholder="프로젝트 레코드의 UUID" />
+                <input id="approvalProjectId" name="projectId" required placeholder="프로젝트 레코드의 UUID" />
               </div>
               <div className="field">
                 <label htmlFor="approvalRequestedTools">요청 도구</label>
@@ -111,7 +156,8 @@ export async function AccessPageContent({
                 <textarea id="approvalReason" name="reason" required defaultValue={prefill.reason} placeholder="업무상 필요 사유" />
               </div>
               <div className="form-actions"><button className="button" type="submit">승인 요청 제출</button></div>
-            </>
+              </>
+            )
           ) : servers.ok ? <EmptyState title="사용 가능한 서버 없음" description="승인 요청에는 카탈로그의 서버가 필요합니다." /> : <ErrorState message={servers.error} />}
         </form>
         {mode === "admin" ? <form className="form-card" action={createGrantAction}>
