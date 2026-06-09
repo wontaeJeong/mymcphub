@@ -3,7 +3,7 @@
 ```text
 CONTEXT: User pages show operator-style metadata and dense tables that make self-service discovery harder.
 
-TARGET ROUTES/FILES: apps/web/app/user/page.tsx, apps/web/app/catalog/content.tsx, apps/web/app/user/servers/[serverId]/page.tsx, shared table components.
+TARGET ROUTES/FILES: apps/web/app/user/page.tsx, apps/web/app/catalog/content.tsx via apps/web/app/user/catalog/page.tsx, apps/web/app/user/servers/[serverId]/page.tsx, shared table components.
 
 UX GOAL: Turn user discovery into a task-focused flow: find server, understand risk/access, request access or generate config.
 
@@ -25,4 +25,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/user`, `/user/catalog`, `/user/servers/[serverId]`
 ```
-

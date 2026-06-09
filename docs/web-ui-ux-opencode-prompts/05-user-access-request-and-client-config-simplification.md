@@ -3,7 +3,7 @@
 ```text
 CONTEXT: `/user/access` asks for raw subject/project IDs, comma-separated tools, requestedAction, and ISO timestamps. `/user/client-config` surfaces profile, command hints, and JSON too early.
 
-TARGET ROUTES/FILES: apps/web/app/access/content.tsx, apps/web/components/client-config-form.tsx, related server actions only where needed to preserve existing contracts.
+TARGET ROUTES/FILES: apps/web/app/access/content.tsx via apps/web/app/user/access/page.tsx, apps/web/app/client-config/content.tsx via apps/web/app/user/client-config/page.tsx, apps/web/components/client-config-form.tsx, related server actions only where needed to preserve existing contracts.
 
 UX GOAL: Make user access requests and client config generation guided and understandable for Korean users.
 
@@ -25,4 +25,3 @@ VALIDATION:
 - lsp_diagnostics on changed files
 - Manual Web QA for `/user/access`, `/user/client-config`, mobile forms
 ```
-
