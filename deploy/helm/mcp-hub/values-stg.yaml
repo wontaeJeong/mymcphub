@@ -1,61 +1,73 @@
 image:
   registry: registry.example.com
   repositoryPrefix: mcp-hub
-  tag: stg
+  tag: latest
   pullPolicy: IfNotPresent
 
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+  annotations: {}
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
 config:
-  nodeEnv: production
-  logLevel: info
-  publicUrl: https://mcp-hub-stg.example.com
+  authMode: oidc
   apiUrl: http://mcp-hub-api:4000
-  gatewayUrl: http://mcp-hub-gateway:5000
+  publicUrl: https://mcp-hub.example.com
+  workerInterval: 60s
+  syncTimeout: 20s
+  enableServerStdioExec: "false"
 
 auth:
-  mode: oidc
-  oidcIssuerUrl: https://issuer-stg.example.com
-  audience: mcp-hub-stg
-  trustedHeaderToken:
-    secretName: mcp-hub-auth-proxy-stg
-    secretKey: token
+  adminTokenSecretName: mcp-hub-admin
+  adminTokenSecretKey: adminToken
+  readTokenSecretName: mcp-hub-read
+  readTokenSecretKey: readToken
+
+postgres:
+  databaseUrlSecretName: mcp-hub-db
+  databaseUrlSecretKey: databaseUrl
 
 web:
   replicas: 2
-
+  port: 3000
+  image: { repository: web, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 api:
   replicas: 2
-
-gateway:
-  replicas: 2
-
+  port: 4000
+  image: { repository: api, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 worker:
   replicas: 1
-  jobToken:
-    secretName: mcp-hub-worker-job-stg
-    secretKey: token
-
-serviceMonitor:
-  enabled: true
-
-prometheusRule:
-  enabled: true
-
-grafanaDashboards:
-  enabled: true
+  port: 4100
+  image: { repository: worker, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 
 ingress:
-  hosts:
-    - host: mcp-hub-stg.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service: web
-        - path: /api
-          pathType: Prefix
-          service: api
-        - path: /mcp
-          pathType: Prefix
-          service: gateway
+  enabled: true
+  className: nginx
+  annotations: {}
+  host: mcp-hub.example.com
+  tls: []
 
 networkPolicy:
-  allowExternalEgress: false
+  enabled: true
+  allowExternalEgress: true
+
+hpa:
+  enabled: false
+pdb:
+  enabled: false

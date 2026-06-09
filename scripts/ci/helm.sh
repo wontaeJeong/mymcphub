@@ -1,8 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-if command -v helm >/dev/null 2>&1; then
-  bash scripts/ci/helm-template.sh
-else
-  echo "helm not installed; skipping local Helm render check" >&2
-fi
+#!/usr/bin/env sh
+set -eu
+helm lint deploy/helm/mcp-hub
+helm template mcp-hub deploy/helm/mcp-hub >/dev/null

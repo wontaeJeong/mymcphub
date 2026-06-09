@@ -9,31 +9,12 @@
     "dev:infra": "scripts/dev/up-infra.sh",
     "dev:infra:down": "scripts/dev/down-infra.sh",
     "db:migrate": "scripts/dev/db-migrate.sh",
-    "db:seed": "scripts/dev/seed.sh",
-    "dev:reset-db": "scripts/dev/reset-db.sh",
-    "dev:seed": "scripts/dev/seed.sh",
-    "dev:smoke-test": "scripts/dev/smoke-test.sh",
-    "dev:create-mock-token": "scripts/dev/create-mock-token.sh",
     "build": "make build",
     "lint": "make lint",
     "test": "make test",
     "typecheck": "pnpm --filter @mcp-hub/ui typecheck && pnpm --filter @mcp-hub/web typecheck",
-    "format": "prettier --write .",
-    "security:deps": "scripts/security/scan-deps.sh",
-    "security:supply-chain": "scripts/security/scan-supply-chain.sh",
-    "security:images": "scripts/security/scan-images.sh",
-    "security:sbom": "scripts/security/sbom-sign-images.sh",
-    "security:secrets": "scripts/security/scan-secrets.sh",
-    "security:k8s": "scripts/security/scan-k8s-manifests.sh",
-    "security:mcp-manifests": "go run ./tools/cmd/check-mcp-manifest",
-    "security:check": "scripts/security/check-all.sh",
     "ci": "make ci",
-    "test:unit": "go test ./internal/... && pnpm --filter @mcp-hub/ui test && pnpm --filter @mcp-hub/web test:unit",
-    "test:integration": "go test ./apps/... ./tests/...",
-    "test:e2e": "go test ./tests/e2e ./tests/security",
-    "helm:template": "bash scripts/ci/helm-template.sh",
-    "security:smoke": "pnpm security:mcp-manifests",
-    "release:notes": "bash scripts/release/generate-notes.sh"
+    "helm:template": "helm template mcp-hub deploy/helm/mcp-hub >/dev/null"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
@@ -46,10 +27,5 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0",
     "vitest": "^4.1.8"
-  },
-  "pnpm": {
-    "overrides": {
-      "postcss": "^8.5.10"
-    }
   }
 }

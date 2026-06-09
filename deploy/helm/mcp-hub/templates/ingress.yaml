@@ -3,33 +3,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "mcp-hub.fullname" . }}
-  labels:
-{{ include "mcp-hub.labels" . | indent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
-{{ toYaml . | indent 4 }}
-  {{- end }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
-  {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
-  {{- end }}
-  {{- with .Values.ingress.tls }}
-  tls:
-{{ toYaml . | indent 4 }}
-  {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ .Values.ingress.host }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
-            backend:
-              service:
-                name: {{ include "mcp-hub.componentName" (dict "root" $ "component" .service) }}
-                port:
-                  name: http
-          {{- end }}
-    {{- end }}
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: {{ include "mcp-hub.fullname" . }}-api, port: { number: {{ .Values.api.port }} } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: {{ include "mcp-hub.fullname" . }}-web, port: { number: {{ .Values.web.port }} } } }
 {{- end }}

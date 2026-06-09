@@ -1,295 +1,73 @@
 image:
   registry: registry.example.com
   repositoryPrefix: mcp-hub
-  # image.tag is used for components that do not set image.digest.
-  # A component digest renders an immutable @sha256:... image reference instead.
   tag: latest
   pullPolicy: IfNotPresent
-
-nameOverride: ""
-fullnameOverride: ""
 
 serviceAccount:
   create: true
   automountServiceAccountToken: false
   annotations: {}
 
-runtime:
-  readOnlyRootFilesystem: true
+securityContext:
   runAsNonRoot: true
   runAsUser: 10001
   runAsGroup: 10001
   fsGroup: 10001
+containerSecurityContext:
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
-    drop:
-      - ALL
+    drop: ["ALL"]
   seccompProfile:
     type: RuntimeDefault
 
-corporateCa:
-  # Runtime trust anchor injection for internal TLS. Leave disabled when the
-  # certificate is baked into the image via deploy/certs/*.crt during build.
-  enabled: false
-  secretName: ""
-  secretKey: ca.crt
-  mountDir: /etc/mcp-hub/tls
-
 config:
-  nodeEnv: production
-  appEnv: production
-  logLevel: info
-  oidcClientId: mcp-hub
-  publicUrl: https://mcp-hub.example.com
+  authMode: oidc
   apiUrl: http://mcp-hub-api:4000
-  gatewayUrl: http://mcp-hub-gateway:5000
-  storePath: /tmp/mcp-hub/store.json
-  workerIntervalSeconds: 60
+  publicUrl: https://mcp-hub.example.com
+  workerInterval: 60s
+  syncTimeout: 20s
+  enableServerStdioExec: "false"
 
 auth:
-  mode: oidc
-  oidcIssuerUrl: ""
-  audience: mcp-hub
-  oidcClientSecret:
-    secretName: mcp-hub-oidc
-    secretKey: clientSecret
-  trustedHeaderToken:
-    secretName: mcp-hub-auth-proxy
-    secretKey: token
-  trustedProxy:
-    headerName: x-mcp-hub-trusted-proxy
-    secretName: mcp-hub-trusted-proxy
-    secretKey: sharedSecret
-
-webAuth:
-  enabledProviders: ""
-  sessionCookieName: mcp_hub_session
-  sessionTtlSeconds: 28800
-  localAuthEnabled: false
-  devAuthEnabled: false
-  oidcProviders: ""
-  sessionSecret:
-    secretName: mcp-hub-web-session
-    secretKey: sessionSecret
+  adminTokenSecretName: mcp-hub-admin
+  adminTokenSecretKey: adminToken
+  readTokenSecretName: mcp-hub-read
+  readTokenSecretKey: readToken
 
 postgres:
-  external:
-    enabled: true
-    databaseUrlSecretName: mcp-hub-db
-    databaseUrlSecretKey: databaseUrl
-  placeholder:
-    enabled: false
-    port: 5432
-
-redis:
-  external:
-    enabled: true
-    redisUrlSecretName: mcp-hub-redis
-    redisUrlSecretKey: redisUrl
-  placeholder:
-    enabled: false
-    port: 6379
+  databaseUrlSecretName: mcp-hub-db
+  databaseUrlSecretKey: databaseUrl
 
 web:
-  enabled: true
   replicas: 2
   port: 3000
-  serviceAccountName: ""
-  image:
-    repository: web
-    # Set to sha256:<digest> to render registry.example.com/mcp-hub/web@sha256:...
-    # When set, digest rendering overrides image.tag for this component.
-    digest: ""
-  service:
-    type: ClusterIP
-    port: 3000
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  probes:
-    enabled: true
-    readiness:
-      path: /
-      initialDelaySeconds: 10
-      periodSeconds: 10
-    liveness:
-      path: /
-      initialDelaySeconds: 30
-      periodSeconds: 20
-
+  image: { repository: web, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 api:
-  enabled: true
   replicas: 2
   port: 4000
-  serviceAccountName: ""
-  image:
-    repository: api
-    # Set to sha256:<digest> to render registry.example.com/mcp-hub/api@sha256:...
-    # When set, digest rendering overrides image.tag for this component.
-    digest: ""
-  service:
-    type: ClusterIP
-    port: 4000
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  probes:
-    enabled: true
-    readiness:
-      path: /readyz
-      initialDelaySeconds: 10
-      periodSeconds: 10
-    liveness:
-      path: /healthz
-      initialDelaySeconds: 30
-      periodSeconds: 20
-
-gateway:
-  enabled: true
-  replicas: 2
-  port: 5000
-  serviceAccountName: ""
-  image:
-    repository: gateway
-    # Set to sha256:<digest> to render registry.example.com/mcp-hub/gateway@sha256:...
-    # When set, digest rendering overrides image.tag for this component.
-    digest: ""
-  service:
-    type: ClusterIP
-    port: 5000
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  probes:
-    enabled: true
-    type: httpGet
-    readiness:
-      initialDelaySeconds: 10
-      periodSeconds: 10
-      path: /healthz
-    liveness:
-      initialDelaySeconds: 30
-      periodSeconds: 20
-      path: /healthz
-
+  image: { repository: api, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 worker:
-  enabled: true
   replicas: 1
   port: 4100
-  serviceAccountName: ""
-  jobToken:
-    secretName: mcp-hub-worker-job
-    secretKey: token
-  image:
-    repository: worker
-    # Set to sha256:<digest> to render registry.example.com/mcp-hub/worker@sha256:...
-    # When set, digest rendering overrides image.tag for this component.
-    digest: ""
-  service:
-    enabled: true
-    type: ClusterIP
-    port: 4100
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  probes:
-    enabled: true
-    readiness:
-      path: /metrics
-      initialDelaySeconds: 10
-      periodSeconds: 10
-    liveness:
-      path: /metrics
-      initialDelaySeconds: 30
-      periodSeconds: 20
-
-cli:
-  image:
-    repository: mcphubctl
-    digest: ""
+  image: { repository: worker, digest: "" }
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 
 ingress:
   enabled: true
   className: nginx
   annotations: {}
-  hosts:
-    - host: mcp-hub.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service: web
-        - path: /api
-          pathType: Prefix
-          service: api
-        - path: /mcp
-          pathType: Prefix
-          service: gateway
+  host: mcp-hub.example.com
   tls: []
-
-rollout:
-  canary:
-    # Placeholder only. The chart does not render traffic splitting resources yet.
-    enabled: false
-    weight: 0
 
 networkPolicy:
   enabled: true
   allowExternalEgress: true
-  ingressNamespaceSelector:
-    matchLabels:
-      kubernetes.io/metadata.name: ingress-nginx
 
-managedRuntime:
-  namespace: mcp-runtime
-  controller:
-    mode: render
-    reconcileInterval: 60s
-    rbac:
-      enabled: true
-  defaults:
-    secretLeaseSeconds: 1800
-    sandboxProfile: restricted
-    imagePullPolicy: IfNotPresent
-
-serviceMonitor:
+hpa:
   enabled: false
-  namespace: ""
-  interval: 30s
-  scrapeTimeout: 10s
-  networkPolicy:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: monitoring
-    podSelector: {}
-
-prometheusRule:
+pdb:
   enabled: false
-  namespace: ""
-  labels: {}
-  runbookURL: https://mcp-hub.example.com/docs/runbooks#observability-alerts
-  thresholds:
-    gatewayErrorRate: 0.05
-    authFailures: 20
-    upstreamFailures: 5
-    workerLagSeconds: 300
-
-grafanaDashboards:
-  enabled: false
-  labels:
-    grafana_dashboard: "1"

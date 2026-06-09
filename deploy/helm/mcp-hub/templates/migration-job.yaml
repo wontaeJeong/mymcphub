@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mcp-hub.fullname" . }}-migrate
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "mcp-hub.fullname" . }}
+      containers:
+        - name: migrate
+          image: {{ include "mcp-hub.image" (list . "api") }}
+          command: ["/bin/sh", "-c", "scripts/dev/db-migrate.sh"]
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.postgres.databaseUrlSecretName | quote }}, key: {{ .Values.postgres.databaseUrlSecretKey | quote }} } }

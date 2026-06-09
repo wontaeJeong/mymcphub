@@ -1,10 +1,12 @@
-import { redirect } from "next/navigation";
+import { Badge, DateText, JsonBlock } from "../../../components/status";
+import { getHealth, getServer, getSnapshot } from "../../../lib/api";
 
-type ServerDetailPageProps = Readonly<{
-  params: Promise<{ serverId: string }>;
-}>;
-
-export default async function ServerDetailPage({ params }: ServerDetailPageProps) {
+export default async function DetailPage({ params }: { params: Promise<{ serverId:string }> }) {
   const { serverId } = await params;
-  redirect(`/user/servers/${encodeURIComponent(serverId)}`);
+  const server = await getServer(serverId);
+  const [snapshotResult, health] = await Promise.all([getSnapshot(serverId).then(v=>({ok:true as const,v})).catch(e=>({ok:false as const,e})), getHealth(serverId)]);
+  const latest = health.items[0];
+  return <><section className="hero"><div><p className="eyebrow">Server detail</p><h1>{server.name}</h1><p className="muted">{server.slug} · {server.description}</p></div><Badge value={server.livenessStatus}/></section><section className="detail"><div className="panel"><h2>Overview</h2><p><b>Transport</b> {server.transport}</p><p><b>Hosting</b> {server.hostingType}</p><p><b>Environment</b> {server.environment}</p><p><b>Endpoint</b> {server.transport === "streamable_http" ? server.endpointUrl : server.stdioCommand}</p><p><b>Tags</b> {server.tags?.join(", ")}</p></div><div className="panel"><h2>Operations</h2><p><b>Owner</b> {server.ownerTeam}</p><p><b>Contact</b> {server.contact}</p><p><b>Repository</b> {server.repositoryUrl || "-"}</p><p><b>Runbook</b> {server.runbookUrl || "-"}</p><p><b>Last health</b> {latest ? `${latest.status} · ${latest.latencyMs}ms` : "기록 없음"}</p><p><b>Last sync</b> <DateText value={server.lastSyncAt}/> · {server.lastSyncStatus}</p>{server.lastSyncError ? <p className="failed"><b>Sync error</b> {server.lastSyncError}</p> : null}</div></section>{snapshotResult.ok ? <SnapshotView snapshot={snapshotResult.v}/> : <div className="panel section"><h2>Capability snapshot</h2><p className="muted">저장된 snapshot이 없습니다.</p></div>}</>;
 }
+function SnapshotView({ snapshot }: { snapshot: Awaited<ReturnType<typeof getSnapshot>> }) { return <section className="section"><div className="panel"><h2>Capability snapshot</h2><p><b>Protocol</b> {snapshot.protocolVersion || "-"}</p><p><b>Hash</b> {snapshot.snapshotHash}</p><p><b>Captured</b> <DateText value={snapshot.capturedAt}/></p>{snapshot.warnings?.length ? <p className="muted">Warnings: {snapshot.warnings.join(", ")}</p> : null}</div><CapabilityTable title="Tools" items={snapshot.tools} columns={["name","title","description","inputSchema","outputSchema"]}/><CapabilityTable title="Resources" items={snapshot.resources} columns={["uri","name","title","mimeType","description"]}/><CapabilityTable title="Prompts" items={snapshot.prompts} columns={["name","title","description","arguments"]}/><details className="panel section"><summary>Raw snapshot JSON</summary><JsonBlock value={snapshot}/></details></section> }
+function CapabilityTable({ title, items, columns }: { title:string; items:Record<string,unknown>[]; columns:string[] }) { return <div className="section"><h2>{title}</h2><table className="table"><thead><tr>{columns.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{items.map((item,i)=><tr key={i}>{columns.map(c=><td key={c}>{typeof item[c] === "object" ? <code>{JSON.stringify(item[c])}</code> : String(item[c] ?? "")}</td>)}</tr>)}</tbody></table>{items.length===0?<div className="empty">표시할 항목이 없습니다.</div>:null}</div> }

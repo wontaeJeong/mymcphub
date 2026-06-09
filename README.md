@@ -1,87 +1,43 @@
 # MCP Hub
 
-MCP Hub is an internal platform skeleton for managing MCP server catalog entries, an internal MCP market/registry experience, a Go Control Plane API, a Go MCP Gateway data plane, Go worker jobs, a Go operator CLI, a TypeScript Next.js web operations console, and Go first-party MCP servers.
+MCP Hub is an internal catalog for MCP servers owned by teams in an organization. Hub does not host MCP servers. Each MCP server development team operates the real server; Hub stores metadata, ownership, liveness, capability snapshots, and sync history.
 
-## Workspace Structure
+Supported MVP transports:
+
+- `streamable_http`: API/Worker can sync capabilities from the remote endpoint.
+- `stdio`: `mcphubctl` runs the local process, collects capabilities, and uploads a snapshot. Server-side stdio execution is disabled unless `MCPHUB_ENABLE_SERVER_STDIO_EXEC=true`.
+
+## Workspace
 
 ```txt
-apps/
-  web/          TypeScript / Next.js operations console and internal MCP market/registry UI
-  api/          Go Control Plane API service
-  gateway/      Go MCP Gateway service
-  worker/       Go background worker service
-  cli/          Go mcphubctl operator CLI
-servers/
-  k8s/              Go read-only Kubernetes MCP server
-  runtime-adapter/  Go stdio subprocess adapter MCP server
-  github/           Go read-only GitHub MCP server
-  gitlab/           Go read-only GitLab MCP server
-  internal-docs/    Go read-only internal docs MCP server
-packages/
-  ui/               Shared TypeScript UI package
-internal/           Go shared auth, audit, config, db, policy, MCP, redaction, telemetry packages
-schemas/            OpenAPI and JSON Schema source of truth
-config/             Local development config data consumed by Compose
-deploy/             Helm chart, GitOps overlays, and certificate placeholders
-docs/               Architecture, operation, security, and runbook documentation
-scripts/            dev, ci, gen, release, and deprecated helper scripts only
-tools/              Repository-local Go command implementations used by scripts
-tests/              Go e2e/security tests and TS contract smoke tests
+apps/web       read-only catalog UI
+apps/api       catalog/control API
+apps/worker    streamable_http health and capability sync
+apps/cli       mcphubctl admin CLI
+internal       auth, config, db repository, MCP client, API, worker, CLI helpers
+packages/ui    minimal shared UI package
+migrations      PostgreSQL SQL migrations
+deploy/helm     Web/API/Worker chart
+docs            MVP operating docs
 ```
 
-Executable config is the source of truth for active runtime structure. `Makefile` and CI define the active Go apps and first-party MCP servers, while `pnpm-workspace.yaml` currently includes only `apps/web` and `packages/ui` for TypeScript workspace packages.
+## Local development
 
-Non-source artifacts such as `node_modules`, `dist`, `.next`, `.turbo`, coverage output, local env files, logs, and `.sisyphus` are local or generated and should not be treated as active workspace structure.
+```sh
+pnpm install
+docker compose up -d postgres
+cp .env.example .env
+make migrate
+make dev
+```
 
-## Local Development
+Validate with:
 
-1. Install dependencies with `pnpm install`.
-2. Copy `.env.example` to `.env` and adjust local values.
-3. Start support infrastructure with `pnpm dev:infra`.
-4. Run the Go core plus web stack with `pnpm dev`.
-5. Validate with `make lint`, `make test`, `make build`, and `make ci`.
-
-Use `go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 health` to check the local API through the CLI.
-
-## MVP Demo
-
-Use [MVP Demo](docs/MVP_DEMO.md) for the end-to-end local demo order, internal MCP Market Web screens, Gateway/CLI checks, fallback steps, and `make demo-check` validation target.
-
-The Web UI separates user discovery/access/config generation from admin curation/governance/audit/operations. User routes help operators find internal MCP servers, inspect risk and install guidance, request access, and generate Gateway-routed client snippets. Admin routes curate market metadata, publish or quarantine entries, review approval context, and inspect audit/operations state.
-
-## Operator Documentation
-
-Use these docs when running or extending MCP Hub:
-
-| Doc                                                          | Use                                                                     |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [Documentation Index](docs/README.md)                        | MVP-first document map.                                                 |
-| [MVP Demo](docs/MVP_DEMO.md)                                 | End-to-end local demo flow and demo check target.                       |
-| [Architecture](docs/ARCHITECTURE.md)                         | Go core, Web UI, schemas, and runtime planes.                           |
-| [Contracts](docs/CONTRACTS.md)                               | OpenAPI, JSON Schema, generated Web client, and error envelope.         |
-| [Control Plane API](docs/API.md)                             | Go API routes and local curl checks.                                    |
-| [Gateway](docs/GATEWAY.md)                                   | Go MCP Gateway auth, policy, redaction, and proxy behavior.             |
-| [Worker](docs/WORKER.md)                                     | Go worker jobs and manual trigger endpoint.                             |
-| [CLI](docs/CLI.md)                                           | `mcphubctl` command guide.                                              |
-| [Local Development](docs/LOCAL_DEV.md)                       | Local stack, seed data, MCP Inspector, and reset flow.                  |
-| [Operations](docs/OPERATIONS.md)                             | Day-2 operating model.                                                  |
-| [Runbooks](docs/RUNBOOKS.md)                                 | Gateway, upstream, auth, policy, schema drift, and quarantine response. |
-| [Testing](docs/TESTING.md)                                   | Go, TS, e2e, security, schema, and Helm validation.                     |
-| [Developer Guide](docs/DEVELOPER_GUIDE.md)                   | Go core coding conventions, fixtures, and validation surfaces.          |
-| [MCP Client Compatibility](docs/MCP_CLIENT_COMPATIBILITY.md) | Client profile support matrix and Gateway compatibility checks.         |
-| [Deployment](docs/DEPLOYMENT.md)                             | Helm/GitOps deployment for Go images.                                   |
-| [Rollback](docs/ROLLBACK.md)                                 | Roll back to previous Go image tags.                                    |
-| [MCP Server Matrix](docs/MCP_SERVER_LANGUAGE_MATRIX.md)      | First-party server language decisions.                                  |
-| [Worktree Merge Guide](docs/WORKTREE_MERGE_GUIDE.md)         | Parallel lane merge order, conflict handling, and test checklist.       |
-
-## Contracts
-
-`schemas/openapi/mcp-hub.openapi.yaml` is the Control Plane API contract. `schemas/jsonschema/` contains manifest, policy, audit event, grant request, and client profile schemas. The Web UI consumes the generated boundary at `apps/web/lib/generated/mcp-hub-client.ts`.
-
-## Development Order
-
-1. Update neutral schemas.
-2. Implement Go API, Gateway, Worker, and CLI behavior.
-3. Keep Web in TypeScript and consume the generated API client.
-4. Keep first-party MCP servers in Go unless the user explicitly adds another non-Web runtime.
-5. Validate with Go/Web UI tests, security negatives, schema checks, Helm rendering, and manual HTTP/CLI QA.
+```sh
+make lint
+make test
+make build
+make ci
+helm lint deploy/helm/mcp-hub
+helm template mcp-hub deploy/helm/mcp-hub
+```
