@@ -1,251 +1,68 @@
 # AGENTS.md
 
-## 목적
-
-이 문서는 MCP Hub 저장소에서 작업하는 AI 에이전트와 기여자가 따라야 할 기본 동작 규칙을 정의한다. 구현 방식 자체를 상세히 지시하기보다는, 작업을 어떻게 쪼개고, 검증하고, 커밋하고, 보고해야 하는지에 대한 팀 그라운드룰을 제공한다.
-
-MCP Hub는 MCP 서버를 등록, 탐색, 운영, 통제하기 위한 플랫폼이다. 따라서 모든 작업은 단순 기능 구현보다 보안, 변경 추적성, 운영 가능성, 테스트 가능성, 명확한 책임 경계를 우선해야 한다.
-
-## 기본 원칙
-
-### 1. 작은 단위로 작업한다
-
-하나의 작업은 가능한 한 하나의 목적만 가져야 한다. 관련 없는 리팩터링, 포맷팅, 의존성 변경, 기능 추가, 문서 변경을 한 번에 섞지 않는다.
-
-작업 범위가 커질 경우 먼저 하위 작업으로 나누고, 각 하위 작업이 독립적으로 검토 가능한 상태가 되도록 만든다.
-
-### 2. 추측보다 확인을 우선한다
-
-기존 구조, 네이밍, API 형태, 디렉터리 규칙, 테스트 방식이 이미 있다면 새 규칙을 만들기 전에 먼저 따른다.
-
-불명확한 부분은 코드, README, 설정 파일, 테스트, CI 정의를 확인한 뒤 결정한다. 그래도 불확실하면 작업 결과에 가정 사항을 명시한다.
-
-### 3. 변경에는 검증이 따라야 한다
-
-코드를 바꿨다면 가능한 범위에서 테스트, 빌드, 린트, 타입체크 중 관련된 검증을 실행한다. 검증을 실행하지 못했다면 이유를 명확히 남긴다.
-
-검증 없이 “완료”라고 말하지 않는다.
-
-### 4. 보안과 운영성을 기본값으로 둔다
-
-MCP Hub는 외부 MCP 서버, 내부 시스템, 사용자 세션, 인증 정보, 도구 실행 결과를 다룰 수 있다. 모든 입력, URL, 토큰, 서버 설정, 실행 결과는 신뢰 경계를 넘는 데이터로 취급한다.
-
-비밀값을 코드, 테스트 데이터, 로그, 문서, 커밋 메시지에 남기지 않는다.
-
-## 작업 시작 규칙
-
-작업을 시작하기 전에 다음을 확인한다.
-
-* 현재 작업의 목표와 완료 조건
-* 변경해야 할 디렉터리와 건드리지 말아야 할 영역
-* 기존 README, 설계 문서, API 명세, 테스트 구조
-* 사용하는 언어와 도구 체인
-* CI에서 실행될 가능성이 높은 검증 명령
-
-기존 파일을 수정할 때는 주변 코드 스타일을 따른다. 새 구조를 만들 때는 프로젝트 전체 구조와 충돌하지 않게 한다.
-
-## 변경 범위 규칙
-
-요청받은 범위 밖의 코드를 임의로 고치지 않는다. 단, 명백한 오타, 깨진 참조, 변경에 필요한 최소한의 보정은 허용한다.
-
-대규모 리팩터링은 명시적으로 요청된 경우에만 수행한다. 기능 구현 중 발견한 개선점은 바로 섞지 말고 별도 후속 작업으로 제안한다.
-
-자동 포맷터를 실행할 때는 변경 범위를 확인한다. 전체 저장소 포맷팅으로 대량 diff가 생기는 경우, 작업 목적과 직접 관련이 없다면 피한다.
-
-## Git 및 커밋 규칙
-
-### 커밋 생성 기준
-
-에이전트는 사용자가 명시적으로 요청했거나 작업 프롬프트에 커밋이 포함된 경우에만 커밋을 만든다. 요청이 없다면 변경사항은 워킹트리에 남기고, 수정 파일과 검증 결과만 보고한다.
-
-커밋을 만들 경우 다음 기준을 따른다.
-
-* 하나의 커밋은 하나의 논리적 변경만 포함한다.
-* 테스트가 실패한 상태의 커밋을 만들지 않는다. 불가피하면 커밋 메시지와 보고에 실패 사유를 명시한다.
-* 임시 로그, 디버그 코드, 로컬 설정, 개인 환경 파일을 커밋하지 않는다.
-* 생성 파일, lockfile, schema, migration, 문서 변경은 의도적으로 포함 여부를 판단한다.
-* 커밋 전 `git diff`와 `git status`로 포함 범위를 확인한다.
-
-### 커밋 메시지
-
-커밋 메시지는 간결하고 변경 의도를 설명해야 한다. 가능하면 다음 형식을 사용한다.
-
-```text
-<type>: <summary>
-```
-
-권장 타입은 다음과 같다.
-
-* `feat`: 사용자-visible 기능 추가
-* `fix`: 버그 수정
-* `refactor`: 동작 변경 없는 구조 개선
-* `test`: 테스트 추가 또는 수정
-* `docs`: 문서 변경
-* `build`: 빌드, 패키징, 컨테이너 관련 변경
-* `ci`: CI/CD 변경
-* `chore`: 기타 유지보수 작업
-
-예시:
-
-```text
-feat: add mcp server registration validation
-fix: handle invalid transport config
-ci: add container build check
-```
-
-### 금지되는 Git 작업
-
-다음 작업은 명시적 지시 없이 수행하지 않는다.
-
-* 원격 저장소에 push
-* force push
-* main/master 직접 커밋
-* rebase, reset, checkout으로 사용자 변경사항 제거
-* 기존 커밋 amend 또는 squash
-* 태그 생성
-* 브랜치 삭제
-* worktree 삭제
-
-사용자 또는 다른 에이전트의 변경사항이 보이면 덮어쓰지 않는다. 충돌 가능성이 있으면 먼저 상태를 보고한다.
-
-## 브랜치와 워크트리 규칙
-
-병렬 작업을 전제로 한다. 각 에이전트는 자신에게 할당된 브랜치 또는 worktree 안에서만 작업한다.
-
-다른 worktree, 다른 브랜치, 상위 디렉터리의 파일을 임의로 수정하지 않는다. 공통 파일을 수정해야 하는 경우 변경 이유와 영향 범위를 명확히 남긴다.
-
-브랜치 이름을 직접 만들 필요가 있을 때는 작업 목적이 드러나게 짧게 작성한다.
-
-```text
-feat/mcp-registry
-fix/auth-callback-validation
-ci/container-build
-```
-
-## 테스트 및 검증 규칙
-
-변경한 영역에 맞는 최소 검증을 수행한다.
-
-Go 코드를 변경했다면 관련 패키지의 테스트를 우선 실행한다.
-
-```bash
-go test ./...
-```
-
-TypeScript UI 코드를 변경했다면 프로젝트에서 정의한 타입체크, 린트, 테스트, 빌드 명령을 확인해서 실행한다.
-
-```bash
-pnpm test
-pnpm lint
-pnpm typecheck
-pnpm build
-```
-
-실제 명령은 저장소의 `package.json`, `Makefile`, `Taskfile`, CI 설정을 우선한다. 위 명령은 예시일 뿐이다.
-
-테스트를 추가할 때는 구현 세부보다 observable behavior를 검증한다. 보안, 인증, 권한, 설정 검증, MCP 서버 등록, transport 처리, 에러 응답은 우선 테스트 대상이다.
-
-## 문서화 규칙
-
-다음 변경에는 문서 업데이트가 필요하다.
-
-* API 요청/응답 변경
-* 설정 키 추가 또는 변경
-* 인증/인가 흐름 변경
-* MCP 서버 등록 방식 변경
-* 컨테이너 실행 방식 변경
-* CI/CD 절차 변경
-* 로컬 개발 환경 변경
-* 운영자가 알아야 하는 제한사항 추가
-
-문서는 이상적인 성공 경로만 쓰지 않는다. 필요한 환경 변수, 실패 가능성, 검증 방법, 예외 조건도 함께 적는다.
-
-## 보안 규칙
-
-다음 항목은 절대 커밋하지 않는다.
-
-* API key
-* OAuth client secret
-* access token 또는 refresh token
-* session cookie
-* private key
-* 내부망 민감 URL
-* 개인 계정 정보
-* 운영 DB 접속 정보
-
-로그에는 인증 헤더, 쿠키, 토큰, 원문 secret을 남기지 않는다. 필요하면 마스킹된 값만 사용한다.
-
-사용자 입력 URL, MCP 서버 엔드포인트, callback URL, metadata URL은 SSRF와 내부망 노출 가능성을 고려해 다룬다.
-
-## MCP Hub 관련 주의사항
-
-MCP Hub의 핵심 도메인에서는 다음 기준을 지킨다.
-
-* MCP 서버는 기본적으로 신뢰하지 않는다.
-* MCP tool/resource/prompt metadata는 단순 표시용 문자열이 아니라 정책과 실행에 영향을 줄 수 있는 데이터로 본다.
-* 서버 등록, transport 설정, 인증 방식, 권한 정책 변경은 보안 영향이 있는 변경으로 취급한다.
-* UI는 정책 판단의 주체가 아니다. 중요한 검증과 권한 확인은 backend에서 수행되어야 한다.
-* TypeScript는 web UI 중심으로 사용한다.
-* Go는 backend, gateway, worker, CLI, protocol handling 등 non-UI runtime에 사용한다.
-* 컨테이너, 테스트, CI는 MVP에서도 생략하지 않는다.
-
-## 파일 작업 규칙
-
-새 파일을 만들 때는 위치와 책임이 명확해야 한다. 임시 파일은 작업 후 제거한다.
-
-생성 산출물은 필요한 경우에만 커밋한다. 빌드 결과물, 캐시, 로컬 실행 로그, 임시 export 파일은 기본적으로 커밋하지 않는다.
-
-`.gitignore`를 수정할 때는 특정 개인 환경만을 위한 규칙을 추가하지 않는다. 팀 전체에 유효한 제외 규칙만 추가한다.
-
-## 의존성 규칙
-
-새 의존성은 신중하게 추가한다. 추가 전 다음을 고려한다.
-
-* 표준 라이브러리나 기존 의존성으로 충분하지 않은가
-* 유지보수 상태가 양호한가
-* 라이선스 문제가 없는가
-* 보안 리스크가 없는가
-* 사내망 또는 제한된 CI 환경에서도 재현 가능한가
-* 컨테이너 빌드에 영향을 주지 않는가
-
-버전은 가능한 명시적으로 고정한다. `latest`에 의존하지 않는다.
-
-## 에이전트 보고 규칙
-
-작업 완료 보고에는 다음을 포함한다.
-
-* 무엇을 변경했는지
-* 어떤 파일을 변경했는지
-* 어떤 검증을 실행했는지
-* 실패한 검증이 있다면 실패 이유
-* 남은 리스크 또는 후속 작업
-
-불확실한 내용을 확정적으로 말하지 않는다. 확인하지 않은 것은 확인하지 않았다고 적는다.
-
-## 금지되는 행동
-
-다음 행동은 피한다.
-
-* 요청 범위를 넘어선 대규모 구조 변경
-* 테스트 없이 핵심 로직 변경 완료 처리
-* secret 또는 개인 설정 커밋
-* 사용자의 미커밋 변경사항 덮어쓰기
-* 원격 브랜치에 임의 push
-* CI 실패를 무시하고 완료 처리
-* UI에서만 권한을 제한하는 구현
-* MCP 서버를 신뢰할 수 있다고 가정하는 구현
-* 임시 스크립트를 운영 경로의 핵심으로 만드는 구현
-* 문서와 실제 동작을 다르게 만드는 변경
-
-## 완료 기준
-
-작업은 다음 조건을 만족할 때 완료된 것으로 본다.
-
-* 요청된 목표가 충족되었다.
-* 변경 범위가 과도하지 않다.
-* 관련 테스트 또는 검증을 실행했다.
-* 실행하지 못한 검증은 이유를 남겼다.
-* 보안상 민감한 정보가 포함되지 않았다.
-* 문서 변경이 필요한 경우 반영했다.
-* 커밋이 필요한 경우 논리적 단위로 커밋했다.
-* 다음 작업자가 변경 이유와 상태를 이해할 수 있다.
+## Read first
+
+- Trust executable config over prose: `Makefile`, `package.json`, `.github/workflows/ci.yaml`, and `scripts/ci/*` define the active validation lanes.
+- For context, open the smallest relevant doc: `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md`, `docs/CONTRACTS.md`, `docs/TESTING.md`, `docs/LOCAL_DEV.md`, or `docs/SECURITY.md`.
+- Only this root `AGENTS.md` exists; there are no nested repo instruction files to merge.
+
+## Architecture boundaries
+
+- Go owns runtime code: `apps/api`, `apps/gateway`, `apps/worker`, `apps/cli`, `internal/*`, and first-party MCP servers under `servers/*`.
+- TypeScript is Web-only: `apps/web` and `packages/ui`. Do not add TypeScript server/operator runtimes unless explicitly requested.
+- Active TypeScript workspace packages are only `apps/web` and `packages/ui` from `pnpm-workspace.yaml`; ignore generated/local artifacts such as `dist`, `.next`, `.turbo`, and `node_modules`.
+- Entrypoints are `apps/api/cmd/api`, `apps/gateway/cmd/gateway`, `apps/worker/cmd/worker`, `apps/cli/cmd/mcphubctl`, and server `cmd/*` packages.
+- Operator actions should go through Control Plane API, Gateway, Web UI, or `mcphubctl`; scripts are local dev, CI, generation, security, or release helpers only.
+
+## Toolchain and commands
+
+- Required versions in CI/config: Go `1.26.4` (`go.mod` says `go 1.26`), Node `22`, pnpm `10.12.1`.
+- Setup/start from repo root: `pnpm install`, `cp .env.example .env`, `pnpm dev:infra`, then `pnpm dev`.
+- `pnpm dev` starts API `:4000`, Gateway `:5000`, Worker `:4100`, k8s MCP server `:5102`, and Next.js Web `:3000`.
+- Go services read the generic `PORT`; `pnpm dev` sets `PORT` per process. Do not assume `.env.example` names like `API_PORT` or `GATEWAY_PORT` are wired unless code changes too.
+- Use `pnpm run ci` or `make ci` for the aggregate CI script; bare `pnpm ci` is pnpm's clean-install command, not this repo's CI.
+- Root checks: `make lint`, `make test`, `make build`; `make ci` also runs schema, Helm, and security checks.
+- `make build` and CI build API, Gateway, Worker, CLI, Web, plus `k8s`, `runtime-adapter`, `github`, `gitlab`, and `internal-docs` MCP server targets; `pnpm dev` starts only the k8s server locally.
+- Focused Go checks: `go test ./internal/<pkg>`, `go test ./apps/... ./tests/...`, or `go test ./tests/e2e ./tests/security`.
+- Focused Web checks: `pnpm --filter @mcp-hub/web test`, `typecheck`, `lint`, or `build`; use `@mcp-hub/ui` for the shared UI package.
+- `pnpm typecheck` runs UI then Web typechecks; `scripts/ci/web.sh` runs lint, typecheck, test, build for both workspaces.
+- `pnpm dev:smoke-test` expects the local stack and Compose infra to be running. Go tests under `tests/contract`, `tests/e2e`, `tests/load`, and `tests/migration` are offline `httptest`/in-memory suites.
+- `pnpm helm:template` requires both `helm` and `kustomize`; `bash tests/helm-template.sh` renders default/dev/stg/prod Helm values plus GitOps overlays. `scripts/ci/helm.sh` may skip locally if `helm` is missing.
+- Avoid `pnpm format` or `make fmt` unless requested: they format the whole repo.
+
+## Contracts and generated files
+
+- `schemas/` is the language-neutral source of truth. Update schemas before runtime/Web consumers when behavior crosses API, policy, manifest, audit, grant, or client-profile boundaries.
+- OpenAPI source is `schemas/openapi/mcp-hub.openapi.yaml`; the runtime OpenAPI document is emitted from `internal/controlplane/server.go`; generated artifacts are `schemas/openapi/control-plane.openapi.json` and `apps/web/lib/generated/mcp-hub-client.ts`.
+- Do not edit `apps/web/lib/generated/mcp-hub-client.ts` by hand. Run `make gen-openapi`, then `scripts/gen/openapi.sh --check`.
+- JSON schemas under `schemas/jsonschema/` and `schemas/catalog/mcp-server-manifest.schema.json` are hand-authored. Run `make gen-schemas` and `scripts/gen/schemas.sh --check` after edits.
+- First-party MCP manifests live at `servers/*/mcp-server.manifest.json`; validate with `pnpm security:mcp-manifests` or pass explicit manifest paths after `--`.
+- Application Web code should import the generated client boundary instead of duplicating Control Plane paths or the `{ error, traceId }` envelope.
+
+## Runtime state and local auth
+
+- Service entrypoints use `internal/db.NewRuntimeStore()` with shared local JSON persistence, not automatic PostgreSQL migrations; tests often use in-memory `internal/db.NewSeedStore()`.
+- Default `MCP_STORE_PATH` is `<os temp dir>/mcp-hub/store.json` (usually `/tmp/mcp-hub/store.json`); set `MCP_STORE_MODE=memory` to bypass persistence.
+- API, Gateway, and Worker share local state through `MCP_STORE_PATH`; reset local runtime state with `pnpm dev:reset-db` or remove that file.
+- Seed data is code-backed in `internal/db.NewSeedStore` and mirrored in `tests/fixtures/local-seed.json`; keep them aligned when seed users, grants, servers, or client profiles change.
+- Local mock tokens are `dev-admin-token` and `dev-readonly-token`. Keep fixture/docs examples limited to these mock values.
+- In `MCP_AUTH_MODE=oidc`, mock Gateway tokens are rejected unless `MCP_ALLOW_MOCK_TOKENS=true`; Control Plane trusted identity headers require `MCP_TRUSTED_AUTH_HEADERS=true` or the configured trusted proxy token/header.
+- Web browser auth is separate from Gateway MCP bearer auth; non-production Web enables the `dev` provider by default, and server-side Web requests forward signed-session identity through trusted headers only when the API trusts them.
+- Worker `POST /jobs/run` requires a platform-admin bearer token or `MCP_WORKER_JOB_TOKEN`, and the body must be one JSON job array.
+
+## MCP Hub security constraints
+
+- Treat MCP servers, tool/resource/prompt metadata, upstream URLs, and manifests as untrusted input.
+- Gateway policy/auth/redaction/SSRF checks must happen before upstream calls; do not move authorization into the UI only.
+- Generated client configs must route through Gateway `/mcp/{serverSlug}` with bearer auth so clients do not bypass policy, rate limiting, redaction, or audit.
+- Server mutations, approvals, emergency controls, runtime status, and secret lease APIs require platform-admin context and audit-worthy behavior.
+- Manifests may reference secrets only by external refs; never commit raw secret/token/password/client-secret values in manifests, docs, tests, logs, or Helm values.
+- High or critical tool changes need explicit policy/grant review; prompt-injection-like tool metadata is quarantined from discovery.
+
+## Manual QA surfaces
+
+- CLI: `go run ./apps/cli/cmd/mcphubctl --help`, `version`, or `--api-url http://localhost:4000 health`.
+- API: run `go run ./apps/api/cmd/api`, then `curl http://localhost:4000/healthz` and a focused `/api/*` route.
+- Gateway: run the stack, then call `/mcp/k8s-readonly` with `Authorization: Bearer dev-admin-token` and a `tools/list` JSON-RPC body.
+- Web: run API plus `pnpm --filter @mcp-hub/web dev`; protected user routes are under `/user/*`, admin routes under `/admin/*`, and legacy flat routes only redirect.
+- Worker: run `go run ./apps/worker/cmd/worker`, then trigger `/jobs/run` with an authorized JSON array.
