@@ -8,15 +8,26 @@ import type { ApiGrant } from "../../lib/api";
 import { listGrants, listServers } from "../../lib/api";
 import { getCurrentSession } from "../../lib/auth/session";
 import { loadResult } from "../../lib/result";
+import { readAccessRequestDefaults, type QueryParams } from "./page-helpers";
 
-export async function AccessPageContent({ mode = "user" }: Readonly<{ mode?: "user" | "admin" }>) {
-  const session = await getCurrentSession();
+export async function AccessPageContent({
+  mode = "user",
+  searchParams,
+}: Readonly<{ mode?: "user" | "admin"; searchParams?: Promise<QueryParams> }>) {
+  const filtersPromise = searchParams ?? Promise.resolve({});
+  const sessionPromise = getCurrentSession();
   const serversPromise = loadResult(listServers());
   const grantsPromise = loadResult(listGrants());
-  const [servers, grants] = await Promise.all([serversPromise, grantsPromise]);
+  const [filters, session, servers, grants] = await Promise.all([
+    filtersPromise,
+    sessionPromise,
+    serversPromise,
+    grantsPromise,
+  ]);
   const serverItems = servers.ok ? servers.data.items : [];
   const serverNameById = new Map(serverItems.map((server) => [server.id, server.displayName]));
   const visibleGrants = grants.ok && mode === "user" ? grants.data.items.filter((grant) => grant.subjectId === session?.principal.userId || session?.principal.teamIds.includes(grant.subjectId) || session?.principal.teams.includes(grant.subjectId)) : grants.ok ? grants.data.items : [];
+  const requestDefaults = readAccessRequestDefaults(filters, serverItems);
 
   return (
     <div className="page-stack">
@@ -42,7 +53,7 @@ export async function AccessPageContent({ mode = "user" }: Readonly<{ mode?: "us
                 </div>
                 <div className="field">
                   <label htmlFor="approvalEnvironment">환경</label>
-                  <select id="approvalEnvironment" name="environment" required>
+                  <select id="approvalEnvironment" name="environment" defaultValue={requestDefaults.environment} required>
                     <option value="dev">개발</option>
                     <option value="stg">스테이징</option>
                     <option value="prod">운영</option>
@@ -56,7 +67,7 @@ export async function AccessPageContent({ mode = "user" }: Readonly<{ mode?: "us
               </div>
               <div className="field">
                 <label htmlFor="approvalServerId">서버</label>
-                <select id="approvalServerId" name="serverId" required>
+                <select id="approvalServerId" name="serverId" defaultValue={requestDefaults.serverId} required>
                   {serverItems.map((server) => <option value={server.id} key={server.id}>{server.displayName}</option>)}
                 </select>
               </div>
@@ -66,7 +77,7 @@ export async function AccessPageContent({ mode = "user" }: Readonly<{ mode?: "us
               </div>
               <div className="field">
                 <label htmlFor="approvalRequestedTools">요청 도구</label>
-                <input id="approvalRequestedTools" name="requestedTools" required placeholder="단일 도구 또는 쉼표로 구분한 도구" />
+                <input id="approvalRequestedTools" name="requestedTools" required defaultValue={requestDefaults.requestedTools} placeholder="단일 도구 또는 쉼표로 구분한 도구" />
               </div>
               <div className="field">
                 <label htmlFor="requestedAction">요청 작업</label>
