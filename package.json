@@ -6,15 +6,15 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "dev": "make dev",
-    "dev:infra": "scripts/dev/up-infra.sh",
-    "dev:infra:down": "scripts/dev/down-infra.sh",
-    "db:migrate": "scripts/dev/db-migrate.sh",
+    "infra:up": "make infra-up",
+    "infra:down": "make infra-down",
+    "migrate": "make migrate",
     "build": "make build",
     "lint": "make lint",
     "test": "make test",
     "typecheck": "pnpm --filter @mcp-hub/ui typecheck && pnpm --filter @mcp-hub/web typecheck",
     "ci": "make ci",
-    "helm:template": "helm template mcp-hub deploy/helm/mcp-hub >/dev/null"
+    "helm:template": "make helm-template"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
