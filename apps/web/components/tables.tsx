@@ -53,19 +53,27 @@ export type ServerTableProps = Readonly<{
   healthByServerId?: Map<string, ApiServerHealth>;
   serverBasePath?: string;
   showMarketCuration?: boolean;
+  audience?: DisplayAudience;
 }>;
 
-export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers", showMarketCuration = false }: ServerTableProps) {
+export type DisplayAudience = "user" | "admin-summary" | "admin-detail";
+
+export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers", showMarketCuration = false, audience }: ServerTableProps) {
+  const tableAudience = audience ?? (showMarketCuration ? "admin-summary" : "user");
+  const showSummaryDiagnostics = tableAudience !== "user";
+
   return (
     <div className="table-wrap">
       <table>
-        {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead />}
+        <caption>{tableAudience === "user" ? "사용자용 MCP 서버 요약" : "관리자용 MCP 서버 요약"}</caption>
+        {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead showSummaryDiagnostics={showSummaryDiagnostics} />}
         <tbody>
           {servers.map((server) => {
             const health = healthByServerId?.get(server.id);
             if (showMarketCuration) {
               return (
                 <MarketCurationTableRow
+                  audience={tableAudience}
                   health={health}
                   key={server.id}
                   server={server}
@@ -84,10 +92,10 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                     {server.description ?? "공개된 설명이 없습니다."}
                   </p>
                 </td>
-                <td>{server.slug}</td>
-                <td>{server.ownerTeamId}</td>
+                {showSummaryDiagnostics ? <td>{server.slug}</td> : null}
+                {showSummaryDiagnostics ? <td><TechnicalDetails summary="소유 팀 보기">{server.ownerTeamId}</TechnicalDetails></td> : null}
                 <td>{formatEnvironment(server.environment)}</td>
-                <td>{formatTransport(server.transport)}</td>
+                {showSummaryDiagnostics ? <td>{formatTransport(server.transport)}</td> : null}
                 <td>
                   <StatusPill tone={riskTone(server.riskLevel)}>
                     {formatRiskLevel(server.riskLevel)}
@@ -107,7 +115,7 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                     {formatEnabled(server.enabled)}
                   </StatusPill>
                 </td>
-                <td>
+                {showSummaryDiagnostics ? <td>
                   <div className="actions">
                     <StatusPill
                       tone={
@@ -128,8 +136,8 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
                       {server.quarantined ? "격리됨" : "격리 안 됨"}
                     </StatusPill>
                   </div>
-                </td>
-                <td>{formatDate(server.updatedAt)}</td>
+                </td> : null}
+                {showSummaryDiagnostics ? <td>{formatDate(server.updatedAt)}</td> : null}
               </tr>
             );
           })}
@@ -139,20 +147,20 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
   );
 }
 
-function ServerTableHead() {
+function ServerTableHead({ showSummaryDiagnostics }: Readonly<{ showSummaryDiagnostics: boolean }>) {
   return (
     <thead>
       <tr>
-        <th>서버</th>
-        <th>슬러그</th>
-        <th>소유 팀</th>
-        <th>환경</th>
-        <th>전송 방식</th>
-        <th>위험도</th>
-        <th>상태</th>
-        <th>활성 여부</th>
-        <th>운영</th>
-        <th>업데이트</th>
+        <th scope="col">서버</th>
+        {showSummaryDiagnostics ? <th scope="col">슬러그</th> : null}
+        {showSummaryDiagnostics ? <th scope="col">소유 팀</th> : null}
+        <th scope="col">환경</th>
+        {showSummaryDiagnostics ? <th scope="col">전송 방식</th> : null}
+        <th scope="col">위험도</th>
+        <th scope="col">상태</th>
+        <th scope="col">활성 여부</th>
+        {showSummaryDiagnostics ? <th scope="col">운영</th> : null}
+        {showSummaryDiagnostics ? <th scope="col">업데이트</th> : null}
       </tr>
     </thead>
   );
@@ -162,22 +170,22 @@ function MarketCurationTableHead() {
   return (
     <thead>
       <tr>
-        <th>서버</th>
-        <th>카테고리/태그</th>
-        <th>신뢰 수준</th>
-        <th>게시/격리</th>
-        <th>문서/설치</th>
-        <th>소유 팀</th>
-        <th>환경/상태</th>
-        <th>위험도</th>
-        <th>빠른 링크</th>
-        <th>업데이트</th>
+        <th scope="col">서버</th>
+        <th scope="col">카테고리/태그</th>
+        <th scope="col">신뢰 수준</th>
+        <th scope="col">게시/격리</th>
+        <th scope="col">문서/설치</th>
+        <th scope="col">운영 소유</th>
+        <th scope="col">환경/상태</th>
+        <th scope="col">위험도</th>
+        <th scope="col">빠른 링크</th>
+        <th scope="col">업데이트</th>
       </tr>
     </thead>
   );
 }
 
-function MarketCurationTableRow({ server, health, serverBasePath }: Readonly<{ server: ApiMcpServer; health?: ApiServerHealth; serverBasePath: string }>) {
+function MarketCurationTableRow({ server, health, serverBasePath, audience }: Readonly<{ server: ApiMcpServer; health?: ApiServerHealth; serverBasePath: string; audience: DisplayAudience }>) {
   const visibility = marketVisibilityForServer(server);
   const docsUrl = safeExternalUrl(server.docsUrl);
   const sourceUrl = safeExternalUrl(server.sourceUrl);
@@ -224,7 +232,9 @@ function MarketCurationTableRow({ server, health, serverBasePath }: Readonly<{ s
         <p className="muted">{formatInstallMethods(server.installMethods)}</p>
         {sourceUrl ? <p><a href={sourceUrl} target="_blank" rel="noreferrer">소스</a></p> : null}
       </td>
-      <td>{server.ownerTeamId}</td>
+      <td>
+        {audience === "admin-detail" ? server.ownerTeamId : <TechnicalDetails summary="소유 팀 보기">{server.ownerTeamId}</TechnicalDetails>}
+      </td>
       <td>
         <p>{formatEnvironment(server.environment)}</p>
         <p className="muted">{formatTransport(server.transport)}</p>
@@ -299,6 +309,7 @@ export type ToolTableProps = Readonly<{
   showAdminPlaceholder?: boolean;
   actionSlot?: (tool: ApiMcpTool) => ReactNode;
   accessActionSlot?: (tool: ApiMcpTool, status: AccessStatus | undefined) => ReactNode;
+  audience?: DisplayAudience;
 }>;
 
 export function ToolTable({
@@ -310,21 +321,26 @@ export function ToolTable({
   showAdminPlaceholder = false,
   actionSlot,
   accessActionSlot,
+  audience = "user",
 }: ToolTableProps) {
+  const showTechnicalColumns = audience !== "user";
+  const showSchemaColumn = showSchema && audience === "admin-detail";
+
   return (
     <div className="table-wrap">
       <table>
+        <caption>{audience === "user" ? "사용자용 도구와 접근 상태" : "관리자용 도구 진단"}</caption>
         <thead>
           <tr>
-            <th>도구</th>
-            <th>위험도</th>
-            <th>상태</th>
-            {showSchema ? <th>입력 스키마</th> : null}
-            {showAccess ? <th>접근 권한</th> : null}
-            <th>발견 시각</th>
-            <th>마지막 확인</th>
-            {showAdminPlaceholder ? <th>관리자 테스트</th> : null}
-            {actionSlot ? <th>제어</th> : null}
+            <th scope="col">도구</th>
+            <th scope="col">위험도</th>
+            <th scope="col">상태</th>
+            {showSchemaColumn ? <th scope="col">입력 스키마</th> : null}
+            {showAccess ? <th scope="col">접근 권한</th> : null}
+            {showTechnicalColumns ? <th scope="col">발견 시각</th> : null}
+            {showTechnicalColumns ? <th scope="col">마지막 확인</th> : null}
+            {showAdminPlaceholder ? <th scope="col">관리자 테스트</th> : null}
+            {actionSlot ? <th scope="col">제어</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -347,7 +363,7 @@ export function ToolTable({
                   {formatEnabled(tool.enabled)}
                 </StatusPill>
               </td>
-              {showSchema ? (
+              {showSchemaColumn ? (
                 <td>
                   <SchemaViewer tool={tool} />
                 </td>
@@ -361,13 +377,13 @@ export function ToolTable({
                   />
                 </td>
               ) : null}
-              <td>{formatDate(tool.discoveredAt)}</td>
-              <td>{formatDate(tool.lastSeenAt)}</td>
+              {showTechnicalColumns ? <td>{formatDate(tool.discoveredAt)}</td> : null}
+              {showTechnicalColumns ? <td>{formatDate(tool.lastSeenAt)}</td> : null}
               {showAdminPlaceholder ? (
                 <td>
                   <StatusPill tone="info">API 대기</StatusPill>
                   <p className="muted">
-                    관리자 테스트 호출 엔드포인트는 prompt 05 범위에 없습니다.
+                    관리자 테스트 호출 API가 제공되면 이 영역에서 연결합니다.
                   </p>
                 </td>
               ) : null}
@@ -441,14 +457,14 @@ export function ServerVersionTable({
   return (
     <div className="table-wrap">
       <table>
+        <caption>서버 버전과 롤아웃 진단</caption>
         <thead>
           <tr>
-            <th>버전</th>
-            <th>상태</th>
-            <th>이미지</th>
-            <th>해시</th>
-            <th>생성</th>
-            <th>활성화</th>
+            <th scope="col">버전</th>
+            <th scope="col">상태</th>
+            <th scope="col">이미지/해시 세부정보</th>
+            <th scope="col">생성</th>
+            <th scope="col">활성화</th>
           </tr>
         </thead>
         <tbody>
@@ -469,12 +485,12 @@ export function ServerVersionTable({
               </td>
               <td>
                 <VersionImage version={version} />
-              </td>
-              <td>
-                <p>{version.configHash ?? "설정 해시 기록 없음"}</p>
-                <p className="muted">
-                  스키마 {version.toolSchemaHash ?? "기록 없음"}
-                </p>
+                <TechnicalDetails summary="해시 보기">
+                  <p>{version.configHash ?? "설정 해시 기록 없음"}</p>
+                  <p className="muted">
+                    스키마 {version.toolSchemaHash ?? "기록 없음"}
+                  </p>
+                </TechnicalDetails>
               </td>
               <td>{formatDate(version.createdAt)}</td>
               <td>{formatDate(version.activatedAt)}</td>
@@ -573,30 +589,34 @@ export function GrantTable({
   grants,
   serverNameById,
   actionSlot,
+  audience = "admin-summary",
 }: Readonly<{
   grants: ApiGrant[];
   serverNameById: Map<string, string>;
   actionSlot?: (grant: ApiGrant) => ReactNode;
+  audience?: DisplayAudience;
 }>) {
   return (
     <div className="table-wrap">
       <table>
+        <caption>{audience === "user" ? "내 접근 권한 요약" : "관리자 권한 목록"}</caption>
         <thead>
           <tr>
-            <th>주체</th>
-            <th>서버</th>
-            <th>도구</th>
-            <th>환경</th>
-            <th>상태</th>
-            <th>사유</th>
-            {actionSlot ? <th>제어</th> : null}
+            <th scope="col">주체</th>
+            <th scope="col">서버</th>
+            <th scope="col">도구</th>
+            <th scope="col">환경</th>
+            <th scope="col">상태</th>
+            <th scope="col">사유</th>
+            {actionSlot ? <th scope="col">제어</th> : null}
           </tr>
         </thead>
         <tbody>
           {grants.map((grant) => (
             <tr key={grant.id}>
               <td>
-                {formatSubjectType(grant.subjectType)}: {grant.subjectId}
+                {audience === "user" ? formatSubjectType(grant.subjectType) : `${formatSubjectType(grant.subjectType)}: ${grant.subjectId}`}
+                {audience === "user" ? <p className="muted">현재 세션과 일치</p> : null}
               </td>
               <td>{serverNameById.get(grant.serverId) ?? grant.serverId}</td>
               <td>{grant.allowedTools.join(", ")}</td>
@@ -787,6 +807,15 @@ function ApprovalToolContext({
   );
 }
 
+function TechnicalDetails({ summary, children }: Readonly<{ summary: string; children: ReactNode }>) {
+  return (
+    <details className="schema-viewer">
+      <summary>{summary}</summary>
+      <div className="grid">{children}</div>
+    </details>
+  );
+}
+
 function VersionImage({ version }: Readonly<{ version: ApiMcpServerVersion }>) {
   if (version.imageRef) {
     return <span>{version.imageRef}</span>;
@@ -866,17 +895,16 @@ export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<
   return (
     <div className="table-wrap">
       <table>
+        <caption>정책 감사 이벤트와 진단 세부정보</caption>
         <thead>
           <tr>
-            <th>이벤트</th>
-            <th>정책</th>
-            <th>위험도</th>
-            <th>행위자</th>
-            <th>실행</th>
-            <th>인자 해시</th>
-            <th>추적</th>
-            <th>마스킹된 페이로드</th>
-            <th>시각</th>
+            <th scope="col">이벤트</th>
+            <th scope="col">정책</th>
+            <th scope="col">위험도</th>
+            <th scope="col">행위자</th>
+            <th scope="col">실행</th>
+            <th scope="col">진단 세부정보</th>
+            <th scope="col">시각</th>
           </tr>
         </thead>
         <tbody>
@@ -903,32 +931,32 @@ export function AuditTable({ events, auditBasePath = "/admin/audit" }: Readonly<
                 <AuditExecution event={event} />
               </td>
               <td>
-                {event.argumentHash ? (
-                  <code>{event.argumentHash}</code>
-                ) : (
-                  <span className="muted">기록 없음</span>
-                )}
-              </td>
-              <td>
-                <CopyButton value={event.traceId} label="추적 ID 복사" />
-                <Link
-                  className="button button--ghost"
-                  href={`${auditBasePath}?trace_id=${encodeURIComponent(event.traceId)}`}
-                >
-                  추적 링크
-                </Link>
-              </td>
-              <td>
-                <RedactedJsonDetails
-                  summary="마스킹된 인자 보기"
-                  value={event.argumentRedactedJson}
-                  emptyText="마스킹된 인자가 없습니다"
-                />
-                <RedactedJsonDetails
-                  summary="마스킹된 메타데이터 보기"
-                  value={event.metadataJson}
-                  emptyText="메타데이터가 없습니다"
-                />
+                <details className="schema-viewer">
+                  <summary>추적·해시·페이로드 보기</summary>
+                  <div className="grid">
+                    <div className="copy-control">
+                      <span className="muted">추적 ID</span>
+                      <CopyButton value={event.traceId} label="추적 ID 복사" />
+                      <Link
+                        className="button button--ghost"
+                        href={`${auditBasePath}?trace_id=${encodeURIComponent(event.traceId)}`}
+                      >
+                        추적 링크
+                      </Link>
+                    </div>
+                    <p>{event.argumentHash ? <code>{event.argumentHash}</code> : <span className="muted">인자 해시 기록 없음</span>}</p>
+                    <RedactedJsonDetails
+                      summary="마스킹된 인자 보기"
+                      value={event.argumentRedactedJson}
+                      emptyText="마스킹된 인자가 없습니다"
+                    />
+                    <RedactedJsonDetails
+                      summary="마스킹된 메타데이터 보기"
+                      value={event.metadataJson}
+                      emptyText="메타데이터가 없습니다"
+                    />
+                  </div>
+                </details>
               </td>
               <td>{formatDate(event.timestamp)}</td>
             </tr>
