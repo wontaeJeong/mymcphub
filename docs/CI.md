@@ -17,6 +17,7 @@ pnpm security:supply-chain
 pnpm security:sbom
 pnpm security:smoke
 pnpm helm:template
+pnpm docs:check
 pnpm run ci
 ```
 
@@ -31,6 +32,7 @@ The workflow in `.github/workflows/ci.yaml` has these jobs:
 - `go-core`: runs Go fmt, vet, tests, and builds.
 - `web-ui`: installs pnpm dependencies and runs Web UI lint, typecheck, tests, and build.
 - `schemas`: runs OpenAPI, JSON Schema, and MCP manifest drift checks.
+- `docs`: installs uv, syncs the locked docs dependency group, and runs `mkdocs build --strict`.
 - `security-scan`: installs `govulncheck`, runs Go vulnerability checks, Web dependency audit, Python audit when Python manifests exist, and Trivy when available.
 - `helm-gitops`: renders Helm and GitOps overlays.
 - `e2e-security`: runs Go e2e and security negative tests.

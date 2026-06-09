@@ -1,0 +1,91 @@
+site_name: mymcphub
+site_description: MCP Hub 사용자, 개발자, 운영자 문서
+repo_url: https://github.com/wontaeJeong/mymcphub
+repo_name: wontaeJeong/mymcphub
+
+theme:
+  name: material
+  language: ko
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+
+plugins:
+  - search
+
+exclude_docs: |
+  README.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home:
+      - Overview: index.md
+      - MVP Demo: MVP_DEMO.md
+      - 기존 문서 인덱스: docs-index.md
+  - User Guide:
+      - Overview: user-guide/index.md
+      - Concepts: user-guide/concepts.md
+      - Quickstart: user-guide/quickstart.md
+      - Catalog: user-guide/catalog.md
+      - Access Requests: user-guide/access.md
+      - Client Config: user-guide/client-config.md
+      - Troubleshooting: user-guide/troubleshooting.md
+  - Admin Guide:
+      - Overview: admin-guide/index.md
+      - Server Operations: admin-guide/server-operations.md
+      - Approvals: admin-guide/approvals.md
+      - Audit: admin-guide/audit.md
+      - Emergency Controls: admin-guide/emergency.md
+  - Developer Guide:
+      - Overview: developer-guide/index.md
+      - Architecture: ARCHITECTURE.md
+      - Local Development: LOCAL_DEV.md
+      - API: API.md
+      - Contracts: CONTRACTS.md
+      - Gateway: GATEWAY.md
+      - Worker: WORKER.md
+      - CLI: CLI.md
+      - Data Model: DATA_MODEL.md
+      - Testing: TESTING.md
+      - Web Auth Route Split: WEB_AUTH_ROUTE_SPLIT.md
+  - Operations:
+      - Overview: operations/index.md
+      - Operations: OPERATIONS.md
+      - Deployment: DEPLOYMENT.md
+      - Runbooks: RUNBOOKS.md
+      - Detailed Runbook: RUNBOOK.md
+      - Rollback: ROLLBACK.md
+      - CI: CI.md
+      - Security: SECURITY.md
+      - Policy: POLICY.md
+      - Audit Observability: AUDIT_OBSERVABILITY.md
+  - Reference:
+      - Overview: reference/index.md
+      - Environment Variables: reference/environment-variables.md
+      - Scripts and CLI: reference/scripts-and-cli.md
+      - MCP Server Matrix: MCP_SERVER_LANGUAGE_MATRIX.md
+      - MCP Client Compatibility: MCP_CLIENT_COMPATIBILITY.md
+      - Client Setup: CLIENT_SETUP.md
+      - Server Onboarding: MCP_SERVER_ONBOARDING.md
+      - Glossary: reference/glossary.md

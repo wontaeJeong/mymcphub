@@ -41,6 +41,22 @@ Non-source artifacts such as `node_modules`, `dist`, `.next`, `.turbo`, coverage
 
 Use `go run ./apps/cli/cmd/mcphubctl --api-url http://localhost:4000 health` to check the local API through the CLI.
 
+## Documentation Site
+
+The MkDocs documentation site uses uv-managed Python tooling isolated from the Go and pnpm workspaces.
+
+```bash
+uv sync --group docs
+uv run --group docs mkdocs serve
+uv run --group docs mkdocs build --strict
+```
+
+- `uv sync --group docs` installs the docs dependency group from `pyproject.toml`.
+- `uv run --group docs mkdocs serve` previews the site locally.
+- `uv run --group docs mkdocs build --strict` runs the same strict docs validation used by CI.
+- Generated `site/` output is local and must not be committed.
+- `uv.lock` is committed so the docs toolchain is reproducible.
+
 ## MVP Demo
 
 Use [MVP Demo](docs/MVP_DEMO.md) for the end-to-end local demo order, expected Web screens, Gateway/CLI checks, fallback steps, and `make demo-check` validation target.

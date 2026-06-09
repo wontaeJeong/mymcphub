@@ -3,6 +3,8 @@ dist/
 .next/
 .turbo/
 coverage/
+.venv/
+site/
 .env
 *.log
 .sisyphus/
