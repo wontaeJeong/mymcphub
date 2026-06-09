@@ -17,7 +17,7 @@ export function ServerRegistrationForm() {
   return (
     <form className="form-card" action={formAction}>
       <h2>서버 등록</h2>
-      <p>제어 플레인 McpServerManifestSchema 계약에 맞춘 간단한 매니페스트를 /api/servers로 전송합니다.</p>
+      <p>기본 서버 정보부터 등록하고, 마켓·스키마 같은 기술 세부정보는 필요할 때 펼쳐 입력합니다.</p>
       <div className="form-grid">
         <div className="field">
           <label htmlFor="registerSlug">슬러그</label>
@@ -63,10 +63,12 @@ export function ServerRegistrationForm() {
         <label htmlFor="registerDescription">설명</label>
         <textarea id="registerDescription" name="description" placeholder="운영 목적과 소유권 메모" />
       </div>
-      <div className="field">
-        <label htmlFor="registerUpstreamUrl">업스트림 URL</label>
-        <input id="registerUpstreamUrl" name="upstreamUrl" type="url" placeholder="stdio 어댑터는 선택 사항" />
-      </div>
+      <details className="schema-viewer">
+        <summary>고급 연결·마켓 정보</summary>
+        <div className="field">
+          <label htmlFor="registerUpstreamUrl">업스트림 URL</label>
+          <input id="registerUpstreamUrl" name="upstreamUrl" type="url" placeholder="stdio 어댑터는 선택 사항" />
+        </div>
       <fieldset className="form-card registration-market-section">
         <legend>마켓 메타데이터</legend>
         <p>내부 MCP Market에서 검색, 검토, 게시 상태 판단에 사용할 카탈로그 정보를 함께 등록합니다.</p>
@@ -136,9 +138,10 @@ export function ServerRegistrationForm() {
           </div>
         </div>
       </fieldset>
+      </details>
       <label className="danger-confirm registration-toggle">
         <input type="checkbox" name="enabled" defaultChecked />
-        서버를 활성 상태로 등록합니다.
+        서버를 등록 즉시 활성화합니다. Gateway 경로에서 발견될 수 있음을 확인하세요.
       </label>
       <div className="form-grid registration-tool-grid">
         <div className="field">
@@ -159,13 +162,16 @@ export function ServerRegistrationForm() {
         <label htmlFor="registerToolDescription">초기 도구 설명</label>
         <input id="registerToolDescription" name="toolDescription" placeholder="도구가 수행하는 작업" />
       </div>
-      <div className="field">
-        <label htmlFor="registerToolInputSchema">입력 스키마 JSON</label>
-        <textarea id="registerToolInputSchema" name="toolInputSchema" required defaultValue={'{"type":"object","properties":{}}'} />
-      </div>
+      <details className="schema-viewer">
+        <summary>초기 도구 입력 스키마</summary>
+        <div className="field">
+          <label htmlFor="registerToolInputSchema">입력 스키마 JSON</label>
+          <textarea id="registerToolInputSchema" name="toolInputSchema" required defaultValue={'{"type":"object","properties":{}}'} />
+        </div>
+      </details>
       <label className="danger-confirm registration-toggle">
         <input type="checkbox" name="toolEnabled" defaultChecked />
-        초기 도구를 활성 상태로 등록합니다.
+        초기 도구를 등록 즉시 활성화합니다. 승인 정책과 위험도를 확인하세요.
       </label>
       <div className="form-actions">
         <button className="button" type="submit" disabled={pending}>{pending ? "등록 중..." : "서버 등록"}</button>
