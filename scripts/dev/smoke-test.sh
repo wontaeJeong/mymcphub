@@ -103,6 +103,15 @@ json_assert "$tmp_dir/api-ready.json" "data.service === 'api' && data.status ===
 
 request 200 "$tmp_dir/catalog.json" "$api_url/api/servers"
 json_assert "$tmp_dir/catalog.json" "Array.isArray(data.items) && data.items.some((server) => server.slug === 'k8s-readonly')" "Seeded catalog includes k8s-readonly"
+json_assert "$tmp_dir/catalog.json" "data.items.some((server) => server.slug === 'k8s-readonly' && server.category === 'cloud_infra' && Array.isArray(server.tags) && server.tags.includes('kubernetes') && server.summary === 'Read Kubernetes namespaces and pods through the MCP Gateway.' && Array.isArray(server.installMethods) && server.installMethods.includes('gateway') && server.trustLevel === 'platform_supported' && server.visibility === 'published')" "Seeded catalog includes k8s-readonly market metadata"
+
+request 200 "$tmp_dir/server-health.json" "$api_url/api/server-health"
+json_assert "$tmp_dir/server-health.json" "Array.isArray(data.items) && data.items.some((check) => check.serverId === '00000000-0000-4000-8000-000000000102' && check.status === 'healthy')" "API server-health returns seeded health records"
+
+request 200 "$tmp_dir/client-config.json" "$api_url/api/client-config/generate" \
+  -H 'content-type: application/json' \
+  -d '{"client":"opencode","profile":"local","serverId":"00000000-0000-4000-8000-000000000102"}'
+json_assert "$tmp_dir/client-config.json" "data.client === 'opencode' && data.profile === 'local' && data.placeholder === false && data.gatewayUrl === '$gateway_url/mcp/k8s-readonly' && data.serverSlug === 'k8s-readonly' && data.auth?.type === 'bearer' && data.auth?.tokenEnv === 'MCPHUB_TOKEN' && data.config?.mcp?.['k8s-readonly']?.headers?.authorization === 'Bearer \${MCPHUB_TOKEN}'" "API client-config generate returns Gateway bearer config"
 
 request 200 "$tmp_dir/k8s-health.json" "$k8s_url/health"
 json_assert "$tmp_dir/k8s-health.json" "data.status === 'ok' && data.server === 'k8s-readonly'" "K8s upstream health is ok"
