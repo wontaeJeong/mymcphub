@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusPill } from "@mcp-hub/ui";
+import type { StatusTone } from "@mcp-hub/ui";
 
 import { CopyButton } from "./copy-button";
 import type {
@@ -12,8 +13,17 @@ import type {
   ApiMcpTool,
   ApiServerHealth,
   ApiToolCallEvent,
+  MarketTrustLevel,
+  MarketVisibility,
   ServerVersionStatus,
 } from "../lib/api";
+import {
+  formatInstallMethods,
+  formatMarketCategory,
+  formatMarketTrustLevel,
+  formatMarketVisibility,
+  marketVisibilityForServer,
+} from "../lib/market";
 import {
   approvalTone,
   enabledTone,
@@ -38,29 +48,28 @@ export type ServerTableProps = Readonly<{
   servers: ApiMcpServer[];
   healthByServerId?: Map<string, ApiServerHealth>;
   serverBasePath?: string;
+  showMarketCuration?: boolean;
 }>;
 
-export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers" }: ServerTableProps) {
+export function ServerTable({ servers, healthByServerId, serverBasePath = "/user/servers", showMarketCuration = false }: ServerTableProps) {
   return (
     <div className="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>서버</th>
-            <th>슬러그</th>
-            <th>소유 팀</th>
-            <th>환경</th>
-            <th>전송 방식</th>
-            <th>위험도</th>
-            <th>상태</th>
-            <th>활성 여부</th>
-            <th>운영</th>
-            <th>업데이트</th>
-          </tr>
-        </thead>
+        {showMarketCuration ? <MarketCurationTableHead /> : <ServerTableHead />}
         <tbody>
           {servers.map((server) => {
             const health = healthByServerId?.get(server.id);
+            if (showMarketCuration) {
+              return (
+                <MarketCurationTableRow
+                  health={health}
+                  key={server.id}
+                  server={server}
+                  serverBasePath={serverBasePath}
+                />
+              );
+            }
+
             return (
               <tr key={server.id}>
                 <td>
@@ -124,6 +133,157 @@ export function ServerTable({ servers, healthByServerId, serverBasePath = "/user
       </table>
     </div>
   );
+}
+
+function ServerTableHead() {
+  return (
+    <thead>
+      <tr>
+        <th>서버</th>
+        <th>슬러그</th>
+        <th>소유 팀</th>
+        <th>환경</th>
+        <th>전송 방식</th>
+        <th>위험도</th>
+        <th>상태</th>
+        <th>활성 여부</th>
+        <th>운영</th>
+        <th>업데이트</th>
+      </tr>
+    </thead>
+  );
+}
+
+function MarketCurationTableHead() {
+  return (
+    <thead>
+      <tr>
+        <th>서버</th>
+        <th>카테고리/태그</th>
+        <th>신뢰 수준</th>
+        <th>게시/격리</th>
+        <th>문서/설치</th>
+        <th>소유 팀</th>
+        <th>환경/상태</th>
+        <th>위험도</th>
+        <th>빠른 링크</th>
+        <th>업데이트</th>
+      </tr>
+    </thead>
+  );
+}
+
+function MarketCurationTableRow({ server, health, serverBasePath }: Readonly<{ server: ApiMcpServer; health?: ApiServerHealth; serverBasePath: string }>) {
+  const visibility = marketVisibilityForServer(server);
+  const docsUrl = safeExternalUrl(server.docsUrl);
+  const sourceUrl = safeExternalUrl(server.sourceUrl);
+
+  return (
+    <tr>
+      <td>
+        <Link href={`${serverBasePath}/${server.id}`}>{server.displayName}</Link>
+        <p className="muted">{server.slug}</p>
+        <p className="muted">{server.summary ?? server.description ?? "마켓 요약이 없습니다."}</p>
+      </td>
+      <td>
+        {formatMarketCategory(server.category)}
+        <p className="muted">{formatTagSummary(server.tags)}</p>
+      </td>
+      <td>
+        <StatusPill tone={marketTrustLevelTone(server.trustLevel)}>
+          {formatMarketTrustLevel(server.trustLevel)}
+        </StatusPill>
+        <p className="muted">검토자 {server.reviewedBy ?? "기록 없음"}</p>
+      </td>
+      <td>
+        <div className="actions">
+          <StatusPill tone={marketVisibilityTone(visibility)}>
+            {formatMarketVisibility(visibility)}
+          </StatusPill>
+          <StatusPill tone={server.published ? "success" : "warning"}>
+            {server.published ? "게시됨" : "게시 안 됨"}
+          </StatusPill>
+          <StatusPill tone={server.quarantined ? "danger" : "neutral"}>
+            {server.quarantined ? "격리됨" : "격리 안 됨"}
+          </StatusPill>
+        </div>
+      </td>
+      <td>
+        <div className="actions">
+          <StatusPill tone={docsUrl ? "success" : "warning"}>
+            {docsUrl ? "문서 있음" : "문서 누락"}
+          </StatusPill>
+          <StatusPill tone={server.installMethods && server.installMethods.length > 0 ? "success" : "warning"}>
+            {server.installMethods && server.installMethods.length > 0 ? "설치 있음" : "설치 누락"}
+          </StatusPill>
+        </div>
+        <p className="muted">{formatInstallMethods(server.installMethods)}</p>
+        {sourceUrl ? <p><a href={sourceUrl} target="_blank" rel="noreferrer">소스</a></p> : null}
+      </td>
+      <td>{server.ownerTeamId}</td>
+      <td>
+        <p>{formatEnvironment(server.environment)}</p>
+        <p className="muted">{formatTransport(server.transport)}</p>
+        <div className="actions">
+          {health ? (
+            <StatusPill tone={healthTone(health.status)}>{formatHealthStatus(health.status)}</StatusPill>
+          ) : (
+            <StatusPill>확인 불가</StatusPill>
+          )}
+          <StatusPill tone={enabledTone(server.enabled)}>{formatEnabled(server.enabled)}</StatusPill>
+        </div>
+      </td>
+      <td>
+        <StatusPill tone={riskTone(server.riskLevel)}>{formatRiskLevel(server.riskLevel)}</StatusPill>
+      </td>
+      <td>
+        <div className="actions">
+          <Link className="button button--ghost" href={`${serverBasePath}/${server.id}`}>상세</Link>
+          <Link className="button button--ghost" href={`${serverBasePath}/${server.id}#market-metadata`}>편집</Link>
+          <Link className="button button--ghost" href={`/admin/audit?server=${encodeURIComponent(server.id)}`}>감사</Link>
+        </div>
+      </td>
+      <td>{formatDate(server.updatedAt)}</td>
+    </tr>
+  );
+}
+
+function formatTagSummary(tags: string[] | undefined) {
+  if (!tags || tags.length === 0) {
+    return "태그 없음";
+  }
+
+  const visibleTags = tags.slice(0, 3).join(", ");
+  const remaining = tags.length - 3;
+  return remaining > 0 ? `${visibleTags} 외 ${remaining}개` : visibleTags;
+}
+
+function marketTrustLevelTone(value: MarketTrustLevel | undefined): StatusTone {
+  if (value === "platform_supported" || value === "official") {
+    return "success";
+  }
+
+  if (value === "verified") {
+    return "info";
+  }
+
+  return "neutral";
+}
+
+function marketVisibilityTone(value: MarketVisibility): StatusTone {
+  if (value === "published") {
+    return "success";
+  }
+
+  if (value === "quarantined") {
+    return "danger";
+  }
+
+  if (value === "draft" || value === "internal") {
+    return "warning";
+  }
+
+  return "neutral";
 }
 
 export type ToolTableProps = Readonly<{
