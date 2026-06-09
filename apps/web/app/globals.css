@@ -155,7 +155,7 @@ button {
 .brand {
   display: grid;
   gap: var(--space-2);
-  margin-bottom: var(--space-7);
+  margin-bottom: var(--space-5);
 }
 
 .theme-toggle {
@@ -226,7 +226,7 @@ button {
 .session-card {
   display: grid;
   gap: var(--space-3);
-  margin-top: var(--space-7);
+  margin-top: var(--space-5);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -247,12 +247,18 @@ button {
 }
 
 .nav a:hover,
-.nav a:focus-visible {
+.nav a:focus-visible,
+.nav a[aria-current="page"] {
   color: var(--color-ink);
   border-color: var(--color-border);
   background: var(--color-faint);
   transform: translateX(var(--space-1));
   outline: none;
+}
+
+.nav a[aria-current="page"] {
+  border-color: var(--color-accent);
+  background: var(--color-button-bg);
 }
 
 .content {
