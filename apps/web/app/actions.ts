@@ -20,12 +20,24 @@ import {
   revokeGrant,
   revokeServerGrants,
   testPolicyCall,
+  updateServer,
   type ClientConfigKind,
   type Environment,
+  type InstallMethod,
+  type MarketCategory,
+  type MarketTrustLevel,
+  type MarketVisibility,
   type RiskLevel,
   type ServerTransport
 } from "../lib/api";
 import { getCurrentSession } from "../lib/auth/session";
+import {
+  isInstallMethod,
+  isMarketCategory,
+  isMarketTrustLevel,
+  isMarketVisibility,
+  parseDelimitedList,
+} from "../lib/market";
 import { buildPolicyTestCallInput, buildPolicyTestDisplayPayload, parseToolTestRef } from "../lib/policy-test";
 
 export async function approveApprovalAction(formData: FormData) {
@@ -96,6 +108,17 @@ export async function createServerAction(_previousState: FormActionState, formDa
       upstreamUrl: readOptional(formData, "upstreamUrl"),
       enabled: readBoolean(formData, "enabled"),
       riskLevel: readRiskLevel(formData, "riskLevel"),
+      category: readMarketCategory(formData, "category"),
+      tags: readDelimitedList(formData, "tags"),
+      summary: readOptional(formData, "summary"),
+      useCases: readDelimitedList(formData, "useCases"),
+      docsUrl: readOptional(formData, "docsUrl"),
+      sourceUrl: readOptional(formData, "sourceUrl"),
+      installMethods: readInstallMethods(formData),
+      prerequisites: readDelimitedList(formData, "prerequisites"),
+      securityNotes: readDelimitedList(formData, "securityNotes"),
+      trustLevel: readMarketTrustLevel(formData, "trustLevel"),
+      visibility: readMarketVisibility(formData, "visibility"),
       tools: [
         {
           name: readRequired(formData, "toolName"),
@@ -116,6 +139,68 @@ export async function createServerAction(_previousState: FormActionState, formDa
     return {
       status: "error",
       message: formatApiError(error)
+    };
+  }
+}
+
+export async function updateServerMarketMetadataAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  const session = await requireAdminForAction();
+  try {
+    const serverId = readRequired(formData, "serverId");
+    const server = await updateServer(serverId, {
+      category: readMarketCategory(formData, "category"),
+      tags: readDelimitedList(formData, "tags"),
+      summary: readOptional(formData, "summary"),
+      useCases: readDelimitedList(formData, "useCases"),
+      docsUrl: readOptional(formData, "docsUrl"),
+      sourceUrl: readOptional(formData, "sourceUrl"),
+      installMethods: readInstallMethods(formData),
+      prerequisites: readDelimitedList(formData, "prerequisites"),
+      securityNotes: readDelimitedList(formData, "securityNotes"),
+      trustLevel: readMarketTrustLevel(formData, "trustLevel"),
+      reviewedBy: session.principal.email || session.principal.userId,
+      reviewedAt: new Date().toISOString(),
+      reason: readRequired(formData, "reason"),
+    });
+    revalidateServerSurfaces(serverId);
+    revalidatePath("/admin/audit");
+    return {
+      status: "success",
+      message: `${server.displayName} 마켓 메타데이터를 저장했습니다.`,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: formatApiError(error),
+    };
+  }
+}
+
+export async function updateServerMarketLifecycleAction(_previousState: FormActionState, formData: FormData): Promise<FormActionState> {
+  const session = await requireAdminForAction();
+  try {
+    requireConfirmation(formData, "confirmMarketLifecycle");
+    const serverId = readRequired(formData, "serverId");
+    const marketAction = readMarketLifecycleAction(formData);
+    const now = new Date().toISOString();
+    const visibility = visibilityForLifecycleAction(marketAction);
+    const server = await updateServer(serverId, {
+      visibility,
+      reviewedBy: session.principal.email || session.principal.userId,
+      reviewedAt: now,
+      publishedAt: visibility === "published" ? now : undefined,
+      reason: readRequired(formData, "reason"),
+    });
+    revalidateServerSurfaces(serverId);
+    revalidatePath("/admin/audit");
+    return {
+      status: "success",
+      message: `${server.displayName} 서버를 ${marketLifecycleActionLabel(marketAction)} 상태로 변경했습니다.`,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: formatApiError(error),
     };
   }
 }
@@ -372,6 +457,89 @@ function readCsvOptional(formData: FormData, name: string) {
     .filter((item) => item.length > 0);
 
   return items.length > 0 ? items : undefined;
+}
+
+function readDelimitedList(formData: FormData, name: string) {
+  return parseDelimitedList(readOptional(formData, name));
+}
+
+function readMarketCategory(formData: FormData, name: string): MarketCategory {
+  const value = readRequired(formData, name);
+  if (isMarketCategory(value)) {
+    return value;
+  }
+
+  throw new Error(`${name}이(가) 올바르지 않습니다`);
+}
+
+function readInstallMethods(formData: FormData): InstallMethod[] {
+  const values = formData.getAll("installMethods");
+  const methods = values.map((value) => {
+    if (typeof value !== "string" || !isInstallMethod(value)) {
+      throw new Error("installMethods가 올바르지 않습니다");
+    }
+
+    return value;
+  });
+
+  if (methods.length === 0) {
+    throw new Error("installMethods는 하나 이상 선택해야 합니다");
+  }
+
+  return Array.from(new Set(methods));
+}
+
+function readMarketTrustLevel(formData: FormData, name: string): MarketTrustLevel {
+  const value = readRequired(formData, name);
+  if (isMarketTrustLevel(value)) {
+    return value;
+  }
+
+  throw new Error(`${name}이(가) 올바르지 않습니다`);
+}
+
+function readMarketVisibility(formData: FormData, name: string): MarketVisibility {
+  const value = readRequired(formData, name);
+  if (isMarketVisibility(value)) {
+    return value;
+  }
+
+  throw new Error(`${name}이(가) 올바르지 않습니다`);
+}
+
+type MarketLifecycleAction = "publish" | "unpublish" | "quarantine" | "unquarantine";
+
+function readMarketLifecycleAction(formData: FormData): MarketLifecycleAction {
+  const value = readRequired(formData, "marketAction");
+  if (value === "publish" || value === "unpublish" || value === "quarantine" || value === "unquarantine") {
+    return value;
+  }
+
+  throw new Error("marketAction이 올바르지 않습니다");
+}
+
+function visibilityForLifecycleAction(action: MarketLifecycleAction): MarketVisibility {
+  if (action === "publish") {
+    return "published";
+  }
+
+  if (action === "quarantine") {
+    return "quarantined";
+  }
+
+  return "internal";
+}
+
+function marketLifecycleActionLabel(action: MarketLifecycleAction) {
+  if (action === "publish") {
+    return "게시됨";
+  }
+
+  if (action === "quarantine") {
+    return "격리됨";
+  }
+
+  return "내부 공개";
 }
 
 function readEnvironment(formData: FormData): Environment {

@@ -533,6 +533,19 @@ button.button {
   text-transform: uppercase;
 }
 
+.field-label,
+.form-card legend {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+fieldset.form-card {
+  margin: 0;
+}
+
 input,
 select,
 textarea {
@@ -719,6 +732,13 @@ textarea:focus {
   align-items: start;
   margin-top: var(--space-4);
   color: var(--color-warning);
+}
+
+.registration-market-section,
+.registration-checkbox-group,
+.market-lifecycle-form,
+.market-lifecycle-summary {
+  margin-top: var(--space-4);
 }
 
 input[type="checkbox"] {

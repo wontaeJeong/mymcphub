@@ -13,7 +13,7 @@ const userNavItems = [
 
 const adminNavItems = [
   ["관리자 홈", "/admin"],
-  ["서버 관리", "/admin/servers"],
+  ["카탈로그 관리", "/admin/servers"],
   ["승인 대기열", "/admin/approvals"],
   ["감사 로그", "/admin/audit"],
   ["운영 상태", "/admin/operations"],

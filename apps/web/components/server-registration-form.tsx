@@ -4,6 +4,12 @@ import { useActionState } from "react";
 
 import { createServerAction } from "../app/actions";
 import { initialFormActionState } from "../app/action-state";
+import {
+  installMethodOptions,
+  marketCategoryOptions,
+  marketTrustLevelOptions,
+  marketVisibilityOptions,
+} from "../lib/market";
 
 export function ServerRegistrationForm() {
   const [state, formAction, pending] = useActionState(createServerAction, initialFormActionState);
@@ -15,7 +21,7 @@ export function ServerRegistrationForm() {
       <div className="form-grid">
         <div className="field">
           <label htmlFor="registerSlug">슬러그</label>
-          <input id="registerSlug" name="slug" required pattern="[a-z0-9-]+" placeholder="internal-tools" />
+          <input id="registerSlug" name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="internal-tools" />
         </div>
         <div className="field">
           <label htmlFor="registerDisplayName">표시 이름</label>
@@ -61,6 +67,75 @@ export function ServerRegistrationForm() {
         <label htmlFor="registerUpstreamUrl">업스트림 URL</label>
         <input id="registerUpstreamUrl" name="upstreamUrl" type="url" placeholder="stdio 어댑터는 선택 사항" />
       </div>
+      <fieldset className="form-card registration-market-section">
+        <legend>마켓 메타데이터</legend>
+        <p>내부 MCP Market에서 검색, 검토, 게시 상태 판단에 사용할 카탈로그 정보를 함께 등록합니다.</p>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="registerCategory">카테고리</label>
+            <select id="registerCategory" name="category" required defaultValue="other">
+              {marketCategoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="registerTrustLevel">신뢰 수준</label>
+            <select id="registerTrustLevel" name="trustLevel" required defaultValue="community">
+              {marketTrustLevelOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="registerVisibility">노출 상태</label>
+            <select id="registerVisibility" name="visibility" required defaultValue="internal">
+              {marketVisibilityOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="registerDocsUrl">문서 URL</label>
+            <input id="registerDocsUrl" name="docsUrl" type="url" placeholder="https://docs.example.test/server" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerSourceUrl">소스 URL</label>
+            <input id="registerSourceUrl" name="sourceUrl" type="url" placeholder="https://github.example.test/team/server" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerTags">태그</label>
+            <textarea id="registerTags" name="tags" placeholder="kubernetes, runbook 또는 줄바꿈으로 입력" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerSummary">마켓 요약</label>
+            <textarea id="registerSummary" name="summary" placeholder="카탈로그 카드와 상세에 표시할 짧은 요약" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerUseCases">사용 사례</label>
+            <textarea id="registerUseCases" name="useCases" placeholder="incident triage&#10;deployment review" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerPrerequisites">사전 조건</label>
+            <textarea id="registerPrerequisites" name="prerequisites" placeholder="VPN, 팀 권한, 읽기 전용 토큰" />
+          </div>
+          <div className="field">
+            <label htmlFor="registerSecurityNotes">보안 메모</label>
+            <textarea id="registerSecurityNotes" name="securityNotes" placeholder="민감 데이터 범위, 토큰/시크릿 취급 메모" />
+          </div>
+        </div>
+        <div className="field registration-checkbox-group">
+          <span className="field-label">설치 방법</span>
+          <div className="actions">
+            {installMethodOptions.map((option) => (
+              <label className="danger-confirm registration-toggle" key={option.value}>
+                <input type="checkbox" name="installMethods" value={option.value} defaultChecked={option.value === "gateway"} />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </fieldset>
       <label className="danger-confirm registration-toggle">
         <input type="checkbox" name="enabled" defaultChecked />
         서버를 활성 상태로 등록합니다.
