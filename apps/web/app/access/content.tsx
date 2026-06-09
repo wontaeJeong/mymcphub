@@ -43,7 +43,7 @@ export async function AccessPageContent({
       <PageHero eyebrow="접근 요청 및 권한" title="추측 없는 권한 흐름." description={mode === "admin" ? "실제 제어 플레인 엔드포인트로 현재 권한을 검토하고, 권한 생성과 회수를 수행합니다." : "내게 보이는 권한을 검토하고 접근 승인 요청을 제출합니다. 권한 생성과 회수는 관리자 전용 흐름에 남습니다."} />
       <section>
         <SectionHeader title="현재 권한" description="/api/grants 데이터이며, 가능한 경우 서버 카탈로그와 로컬에서 결합합니다." />
-        {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} actionSlot={mode === "admin" ? GrantControls : undefined} /> : grants.ok ? <EmptyState title="권한 없음" description={mode === "user" ? "현재 사용자 또는 팀 식별자와 일치하는 권한이 없습니다." : "제어 플레인이 권한을 반환하지 않았습니다."} /> : <ErrorState message={grants.error} />}
+        {grants.ok && visibleGrants.length > 0 ? <GrantTable grants={visibleGrants} serverNameById={serverNameById} actionSlot={mode === "admin" ? GrantControls : undefined} audience={mode === "user" ? "user" : "admin-summary"} /> : grants.ok ? <EmptyState title="권한 없음" description={mode === "user" ? "현재 사용자 또는 팀 식별자와 일치하는 권한이 없습니다." : "제어 플레인이 권한을 반환하지 않았습니다."} /> : <ErrorState message={grants.error} />}
       </section>
       {mode === "user" ? (
         <section>

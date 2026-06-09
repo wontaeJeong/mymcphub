@@ -155,7 +155,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
       </section>
       <section>
         <SectionHeader title="도구" description="도구별 활성 상태, 위험도, 입력 스키마, 현재 사용자 관점의 접근 상태입니다." />
-        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} accessStatusByToolKey={accessStatusByToolKey} showSchema showAccess accessActionSlot={(tool, status) => <UserToolAccessAction server={server.data} tool={tool} status={status} />} /> : tools.ok ? <EmptyState title="발견된 도구 없음" description="서버는 존재하지만 제어 플레인이 도구를 반환하지 않았습니다." /> : <ErrorState message={tools.error} />}
+        {tools.ok && toolItems.length > 0 ? <ToolTable tools={toolItems} accessStatusByToolKey={accessStatusByToolKey} showSchema showAccess accessActionSlot={(tool, status) => <UserToolAccessAction server={server.data} tool={tool} status={status} />} audience="user" /> : tools.ok ? <EmptyState title="발견된 도구 없음" description="서버는 존재하지만 제어 플레인이 도구를 반환하지 않았습니다." /> : <ErrorState message={tools.error} />}
       </section>
       {tools.ok && toolItems.length > 0 ? (
         <section>
@@ -171,7 +171,7 @@ export default async function UserServerDetailPage({ params }: UserServerDetailP
               <p><strong>허용 도구 요약:</strong> {formatAllowedTools(visibleGrants)}</p>
               <p className="muted">권한이 있는 도구만 Gateway 정책에서 허용됩니다. 새 도구나 다른 환경은 별도 승인이 필요합니다.</p>
             </Surface>
-            <GrantTable grants={visibleGrants} serverNameById={serverNameById} />
+            <GrantTable grants={visibleGrants} serverNameById={serverNameById} audience="user" />
           </div>
         ) : grants.ok ? <EmptyState title="일치하는 권한 없음" description="이 도구 중 하나를 사용해야 한다면 접근을 요청하세요." action={<Link className="button" href={accessRequestHref}>접근 요청 열기</Link>} /> : <ErrorState message={grants.error} />}
       </section>

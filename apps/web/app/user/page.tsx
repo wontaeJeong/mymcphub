@@ -45,7 +45,7 @@ export default async function UserHomePage() {
       </section>
       <section>
         <SectionHeader title="내 표시 권한" description="Web 세션의 현재 사용자 또는 팀 식별자와 일치하는 권한만 표시합니다." action={<Link className="button" href="/user/access">내 권한 보기</Link>} />
-        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} /> : grants.ok ? <EmptyState title="표시 가능한 권한 없음" description="필요한 도구가 없다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
+        {grants.ok && userGrants.length > 0 ? <GrantTable grants={userGrants} serverNameById={serverNameById} audience="user" /> : grants.ok ? <EmptyState title="표시 가능한 권한 없음" description="필요한 도구가 없다면 접근을 요청하세요." /> : <ErrorState message={grants.error} />}
       </section>
     </div>
   );
