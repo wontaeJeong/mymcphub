@@ -105,11 +105,12 @@ export async function OperationsPageContent() {
         {denied.ok && deniedReasons.length > 0 ? (
           <div className="table-wrap">
             <table>
+              <caption>정책 거부 사유와 조정 안내</caption>
               <thead>
                 <tr>
-                  <th>사유</th>
-                  <th>수</th>
-                  <th>정책 조정 안내</th>
+                  <th scope="col">사유</th>
+                  <th scope="col">수</th>
+                  <th scope="col">정책 조정 안내</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,15 +170,16 @@ export async function OperationsPageContent() {
         {usage.ok && usageItems.length > 0 ? (
           <div className="table-wrap">
             <table>
+              <caption>일별 사용량 집계</caption>
               <thead>
                 <tr>
-                  <th>기간</th>
-                  <th>서버</th>
-                  <th>도구</th>
-                  <th>호출</th>
-                  <th>거부</th>
-                  <th>p95</th>
-                  <th>p99</th>
+                  <th scope="col">기간</th>
+                  <th scope="col">서버</th>
+                  <th scope="col">도구</th>
+                  <th scope="col">호출</th>
+                  <th scope="col">거부</th>
+                  <th scope="col">p95</th>
+                  <th scope="col">p99</th>
                 </tr>
               </thead>
               <tbody>

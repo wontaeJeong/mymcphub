@@ -29,7 +29,7 @@ export function ServerRegistrationForm() {
         </div>
         <div className="field">
           <label htmlFor="registerOwnerTeamId">소유 팀 ID</label>
-          <input id="registerOwnerTeamId" name="ownerTeamId" required placeholder="소유 팀 UUID" />
+          <input id="registerOwnerTeamId" name="ownerTeamId" required placeholder="소유 팀 식별자" />
         </div>
         <div className="field">
           <label htmlFor="registerEnvironment">환경</label>

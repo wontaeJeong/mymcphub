@@ -138,7 +138,7 @@ function ApprovalActions({
         </div>
         <div className="field">
           <label htmlFor={`expiresAt-${approval.id}`}>권한 만료</label>
-          <input id={`expiresAt-${approval.id}`} name="expiresAt" defaultValue={approval.requestedExpiresAt ?? ""} placeholder="선택 사항인 ISO 시각" />
+          <input id={`expiresAt-${approval.id}`} name="expiresAt" defaultValue={approval.requestedExpiresAt ?? ""} placeholder="예: 2026-06-30T09:00:00Z" />
         </div>
         <div className="field">
           <label htmlFor={`approveComment-${approval.id}`}>검토 의견</label>

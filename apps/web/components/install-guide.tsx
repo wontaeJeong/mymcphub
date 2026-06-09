@@ -68,7 +68,7 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
           <p>
             <strong>Gateway URL:</strong>{" "}
             <span className="muted">
-              정확한 호스트와 전체 URL은 /api/client-config/generate 응답에서 생성 후 확인합니다.
+              정확한 호스트와 전체 URL은 설정을 생성한 뒤 확인합니다.
             </span>
           </p>
           <p>
@@ -109,7 +109,7 @@ export function InstallGuide({ server, hasAccess, accessRequestHref }: InstallGu
         ) : (
           <EmptyState
             title="접근 요청 후 설정을 생성하세요"
-            description="현재 세션에 이 서버 권한이 없습니다. 먼저 접근 승인 요청을 제출한 뒤 생성된 gatewayUrl과 설정 JSON을 사용하세요."
+            description="현재 세션에 이 서버 권한이 없습니다. 먼저 접근 승인 요청을 제출한 뒤 생성된 게이트웨이 URL과 설정을 사용하세요."
             action={
               <Link className="button" href={accessRequestHref}>
                 접근 요청 열기

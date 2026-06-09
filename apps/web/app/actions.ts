@@ -133,7 +133,7 @@ export async function createServerAction(_previousState: FormActionState, formDa
     revalidatePath("/admin");
     return {
       status: "success",
-      message: `${server.displayName} 서버를 /api/servers로 등록했습니다.`
+      message: `${server.displayName} 서버를 등록했습니다.`
     };
   } catch (error) {
     return {

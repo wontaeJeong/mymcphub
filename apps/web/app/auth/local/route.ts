@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     return redirectWithError(request, "invalid_credentials", nextPath);
   }
   clearLoginFailures(rateKey);
-  const response = NextResponse.redirect(new URL(nextPath, request.url));
+  const response = NextResponse.redirect(new URL(nextPath, request.url), 303);
   setSessionCookie(response, request, localUserToPrincipal(user));
   return response;
 }
@@ -36,7 +36,7 @@ function redirectWithError(request: NextRequest, error: string, nextPath = "/use
   const url = new URL("/login", request.url);
   url.searchParams.set("error", error);
   url.searchParams.set("next", sanitizeRedirectPath(nextPath));
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 303);
 }
 
 function readFormValue(formData: FormData, name: string) {

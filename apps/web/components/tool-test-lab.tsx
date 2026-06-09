@@ -20,7 +20,7 @@ export function ToolTestLab({ options }: Readonly<{ options: ToolTestOption[] }>
   return (
     <form className="form-card test-lab" action={formAction}>
       <h2>도구 드라이런 테스트 랩</h2>
-      <p>정책 보호 `tools/call` 페이로드를 만들어 `/api/policy/test-call`로 전송합니다. 드라이런 모드는 업스트림 MCP 서버를 호출하지 않고 정책 결과와 로컬 마스킹 인자만 검토용으로 반환합니다.</p>
+      <p>도구 호출 예시를 만들어 정책 결과와 마스킹된 인자만 사전 점검합니다. 실제 업스트림 서버는 호출하지 않습니다.</p>
       {options.length > 0 ? (
         <>
           <input type="hidden" name="dryRun" value="true" />

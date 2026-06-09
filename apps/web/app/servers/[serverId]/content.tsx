@@ -159,7 +159,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
               </p>
             ) : (
               <p className="muted">
-                이 서버에 대한 /api/server-health 행이 반환되지 않았습니다.
+                이 서버에 대한 상태 확인 결과가 아직 없습니다.
               </p>
             )}
             <div className="actions">
@@ -199,7 +199,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <section>
         <SectionHeader
           title="서버 버전"
-          description="/api/servers/:serverId/versions의 읽기 전용 릴리스 상태입니다."
+          description="읽기 전용 릴리스 상태입니다."
         />
         {versions.ok && activeVersion ? (
           <div className="grid">
@@ -218,7 +218,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
       <section>
         <SectionHeader
           title="최근 감사 이벤트"
-          description="/api/audit-events에서 가져온 이 서버의 가장 최근 이벤트입니다."
+          description="이 서버의 가장 최근 감사 이벤트입니다."
         />
         {audit.ok && recentAudit.length > 0 ? (
           <AuditTable events={recentAudit} />

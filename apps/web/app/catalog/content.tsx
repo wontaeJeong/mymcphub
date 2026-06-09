@@ -68,7 +68,7 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
       <PageHero eyebrow={mode === "user" ? "MCP Market" : "MCP 서버 카탈로그"} title={mode === "user" ? "내부 MCP 서버를 발견하고 연결하세요." : "신뢰할 서버를 빠르게 찾으세요."} description={mode === "admin" ? "실시간 제어 플레인 카탈로그에서 MCP 서버의 마켓 메타데이터, 게시 상태, 검토 품질을 큐레이션합니다." : "검증 상태, 접근 가능 여부, 운영 상태를 함께 보며 필요한 MCP 서버를 찾습니다. 광고, 랭킹, skills 없이 내부 운영 목적의 탐색만 제공합니다."} />
       <form className="form-card" action={mode === "admin" ? "/admin/servers" : "/user/catalog"}>
         <h2>{mode === "user" ? "MCP Market 검색" : "카탈로그 검색 및 필터"}</h2>
-        <p>{mode === "user" ? "먼저 이름, 설명, 태그로 찾고 필요할 때만 고급 필터를 펼치세요." : "필터는 실제 /api/servers 데이터에 적용되며 상태와 카탈로그 메타데이터를 함께 표시합니다."}</p>
+        <p>{mode === "user" ? "먼저 이름, 설명, 태그로 찾고 필요할 때만 고급 필터를 펼치세요." : "필터는 실제 서버 카탈로그에 적용되며 상태와 카탈로그 메타데이터를 함께 표시합니다."}</p>
         <div className="filter-grid">
           <div className="field">
             <label htmlFor="catalogSearch">검색</label>
