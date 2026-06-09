@@ -10,7 +10,7 @@ pnpm security:check
 
 ## Allowed Script Scope
 
-- `scripts/dev`: local-only support such as infra startup and seed helpers.
+- `scripts/dev`: local-only executable helpers such as infra startup and seed helpers; dev config data lives under `../config/dev`.
 - `scripts/ci`: CI wrappers for Go, Web UI, schemas, and Helm.
 - `scripts/gen`: OpenAPI and JSON Schema generation/drift checks.
 - `scripts/release`: release helper scripts only.
