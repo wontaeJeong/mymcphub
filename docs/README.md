@@ -6,7 +6,7 @@ Use this index to find the smallest document set needed for the current work.
 
 | Doc                               | Use                                                                       |
 | --------------------------------- | ------------------------------------------------------------------------- |
-| [MVP Demo](MVP_DEMO.md)           | End-to-end demo order, expected screens, fallback steps, and demo checks. |
+| [MVP Demo](MVP_DEMO.md)           | End-to-end demo order, internal MCP Market screens, fallback steps, and demo checks. |
 | [Local Development](LOCAL_DEV.md) | Local stack startup, seed data, mock tokens, and reset flow.              |
 | [Testing](TESTING.md)             | Main validation commands and focused test suites.                         |
 | [Contracts](CONTRACTS.md)         | OpenAPI, JSON Schema, generated Web boundary, and generation checks.      |
@@ -15,7 +15,7 @@ Use this index to find the smallest document set needed for the current work.
 
 | Doc                                                   | Use                                                                                         |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [Architecture](ARCHITECTURE.md)                       | Current runtime planes, Go services, Web UI, schemas, and deployment shape.                  |
+| [Architecture](ARCHITECTURE.md)                       | Current runtime planes, Go services, internal MCP Market Web UI, schemas, and deployment shape. |
 | [Developer Guide](DEVELOPER_GUIDE.md)                 | Go conventions, fixtures, and validation surfaces.                                          |
 | [Data Model](DATA_MODEL.md)                           | Store areas, schema boundaries, and migration notes.                                        |
 | [Control Plane API](API.md)                           | Current API routes and local curl checks.                                                   |
