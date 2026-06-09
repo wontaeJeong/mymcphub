@@ -122,16 +122,16 @@ jobs:
       - web-ui
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - run: docker build -f deploy/container/apps/api/Dockerfile -t mcp-hub/api:${{ github.sha }} .
-      - run: docker build -f deploy/container/apps/gateway/Dockerfile -t mcp-hub/gateway:${{ github.sha }} .
-      - run: docker build -f deploy/container/apps/worker/Dockerfile -t mcp-hub/worker:${{ github.sha }} .
-      - run: docker build -f deploy/container/apps/cli/Dockerfile -t mcp-hub/mcphubctl:${{ github.sha }} .
-      - run: docker build -f deploy/container/apps/web/Dockerfile -t mcp-hub/web:${{ github.sha }} .
-      - run: docker build -f deploy/container/servers/k8s/Dockerfile -t mcp-hub/k8s-readonly:${{ github.sha }} .
-      - run: docker build -f deploy/container/servers/runtime-adapter/Dockerfile -t mcp-hub/runtime-adapter:${{ github.sha }} .
-      - run: docker build -f deploy/container/servers/github/Dockerfile -t mcp-hub/github-readonly:${{ github.sha }} .
-      - run: docker build -f deploy/container/servers/gitlab/Dockerfile -t mcp-hub/gitlab-readonly:${{ github.sha }} .
-      - run: docker build -f deploy/container/servers/internal-docs/Dockerfile -t mcp-hub/internal-docs-readonly:${{ github.sha }} .
+      - run: docker build -f apps/api/Dockerfile -t mcp-hub/api:${{ github.sha }} .
+      - run: docker build -f apps/gateway/Dockerfile -t mcp-hub/gateway:${{ github.sha }} .
+      - run: docker build -f apps/worker/Dockerfile -t mcp-hub/worker:${{ github.sha }} .
+      - run: docker build -f apps/cli/Dockerfile -t mcp-hub/mcphubctl:${{ github.sha }} .
+      - run: docker build -f apps/web/Dockerfile -t mcp-hub/web:${{ github.sha }} .
+      - run: docker build -f servers/k8s/Dockerfile -t mcp-hub/k8s-readonly:${{ github.sha }} .
+      - run: docker build -f servers/runtime-adapter/Dockerfile -t mcp-hub/runtime-adapter:${{ github.sha }} .
+      - run: docker build -f servers/github/Dockerfile -t mcp-hub/github-readonly:${{ github.sha }} .
+      - run: docker build -f servers/gitlab/Dockerfile -t mcp-hub/gitlab-readonly:${{ github.sha }} .
+      - run: docker build -f servers/internal-docs/Dockerfile -t mcp-hub/internal-docs-readonly:${{ github.sha }} .
       - run: scripts/security/scan-images.sh
         env:
           SECURITY_IMAGES: mcp-hub/api:${{ github.sha }},mcp-hub/gateway:${{ github.sha }},mcp-hub/worker:${{ github.sha }},mcp-hub/mcphubctl:${{ github.sha }},mcp-hub/web:${{ github.sha }},mcp-hub/k8s-readonly:${{ github.sha }},mcp-hub/runtime-adapter:${{ github.sha }},mcp-hub/github-readonly:${{ github.sha }},mcp-hub/gitlab-readonly:${{ github.sha }},mcp-hub/internal-docs-readonly:${{ github.sha }}
