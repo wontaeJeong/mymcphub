@@ -9,6 +9,22 @@ import type {
 } from "../lib/api";
 import type { StatusTone } from "@mcp-hub/ui";
 
+export const koreanGlossary = {
+  provider: "로그인 방식",
+  route: "화면 경로",
+  snippet: "설정 조각",
+  dryRun: "사전 점검",
+  stepUp: "추가 인증",
+  api: "API",
+  controlPlane: "제어 플레인",
+  gateway: "게이트웨이",
+  uuid: "UUID",
+  iso: "ISO 시간",
+  json: "JSON",
+  hash: "해시",
+  trace: "추적 ID"
+} as const;
+
 export function formatDate(value: string | undefined) {
   if (!value) {
     return "기록 없음";
