@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import type { WebSession } from "../lib/auth/session";
 
@@ -27,6 +30,7 @@ export type AppShellProps = Readonly<{
 }>;
 
 export function AppShell({ children, section, session }: AppShellProps) {
+  const pathname = usePathname();
   const navItems = section === "admin" ? adminNavItems : userNavItems;
   return (
     <div className="shell">
@@ -34,20 +38,27 @@ export function AppShell({ children, section, session }: AppShellProps) {
         <div className="brand">
           <p className="brand__eyebrow">{section === "admin" ? "관리 플레인" : "사용자 워크스페이스"}</p>
           <h1>MCP Hub</h1>
-          <p>{section === "admin" ? "보호된 관리자 콘솔에서 접근 승인, 감사, 서버 운영, 긴급 제어를 수행합니다." : "MCP 서버를 탐색하고 접근을 요청하며 사용자 워크스페이스에서 클라이언트 설정을 생성합니다."}</p>
+          <p>{section === "admin" ? "승인, 감사, 운영, 긴급 대응을 한곳에서 확인합니다." : "서버 탐색, 접근 요청, 클라이언트 설정을 빠르게 진행합니다."}</p>
         </div>
         <ThemeToggle />
         <nav className="nav" aria-label="주요 탐색">
-          {navItems.map(([label, href]) => (
-            <Link href={href} key={href}>
+          {navItems.map(([label, href]) => {
+            const isActive = pathname === href || (href !== `/${section}` && pathname.startsWith(`${href}/`));
+            return (
+            <Link aria-current={isActive ? "page" : undefined} href={href} key={href}>
               {label}
             </Link>
-          ))}
+            );
+          })}
         </nav>
         <div className="session-card">
           <p className="brand__eyebrow">로그인됨</p>
           <strong>{session.principal.displayName}</strong>
-          <p>{session.principal.email}</p>
+          <p>{session.principal.isPlatformAdmin ? "관리자 세션" : "사용자 세션"}</p>
+          <details className="schema-viewer">
+            <summary>계정 세부정보 보기</summary>
+            <p>{session.principal.email}</p>
+          </details>
           {session.principal.isPlatformAdmin ? <Link className="button button--ghost" href="/admin">관리자 영역</Link> : null}
           <form action="/auth/logout" method="post">
             <button className="button button--ghost" type="submit">로그아웃</button>
@@ -63,8 +74,8 @@ export function ForbiddenPanel() {
   return (
     <div className="error-state">
       <p className="eyebrow">403</p>
-      <h1>권한이 필요합니다.</h1>
-      <p>이 페이지에는 플랫폼 관리자 역할 또는 설정된 관리자 그룹 매핑이 필요합니다. 현재 세션은 인증되었지만 이 관리자 영역에 대한 권한이 없습니다.</p>
+      <h1>관리자 승인이 필요한 화면입니다.</h1>
+      <p>현재 계정으로는 이 관리자 화면을 열 수 없습니다. 필요한 작업이 있다면 플랫폼 관리자에게 접근 권한을 요청하세요.</p>
     </div>
   );
 }
