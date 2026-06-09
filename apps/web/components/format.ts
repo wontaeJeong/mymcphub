@@ -1,4 +1,12 @@
-import type { ApiApproval, PolicyEffect, RiskLevel, ServerVersionStatus } from "../lib/api";
+import type {
+  ApiApproval,
+  MarketCategory,
+  MarketTrustLevel,
+  MarketVisibility,
+  PolicyEffect,
+  RiskLevel,
+  ServerVersionStatus,
+} from "../lib/api";
 import type { StatusTone } from "@mcp-hub/ui";
 
 export function formatDate(value: string | undefined) {
@@ -140,6 +148,86 @@ export function formatTransport(transport: string) {
   return transport;
 }
 
+export function formatMarketCategory(category: MarketCategory) {
+  if (category === "developer_tools") {
+    return "개발 도구";
+  }
+
+  if (category === "api_development") {
+    return "API 개발";
+  }
+
+  if (category === "data_database") {
+    return "데이터·DB";
+  }
+
+  if (category === "cloud_infra") {
+    return "클라우드·인프라";
+  }
+
+  if (category === "observability") {
+    return "관측성";
+  }
+
+  if (category === "security_testing") {
+    return "보안·테스트";
+  }
+
+  if (category === "knowledge_docs") {
+    return "지식·문서";
+  }
+
+  if (category === "productivity_workflow") {
+    return "생산성·워크플로";
+  }
+
+  if (category === "browser_automation") {
+    return "브라우저 자동화";
+  }
+
+  if (category === "design_tools") {
+    return "디자인 도구";
+  }
+
+  return "기타";
+}
+
+export function formatMarketTrustLevel(trustLevel: MarketTrustLevel) {
+  if (trustLevel === "platform_supported") {
+    return "플랫폼 지원";
+  }
+
+  if (trustLevel === "official") {
+    return "공식";
+  }
+
+  if (trustLevel === "verified") {
+    return "검증됨";
+  }
+
+  return "커뮤니티";
+}
+
+export function formatMarketVisibility(visibility: MarketVisibility) {
+  if (visibility === "published") {
+    return "게시됨";
+  }
+
+  if (visibility === "internal") {
+    return "내부 공개";
+  }
+
+  if (visibility === "draft") {
+    return "초안";
+  }
+
+  if (visibility === "hidden") {
+    return "숨김";
+  }
+
+  return "격리됨";
+}
+
 export function formatToolCallStatus(status: string) {
   const normalized = status.toLowerCase();
   if (normalized === "ok" || normalized === "success" || normalized === "succeeded") {
@@ -236,6 +324,30 @@ export function approvalTone(status: ApiApproval["status"]): StatusTone {
 
   if (status === "cancelled" || status === "expired") {
     return "neutral";
+  }
+
+  return "danger";
+}
+
+export function marketTrustTone(trustLevel: MarketTrustLevel): StatusTone {
+  if (trustLevel === "platform_supported" || trustLevel === "official") {
+    return "success";
+  }
+
+  if (trustLevel === "verified") {
+    return "info";
+  }
+
+  return "neutral";
+}
+
+export function marketVisibilityTone(visibility: MarketVisibility): StatusTone {
+  if (visibility === "published" || visibility === "internal") {
+    return "success";
+  }
+
+  if (visibility === "draft" || visibility === "hidden") {
+    return "warning";
   }
 
   return "danger";

@@ -6,7 +6,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 const userNavItems = [
   ["사용자 홈", "/user"],
-  ["서버 카탈로그", "/user/catalog"],
+  ["MCP Market", "/user/catalog"],
   ["접근 권한", "/user/access"],
   ["클라이언트 설정", "/user/client-config"]
 ] as const;
