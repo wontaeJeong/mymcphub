@@ -51,6 +51,8 @@ Local seed data is code-backed in `internal/db.NewSeedStore` and mirrored for te
 | Granted tools | `list_namespaces`, `list_pods`, `get_pod`                    |
 | Local grant   | `00000000-0000-4000-8000-000000000200`                       |
 
+The seeded `k8s-readonly` entry also carries internal MCP Market metadata for local UX checks: category `cloud_infra`, trust level `platform_supported`, visibility `published`, install method `gateway`, Kubernetes/platform tags, and docs/install/security copy. These fields drive `/user/catalog`, `/user/servers/{serverId}`, `/admin/servers`, approval context, and client-config preselect demos.
+
 Mock tokens:
 
 ```sh
@@ -78,4 +80,4 @@ make build
 pnpm dev:smoke-test
 ```
 
-`pnpm dev:smoke-test` expects the local stack and Compose infrastructure to be running. The Go test suites under `tests/contract`, `tests/e2e`, `tests/load`, and `tests/migration` are offline and do not need running services.
+`pnpm dev:smoke-test` expects the local stack and Compose infrastructure to be running. It checks API readiness, catalog market metadata, server health, Gateway auth/tool calls, client-config generation through `/api/client-config/generate`, and audit creation/query. The Go test suites under `tests/contract`, `tests/e2e`, `tests/load`, and `tests/migration` are offline and do not need running services.
