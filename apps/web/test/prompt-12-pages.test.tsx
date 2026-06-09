@@ -200,13 +200,16 @@ describe("prompt-12 required web pages", () => {
     expect(matchesCatalogFilters(disabledServer, undefined, filters)).toBe(false);
 
     const html = renderToStaticMarkup(<ServerTable servers={[matchingServer]} healthByServerId={new Map([[health.serverId, health]])} />);
+    const adminHtml = renderToStaticMarkup(<ServerTable servers={[matchingServer]} healthByServerId={new Map([[health.serverId, health]])} audience="admin-summary" />);
 
     expect(html).toContain("Production Docs");
-    expect(html).toContain("prod-docs");
-    expect(html).toContain("team-platform");
-    expect(html).toContain("스트리밍 HTTP");
+    expect(html).not.toContain("<td>prod-docs</td>");
+    expect(html).not.toContain("team-platform");
+    expect(html).not.toContain("스트리밍 HTTP");
     expect(html).toContain("저하");
     expect(html).toContain("활성");
+    expect(adminHtml).toContain("prod-docs");
+    expect(adminHtml).toContain("소유 팀 보기");
   });
 
   it("covers server detail health, recent audit, and tool schema behavior", () => {
@@ -218,11 +221,13 @@ describe("prompt-12 required web pages", () => {
     expect(selectRecentServerAuditEvents([latestAudit, olderAudit])).toEqual([latestAudit]);
 
     const toolsHtml = renderToStaticMarkup(<ToolTable tools={[buildTool()]} showSchema />);
+    const adminToolsHtml = renderToStaticMarkup(<ToolTable tools={[buildTool()]} showSchema audience="admin-detail" />);
     const auditHtml = renderToStaticMarkup(<AuditTable events={selectRecentServerAuditEvents([latestAudit, olderAudit])} />);
 
     expect(toolsHtml).toContain("docs.search");
     expect(toolsHtml).toContain("Search internal documentation");
-    expect(toolsHtml).toContain("스키마 보기");
+    expect(toolsHtml).not.toContain("스키마 보기");
+    expect(adminToolsHtml).toContain("스키마 보기");
     expect(toolsHtml).toContain("비활성");
     expect(auditHtml).toContain("trace-latest");
     expect(auditHtml).not.toContain("trace-older");
