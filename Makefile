@@ -10,7 +10,7 @@ build:
 	pnpm -r --if-present build
 
 lint:
-	@test -z "$$(gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests 2>/dev/null)" || (gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests && exit 1)
+	@test -z "$$(gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests tools 2>/dev/null)" || (gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests tools && exit 1)
 	go vet ./...
 	pnpm -r --if-present lint
 
@@ -26,7 +26,7 @@ ci:
 	./scripts/security/check-all.sh
 
 fmt:
-	gofmt -w internal apps/api apps/gateway apps/worker apps/cli servers tests
+	gofmt -w internal apps/api apps/gateway apps/worker apps/cli servers tests tools
 	pnpm format
 
 gen-openapi:

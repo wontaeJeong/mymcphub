@@ -38,7 +38,7 @@ func writeJSON() {
 
 func writeTypeScriptClient() {
 	document := controlplane.OpenAPIDocument()
-	rawPaths, ok := document["paths"].(map[string]interface{})
+	rawPaths, ok := document["paths"].(map[string]any)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "runtime OpenAPI document has no paths object")
 		os.Exit(1)

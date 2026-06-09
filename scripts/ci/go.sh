@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-test -z "$(gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests 2>/dev/null)" || {
-  gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests
+test -z "$(gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests tools 2>/dev/null)" || {
+  gofmt -l internal apps/api apps/gateway apps/worker apps/cli servers tests tools
   exit 1
 }
 go vet ./...
