@@ -42,6 +42,8 @@ type CatalogPageProps = Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>;
 
+type CatalogFilters = Record<string, string | string[] | undefined>;
+
 export async function CatalogPageContent({ searchParams, mode }: CatalogPageProps & Readonly<{ mode: "user" | "admin" }>) {
   const filters = await searchParams;
   const serversPromise = loadResult(listServers());
@@ -65,122 +67,39 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
     <div className="page-stack">
       <PageHero eyebrow={mode === "user" ? "MCP Market" : "MCP 서버 카탈로그"} title={mode === "user" ? "내부 MCP 서버를 발견하고 연결하세요." : "신뢰할 서버를 빠르게 찾으세요."} description={mode === "admin" ? "실시간 제어 플레인 카탈로그에서 MCP 서버의 마켓 메타데이터, 게시 상태, 검토 품질을 큐레이션합니다." : "검증 상태, 접근 가능 여부, 운영 상태를 함께 보며 필요한 MCP 서버를 찾습니다. 광고, 랭킹, skills 없이 내부 운영 목적의 탐색만 제공합니다."} />
       <form className="form-card" action={mode === "admin" ? "/admin/servers" : "/user/catalog"}>
-        <h2>{mode === "user" ? "MCP Market 검색 및 필터" : "카탈로그 검색 및 필터"}</h2>
-        <p>필터는 실제 /api/servers 데이터에 적용되며, 사용 가능한 경우 /api/server-health 상태와 현재 세션 권한이 함께 표시됩니다.</p>
+        <h2>{mode === "user" ? "MCP Market 검색" : "카탈로그 검색 및 필터"}</h2>
+        <p>{mode === "user" ? "먼저 이름, 설명, 태그로 찾고 필요할 때만 고급 필터를 펼치세요." : "필터는 실제 /api/servers 데이터에 적용되며 상태와 카탈로그 메타데이터를 함께 표시합니다."}</p>
         <div className="filter-grid">
           <div className="field">
             <label htmlFor="catalogSearch">검색</label>
-            <input id="catalogSearch" name="q" defaultValue={readFilter(filters, "q")} placeholder="슬러그, 이름, 소유자, 설명, 태그" />
+            <input id="catalogSearch" name="q" defaultValue={readFilter(filters, "q")} placeholder="이름, 설명, 태그" />
           </div>
-          {mode === "user" ? (
-            <>
-              <div className="field">
-                <label htmlFor="catalogCategory">카테고리</label>
-                <select id="catalogCategory" name="category" defaultValue={readFilter(filters, "category")}>
-                  <option value="">전체</option>
-                  <option value="developer_tools">개발 도구</option>
-                  <option value="api_development">API 개발</option>
-                  <option value="data_database">데이터·DB</option>
-                  <option value="cloud_infra">클라우드·인프라</option>
-                  <option value="observability">관측성</option>
-                  <option value="security_testing">보안·테스트</option>
-                  <option value="knowledge_docs">지식·문서</option>
-                  <option value="productivity_workflow">생산성·워크플로</option>
-                  <option value="browser_automation">브라우저 자동화</option>
-                  <option value="design_tools">디자인 도구</option>
-                  <option value="other">기타</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="catalogTag">태그 검색</label>
-                <input id="catalogTag" name="tag" defaultValue={readFilter(filters, "tag")} placeholder="예: docs, ci, database" />
-              </div>
-            </>
-          ) : null}
-          <div className="field">
-            <label htmlFor="catalogEnvironment">환경</label>
-            <select id="catalogEnvironment" name="environment" defaultValue={readFilter(filters, "environment")}>
-              <option value="">전체</option>
-              <option value="dev">개발</option>
-              <option value="stg">스테이징</option>
-              <option value="prod">운영</option>
-              <option value="shared">공용</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="catalogTransport">전송 방식</label>
-            <select id="catalogTransport" name="transport" defaultValue={readFilter(filters, "transport")}>
-              <option value="">전체</option>
-              <option value="streamable_http">스트리밍 HTTP</option>
-              <option value="sse_legacy">레거시 SSE</option>
-              <option value="stdio_adapter">stdio 어댑터</option>
-              <option value="external">외부</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="catalogRisk">위험도</label>
-            <select id="catalogRisk" name="risk" defaultValue={readFilter(filters, "risk")}>
-              <option value="">전체</option>
-              <option value="low">낮음</option>
-              <option value="medium">중간</option>
-              <option value="high">높음</option>
-              <option value="critical">심각</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="catalogHealth">상태</label>
-            <select id="catalogHealth" name="health" defaultValue={readFilter(filters, "health")}>
-              <option value="">전체</option>
-              <option value="healthy">정상</option>
-              <option value="degraded">저하</option>
-              <option value="unhealthy">비정상</option>
-              <option value="unavailable">확인 불가</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="catalogEnabled">활성 상태</label>
-            <select id="catalogEnabled" name="enabled" defaultValue={readFilter(filters, "enabled")}>
-              <option value="">{mode === "user" ? "기본(활성)" : "전체"}</option>
-              <option value="enabled">활성</option>
-              <option value="disabled">비활성</option>
-            </select>
-          </div>
-          {mode === "user" ? (
-            <>
-              <div className="field">
-                <label htmlFor="catalogTrust">신뢰 수준</label>
-                <select id="catalogTrust" name="trust" defaultValue={readFilter(filters, "trust")}>
-                  <option value="">전체</option>
-                  <option value="verified_only">검증된 항목만</option>
-                  <option value="community">커뮤니티</option>
-                  <option value="verified">검증됨</option>
-                  <option value="official">공식</option>
-                  <option value="platform_supported">플랫폼 지원</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="catalogAccess">접근 상태</label>
-                <select id="catalogAccess" name="access" defaultValue={readFilter(filters, "access")}>
-                  <option value="">전체</option>
-                  <option value="accessible">접근 가능</option>
-                  <option value="request_required">접근 요청 필요</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="catalogVisibility">게시/노출</label>
-                <select id="catalogVisibility" name="visibility" defaultValue={readFilter(filters, "visibility")}>
-                  <option value="">기본 노출</option>
-                  <option value="all">전체 보기</option>
-                  <option value="published">게시됨</option>
-                  <option value="internal">내부 공개</option>
-                  <option value="draft">초안</option>
-                  <option value="hidden">숨김</option>
-                  <option value="quarantined">격리됨</option>
-                </select>
-              </div>
-            </>
-          ) : null}
+          {mode === "user" ? <CatalogCategoryField filters={filters} /> : null}
+          {mode === "user" ? <CatalogAccessField filters={filters} /> : null}
         </div>
+        {mode === "user" ? (
+          <details className="schema-viewer">
+            <summary>고급 필터 열기</summary>
+            <div className="filter-grid">
+              <CatalogTagField filters={filters} />
+              <CatalogEnvironmentField filters={filters} />
+              <CatalogTransportField filters={filters} />
+              <CatalogRiskField filters={filters} />
+              <CatalogHealthField filters={filters} />
+              <CatalogEnabledField filters={filters} mode={mode} />
+              <CatalogTrustField filters={filters} />
+              <CatalogVisibilityField filters={filters} />
+            </div>
+          </details>
+        ) : (
+          <div className="filter-grid">
+            <CatalogEnvironmentField filters={filters} />
+            <CatalogTransportField filters={filters} />
+            <CatalogRiskField filters={filters} />
+            <CatalogHealthField filters={filters} />
+            <CatalogEnabledField filters={filters} mode={mode} />
+          </div>
+        )}
         <div className="form-actions">
           <button className="button" type="submit">필터 적용</button>
           <a className="button button--ghost" href={mode === "admin" ? "/admin/servers" : "/user/catalog"}>초기화</a>
@@ -200,6 +119,156 @@ export async function CatalogPageContent({ searchParams, mode }: CatalogPageProp
         ) : servers.ok && filteredServers.length > 0 ? <ServerTable servers={filteredServers} healthByServerId={healthByServerId} serverBasePath={mode === "admin" ? "/admin/servers" : "/user/servers"} showMarketCuration={mode === "admin"} audience={mode === "admin" ? "admin-summary" : "user"} /> : servers.ok && serverItems.length > 0 ? <EmptyState title="일치하는 서버 없음" description="제어 플레인이 서버를 반환했지만 선택한 필터와 일치하는 항목이 없습니다." /> : servers.ok ? <EmptyState title="등록된 서버 없음" description="제어 플레인이 빈 카탈로그를 반환했습니다. UI는 시드 데이터를 주입하지 않습니다." /> : <ErrorState message={servers.error} />}
       </section>
       {mode === "admin" ? <ServerRegistrationForm /> : null}
+    </div>
+  );
+}
+
+function CatalogCategoryField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogCategory">카테고리</label>
+      <select id="catalogCategory" name="category" defaultValue={readFilter(filters, "category")}>
+        <option value="">전체</option>
+        <option value="developer_tools">개발 도구</option>
+        <option value="api_development">API 개발</option>
+        <option value="data_database">데이터·DB</option>
+        <option value="cloud_infra">클라우드·인프라</option>
+        <option value="observability">관측성</option>
+        <option value="security_testing">보안·테스트</option>
+        <option value="knowledge_docs">지식·문서</option>
+        <option value="productivity_workflow">생산성·워크플로</option>
+        <option value="browser_automation">브라우저 자동화</option>
+        <option value="design_tools">디자인 도구</option>
+        <option value="other">기타</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogAccessField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogAccess">접근 상태</label>
+      <select id="catalogAccess" name="access" defaultValue={readFilter(filters, "access")}>
+        <option value="">전체</option>
+        <option value="accessible">접근 가능</option>
+        <option value="request_required">접근 요청 필요</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogTagField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogTag">태그 검색</label>
+      <input id="catalogTag" name="tag" defaultValue={readFilter(filters, "tag")} placeholder="예: docs, ci, database" />
+    </div>
+  );
+}
+
+function CatalogEnvironmentField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogEnvironment">환경</label>
+      <select id="catalogEnvironment" name="environment" defaultValue={readFilter(filters, "environment")}>
+        <option value="">전체</option>
+        <option value="dev">개발</option>
+        <option value="stg">스테이징</option>
+        <option value="prod">운영</option>
+        <option value="shared">공용</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogTransportField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogTransport">전송 방식</label>
+      <select id="catalogTransport" name="transport" defaultValue={readFilter(filters, "transport")}>
+        <option value="">전체</option>
+        <option value="streamable_http">스트리밍 HTTP</option>
+        <option value="sse_legacy">레거시 SSE</option>
+        <option value="stdio_adapter">stdio 어댑터</option>
+        <option value="external">외부</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogRiskField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogRisk">위험도</label>
+      <select id="catalogRisk" name="risk" defaultValue={readFilter(filters, "risk")}>
+        <option value="">전체</option>
+        <option value="low">낮음</option>
+        <option value="medium">중간</option>
+        <option value="high">높음</option>
+        <option value="critical">심각</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogHealthField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogHealth">상태</label>
+      <select id="catalogHealth" name="health" defaultValue={readFilter(filters, "health")}>
+        <option value="">전체</option>
+        <option value="healthy">정상</option>
+        <option value="degraded">저하</option>
+        <option value="unhealthy">비정상</option>
+        <option value="unavailable">확인 불가</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogEnabledField({ filters, mode }: Readonly<{ filters: CatalogFilters; mode: "user" | "admin" }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogEnabled">활성 상태</label>
+      <select id="catalogEnabled" name="enabled" defaultValue={readFilter(filters, "enabled")}>
+        <option value="">{mode === "user" ? "기본(활성)" : "전체"}</option>
+        <option value="enabled">활성</option>
+        <option value="disabled">비활성</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogTrustField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogTrust">신뢰 수준</label>
+      <select id="catalogTrust" name="trust" defaultValue={readFilter(filters, "trust")}>
+        <option value="">전체</option>
+        <option value="verified_only">검증된 항목만</option>
+        <option value="community">커뮤니티</option>
+        <option value="verified">검증됨</option>
+        <option value="official">공식</option>
+        <option value="platform_supported">플랫폼 지원</option>
+      </select>
+    </div>
+  );
+}
+
+function CatalogVisibilityField({ filters }: Readonly<{ filters: CatalogFilters }>) {
+  return (
+    <div className="field">
+      <label htmlFor="catalogVisibility">게시/노출</label>
+      <select id="catalogVisibility" name="visibility" defaultValue={readFilter(filters, "visibility")}>
+        <option value="">기본 노출</option>
+        <option value="all">전체 보기</option>
+        <option value="published">게시됨</option>
+        <option value="internal">내부 공개</option>
+        <option value="draft">초안</option>
+        <option value="hidden">숨김</option>
+        <option value="quarantined">격리됨</option>
+      </select>
     </div>
   );
 }
@@ -281,8 +350,7 @@ function ServerMarketCard({ server, health, accessible }: Readonly<{
       ) : <p className="muted">태그 없음</p>}
       <div className="market-card__actions">
         <Link className="button" href={`/user/servers/${server.id}`}>상세 보기</Link>
-        {accessible ? <Link className="button button--ghost" href="/user/client-config">설정 생성</Link> : <Link className="button button--ghost" href="/user/access">접근 요청</Link>}
-        {!accessible ? <Link className="button button--ghost" href="/user/client-config">설정 생성</Link> : null}
+        {accessible ? <Link className="button button--ghost" href={`/user/client-config?serverId=${encodeURIComponent(server.id)}`}>설정 생성</Link> : <Link className="button button--ghost" href={`/user/access?serverId=${encodeURIComponent(server.id)}&environment=${encodeURIComponent(server.environment)}`}>접근 요청</Link>}
       </div>
     </article>
   );
