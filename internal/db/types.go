@@ -27,6 +27,50 @@ const (
 	TransportExternal       ServerTransport = "external"
 )
 
+type MarketCategory string
+
+const (
+	MarketCategoryDeveloperTools       MarketCategory = "developer_tools"
+	MarketCategoryAPIDevelopment       MarketCategory = "api_development"
+	MarketCategoryDataDatabase         MarketCategory = "data_database"
+	MarketCategoryCloudInfra           MarketCategory = "cloud_infra"
+	MarketCategoryObservability        MarketCategory = "observability"
+	MarketCategorySecurityTesting      MarketCategory = "security_testing"
+	MarketCategoryKnowledgeDocs        MarketCategory = "knowledge_docs"
+	MarketCategoryProductivityWorkflow MarketCategory = "productivity_workflow"
+	MarketCategoryBrowserAutomation    MarketCategory = "browser_automation"
+	MarketCategoryDesignTools          MarketCategory = "design_tools"
+	MarketCategoryOther                MarketCategory = "other"
+)
+
+type InstallMethod string
+
+const (
+	InstallMethodRemoteHTTP InstallMethod = "remote_http"
+	InstallMethodStdio      InstallMethod = "stdio"
+	InstallMethodDocker     InstallMethod = "docker"
+	InstallMethodGateway    InstallMethod = "gateway"
+)
+
+type MarketTrustLevel string
+
+const (
+	MarketTrustCommunity         MarketTrustLevel = "community"
+	MarketTrustVerified          MarketTrustLevel = "verified"
+	MarketTrustOfficial          MarketTrustLevel = "official"
+	MarketTrustPlatformSupported MarketTrustLevel = "platform_supported"
+)
+
+type MarketVisibility string
+
+const (
+	MarketVisibilityDraft       MarketVisibility = "draft"
+	MarketVisibilityInternal    MarketVisibility = "internal"
+	MarketVisibilityPublished   MarketVisibility = "published"
+	MarketVisibilityHidden      MarketVisibility = "hidden"
+	MarketVisibilityQuarantined MarketVisibility = "quarantined"
+)
+
 type PolicyEffect string
 
 const (
@@ -75,21 +119,36 @@ type OAuthClient struct {
 }
 
 type MCPServer struct {
-	ID          string          `json:"id"`
-	Slug        string          `json:"slug"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description,omitempty"`
-	OwnerTeamID string          `json:"ownerTeamId"`
-	Environment Environment     `json:"environment"`
-	Transport   ServerTransport `json:"transport"`
-	UpstreamURL string          `json:"upstreamUrl,omitempty"`
-	TimeoutMS   int             `json:"timeoutMs,omitempty"`
-	Enabled     bool            `json:"enabled"`
-	Published   bool            `json:"published"`
-	Quarantined bool            `json:"quarantined"`
-	RiskLevel   RiskLevel       `json:"riskLevel"`
-	CreatedAt   string          `json:"createdAt"`
-	UpdatedAt   string          `json:"updatedAt"`
+	ID             string           `json:"id"`
+	Slug           string           `json:"slug"`
+	DisplayName    string           `json:"displayName"`
+	Description    string           `json:"description,omitempty"`
+	OwnerTeamID    string           `json:"ownerTeamId"`
+	Environment    Environment      `json:"environment"`
+	Transport      ServerTransport  `json:"transport"`
+	UpstreamURL    string           `json:"upstreamUrl,omitempty"`
+	TimeoutMS      int              `json:"timeoutMs,omitempty"`
+	Enabled        bool             `json:"enabled"`
+	Published      bool             `json:"published"`
+	Quarantined    bool             `json:"quarantined"`
+	RiskLevel      RiskLevel        `json:"riskLevel"`
+	Category       MarketCategory   `json:"category"`
+	Tags           []string         `json:"tags"`
+	Summary        string           `json:"summary"`
+	UseCases       []string         `json:"useCases"`
+	DocsURL        string           `json:"docsUrl,omitempty"`
+	SourceURL      string           `json:"sourceUrl,omitempty"`
+	IconURL        string           `json:"iconUrl,omitempty"`
+	InstallMethods []InstallMethod  `json:"installMethods"`
+	Prerequisites  []string         `json:"prerequisites"`
+	SecurityNotes  []string         `json:"securityNotes"`
+	TrustLevel     MarketTrustLevel `json:"trustLevel"`
+	Visibility     MarketVisibility `json:"visibility"`
+	ReviewedBy     string           `json:"reviewedBy,omitempty"`
+	ReviewedAt     string           `json:"reviewedAt,omitempty"`
+	PublishedAt    string           `json:"publishedAt,omitempty"`
+	CreatedAt      string           `json:"createdAt"`
+	UpdatedAt      string           `json:"updatedAt"`
 }
 
 type MCPTool struct {

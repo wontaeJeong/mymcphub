@@ -23,12 +23,58 @@ paths:
         - { name: transport, in: query, schema: { enum: [streamable_http, sse_legacy, stdio_adapter, external] } }
         - { name: enabled, in: query, schema: { type: boolean } }
         - { name: published, in: query, schema: { type: boolean } }
+        - { name: category, in: query, schema: { $ref: "#/components/schemas/MarketCategory" } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: trust_level, in: query, schema: { $ref: "#/components/schemas/MarketTrustLevel" } }
+        - { name: visibility, in: query, schema: { $ref: "#/components/schemas/MarketVisibility" } }
+        - { name: install_method, in: query, schema: { $ref: "#/components/schemas/InstallMethod" } }
         - { name: q, in: query, schema: { type: string } }
-      responses: { "200": { description: Paginated server list } }
-    post: { summary: Register MCP server, x-audit-event-required: true, responses: { "201": { description: Created server }, "403": { description: Platform admin required } } }
+      responses:
+        "200":
+          description: Paginated server list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServerListResponse" }
+    post:
+      summary: Register MCP server
+      x-audit-event-required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerCreateInput" }
+      responses:
+        "201":
+          description: Created server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "403": { description: Platform admin required }
   /api/servers/{serverId}:
-    get: { summary: Get MCP server, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Server } } }
-    patch: { summary: Patch MCP server, x-audit-event-required: true, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Updated server } } }
+    get:
+      summary: Get MCP server
+      parameters: [ { $ref: "#/components/parameters/serverId" } ]
+      responses:
+        "200":
+          description: Server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+    patch:
+      summary: Patch MCP server
+      x-audit-event-required: true
+      parameters: [ { $ref: "#/components/parameters/serverId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerPatchInput" }
+      responses:
+        "200":
+          description: Updated server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
     delete: { summary: Delete MCP server, x-audit-event-required: true, parameters: [ { $ref: "#/components/parameters/serverId" } ], responses: { "200": { description: Deleted server } } }
   /api/servers/{serverId}/publish:
     post:
@@ -419,6 +465,132 @@ components:
   parameters:
     serverId: { name: serverId, in: path, required: true, schema: { type: string } }
   schemas:
+    MarketCategory:
+      enum:
+        - developer_tools
+        - api_development
+        - data_database
+        - cloud_infra
+        - observability
+        - security_testing
+        - knowledge_docs
+        - productivity_workflow
+        - browser_automation
+        - design_tools
+        - other
+    MarketVisibility:
+      enum: [draft, internal, published, hidden, quarantined]
+    MarketTrustLevel:
+      enum: [community, verified, official, platform_supported]
+    InstallMethod:
+      enum: [remote_http, stdio, docker, gateway]
+    McpServer:
+      type: object
+      required:
+        - id
+        - slug
+        - displayName
+        - ownerTeamId
+        - environment
+        - transport
+        - enabled
+        - published
+        - quarantined
+        - riskLevel
+        - category
+        - tags
+        - summary
+        - useCases
+        - installMethods
+        - prerequisites
+        - securityNotes
+        - trustLevel
+        - visibility
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        displayName: { type: string }
+        description: { type: string }
+        ownerTeamId: { type: string }
+        environment: { enum: [dev, stg, prod, shared] }
+        transport: { enum: [streamable_http, sse_legacy, stdio_adapter, external] }
+        upstreamUrl: { type: string, format: uri }
+        timeoutMs: { type: integer, minimum: 1 }
+        enabled: { type: boolean }
+        published: { type: boolean }
+        quarantined: { type: boolean }
+        riskLevel: { enum: [low, medium, high, critical] }
+        category: { $ref: "#/components/schemas/MarketCategory" }
+        tags: { type: array, items: { type: string } }
+        summary: { type: string }
+        useCases: { type: array, items: { type: string } }
+        docsUrl: { type: string, format: uri }
+        sourceUrl: { type: string, format: uri }
+        iconUrl: { type: string, format: uri }
+        installMethods: { type: array, items: { $ref: "#/components/schemas/InstallMethod" } }
+        prerequisites: { type: array, items: { type: string } }
+        securityNotes: { type: array, items: { type: string } }
+        trustLevel: { $ref: "#/components/schemas/MarketTrustLevel" }
+        visibility: { $ref: "#/components/schemas/MarketVisibility" }
+        reviewedBy: { type: string }
+        reviewedAt: { type: string, format: date-time }
+        publishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    McpServerToolInput:
+      type: object
+      required: [name, inputSchema]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        enabled: { type: boolean }
+        riskLevel: { enum: [low, medium, high, critical] }
+        inputSchema: { type: object }
+    McpServerCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/McpServerPatchInput"
+        - type: object
+          required: [slug, displayName, ownerTeamId, tools]
+          properties:
+            slug: { type: string }
+            displayName: { type: string }
+            ownerTeamId: { type: string }
+            environment: { enum: [dev, stg, prod, shared] }
+            transport: { enum: [streamable_http, sse_legacy, stdio_adapter, external] }
+            upstreamUrl: { type: string, format: uri }
+            enabled: { type: boolean }
+            riskLevel: { enum: [low, medium, high, critical] }
+            tools: { type: array, items: { $ref: "#/components/schemas/McpServerToolInput" } }
+    McpServerPatchInput:
+      type: object
+      properties:
+        displayName: { type: string }
+        description: { type: string }
+        enabled: { type: boolean }
+        timeoutMs: { type: integer, minimum: 1 }
+        category: { $ref: "#/components/schemas/MarketCategory" }
+        tags: { type: array, items: { type: string } }
+        summary: { type: string }
+        useCases: { type: array, items: { type: string } }
+        docsUrl: { type: string, format: uri }
+        sourceUrl: { type: string, format: uri }
+        iconUrl: { type: string, format: uri }
+        installMethods: { type: array, items: { $ref: "#/components/schemas/InstallMethod" } }
+        prerequisites: { type: array, items: { type: string } }
+        securityNotes: { type: array, items: { type: string } }
+        trustLevel: { $ref: "#/components/schemas/MarketTrustLevel" }
+        visibility: { $ref: "#/components/schemas/MarketVisibility" }
+        reviewedBy: { type: string }
+        reviewedAt: { type: string, format: date-time }
+        publishedAt: { type: string, format: date-time }
+    McpServerListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ListResponse"
+        - type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/McpServer" } }
     ErrorResponse:
       type: object
       required: [error, traceId]

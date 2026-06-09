@@ -13,6 +13,30 @@ export type ServerTransport =
   | "sse_legacy"
   | "stdio_adapter"
   | "external";
+export type MarketCategory =
+  | "developer_tools"
+  | "api_development"
+  | "data_database"
+  | "cloud_infra"
+  | "observability"
+  | "security_testing"
+  | "knowledge_docs"
+  | "productivity_workflow"
+  | "browser_automation"
+  | "design_tools"
+  | "other";
+export type InstallMethod = "remote_http" | "stdio" | "docker" | "gateway";
+export type MarketTrustLevel =
+  | "community"
+  | "verified"
+  | "official"
+  | "platform_supported";
+export type MarketVisibility =
+  | "draft"
+  | "internal"
+  | "published"
+  | "hidden"
+  | "quarantined";
 export type ServerVersionStatus =
   | "draft"
   | "pending"
@@ -54,6 +78,21 @@ export type ApiMcpServer = {
   published?: boolean;
   quarantined?: boolean;
   riskLevel: RiskLevel;
+  category?: MarketCategory;
+  tags?: string[];
+  summary?: string;
+  useCases?: string[];
+  docsUrl?: string;
+  sourceUrl?: string;
+  iconUrl?: string;
+  installMethods?: InstallMethod[];
+  prerequisites?: string[];
+  securityNotes?: string[];
+  trustLevel?: MarketTrustLevel;
+  visibility?: MarketVisibility;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  publishedAt?: string;
   schemaVersion?: string;
   createdAt: string;
   updatedAt: string;
@@ -77,6 +116,21 @@ export type CreateServerInput = {
   upstreamUrl?: string;
   enabled: boolean;
   riskLevel: RiskLevel;
+  category?: MarketCategory;
+  tags?: string[];
+  summary?: string;
+  useCases?: string[];
+  docsUrl?: string;
+  sourceUrl?: string;
+  iconUrl?: string;
+  installMethods?: InstallMethod[];
+  prerequisites?: string[];
+  securityNotes?: string[];
+  trustLevel?: MarketTrustLevel;
+  visibility?: MarketVisibility;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  publishedAt?: string;
   tools: CreateServerToolInput[];
 };
 

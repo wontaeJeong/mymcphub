@@ -44,6 +44,18 @@
       "transport": "streamable_http",
       "upstreamUrl": "http://localhost:5102/mcp",
       "riskLevel": "medium",
+      "category": "cloud_infra",
+      "tags": ["kubernetes", "readonly", "ops"],
+      "summary": "Read Kubernetes namespaces and pods through the MCP Gateway.",
+      "useCases": ["Namespace and pod lookup", "Incident investigation", "Cluster inventory"],
+      "installMethods": ["gateway"],
+      "prerequisites": ["Access grant for Kubernetes read-only tools"],
+      "securityNotes": ["Gateway policy and redaction checks run before upstream Kubernetes calls."],
+      "trustLevel": "platform_supported",
+      "visibility": "published",
+      "reviewedBy": "00000000-0000-4000-8000-000000000001",
+      "reviewedAt": "2026-06-09T00:00:00Z",
+      "publishedAt": "2026-06-09T00:00:00Z",
       "tools": [
         {
           "name": "list_namespaces",

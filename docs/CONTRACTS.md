@@ -33,6 +33,8 @@ MCP server manifests now include runtime render inputs:
 
 Runtime state is exposed through platform-admin-only `GET /api/runtime/status`, `GET /api/runtime/secret-leases`, and `POST /api/runtime/secret-leases/{leaseId}/revoke`. Runtime status includes rendered deployment metadata and secret references, never raw secret values.
 
+MCP Market metadata is part of the `McpServer` OpenAPI contract and the Go `MCPServer` model. The source of truth is `schemas/openapi/mcp-hub.openapi.yaml`, mirrored by the runtime `/openapi.json` document and `apps/web/lib/api.ts`. Missing catalog entries default to category `other`, trust level `community`, Gateway install method, and a visibility derived from existing published/quarantined/enabled state.
+
 Generation checks:
 
 ```sh

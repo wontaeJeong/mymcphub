@@ -109,7 +109,7 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request, principal
 	parts := pathParts(r.URL.Path, "/api/servers")
 	if len(parts) == 0 {
 		if r.Method == http.MethodGet {
-			httpx.WriteJSON(w, 200, s.store.ListServersWithOptions(listOptionsFromRequest(r, []string{"environment", "risk_level", "owner_team_id", "transport", "enabled", "published", "q"})))
+			httpx.WriteJSON(w, 200, s.store.ListServersWithOptions(listOptionsFromRequest(r, []string{"environment", "risk_level", "owner_team_id", "transport", "enabled", "published", "category", "tag", "trust_level", "visibility", "install_method", "q"})))
 			return
 		}
 		if r.Method == http.MethodPost {
@@ -938,7 +938,7 @@ func openAPIDocument() map[string]interface{} {
 			"/readyz":                            map[string]interface{}{"get": operation("Readiness check", false)},
 			"/metrics":                           map[string]interface{}{"get": operation("Prometheus metrics", false)},
 			"/api/me":                            map[string]interface{}{"get": operation("Current auth context", false)},
-			"/api/servers":                       map[string]interface{}{"get": operation("List MCP servers", false), "post": operation("Register MCP server", true, 201)},
+			"/api/servers":                       map[string]interface{}{"get": serverListOperation(), "post": operation("Register MCP server", true, 201)},
 			"/api/servers/{serverId}":            map[string]interface{}{"get": operation("Get MCP server", false), "patch": operation("Patch MCP server", true), "delete": operation("Delete MCP server", true)},
 			"/api/servers/{serverId}/publish":    map[string]interface{}{"post": operation("Publish server", true)},
 			"/api/servers/{serverId}/unpublish":  map[string]interface{}{"post": operation("Unpublish server", true)},
@@ -996,8 +996,86 @@ func openAPIDocument() map[string]interface{} {
 			"/api/runtime/secret-leases":                  map[string]interface{}{"get": adminOperation("List runtime secret leases", false)},
 			"/api/runtime/secret-leases/{leaseId}/revoke": map[string]interface{}{"post": adminOperation("Revoke runtime secret lease", true)},
 		},
-		"components": map[string]interface{}{"schemas": map[string]interface{}{"ErrorResponse": map[string]interface{}{"type": "object", "required": []string{"error", "traceId"}}}},
+		"components": openAPIComponents(),
 	}
+}
+
+func openAPIComponents() map[string]interface{} {
+	return map[string]interface{}{
+		"schemas": map[string]interface{}{
+			"ErrorResponse":    map[string]interface{}{"type": "object", "required": []string{"error", "traceId"}},
+			"MarketCategory":   map[string]interface{}{"type": "string", "enum": []string{"developer_tools", "api_development", "data_database", "cloud_infra", "observability", "security_testing", "knowledge_docs", "productivity_workflow", "browser_automation", "design_tools", "other"}},
+			"MarketVisibility": map[string]interface{}{"type": "string", "enum": []string{"draft", "internal", "published", "hidden", "quarantined"}},
+			"MarketTrustLevel": map[string]interface{}{"type": "string", "enum": []string{"community", "verified", "official", "platform_supported"}},
+			"InstallMethod":    map[string]interface{}{"type": "string", "enum": []string{"remote_http", "stdio", "docker", "gateway"}},
+			"McpServer": map[string]interface{}{
+				"type":     "object",
+				"required": []string{"id", "slug", "displayName", "ownerTeamId", "environment", "transport", "enabled", "published", "quarantined", "riskLevel", "category", "tags", "summary", "useCases", "installMethods", "prerequisites", "securityNotes", "trustLevel", "visibility", "createdAt", "updatedAt"},
+				"properties": map[string]interface{}{
+					"id":             map[string]interface{}{"type": "string"},
+					"slug":           map[string]interface{}{"type": "string"},
+					"displayName":    map[string]interface{}{"type": "string"},
+					"description":    map[string]interface{}{"type": "string"},
+					"ownerTeamId":    map[string]interface{}{"type": "string"},
+					"environment":    map[string]interface{}{"type": "string", "enum": []string{"dev", "stg", "prod", "shared"}},
+					"transport":      map[string]interface{}{"type": "string", "enum": []string{"streamable_http", "sse_legacy", "stdio_adapter", "external"}},
+					"upstreamUrl":    map[string]interface{}{"type": "string", "format": "uri"},
+					"timeoutMs":      map[string]interface{}{"type": "integer", "minimum": 1},
+					"enabled":        map[string]interface{}{"type": "boolean"},
+					"published":      map[string]interface{}{"type": "boolean"},
+					"quarantined":    map[string]interface{}{"type": "boolean"},
+					"riskLevel":      map[string]interface{}{"type": "string", "enum": []string{"low", "medium", "high", "critical"}},
+					"category":       map[string]interface{}{"$ref": "#/components/schemas/MarketCategory"},
+					"tags":           map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+					"summary":        map[string]interface{}{"type": "string"},
+					"useCases":       map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+					"docsUrl":        map[string]interface{}{"type": "string", "format": "uri"},
+					"sourceUrl":      map[string]interface{}{"type": "string", "format": "uri"},
+					"iconUrl":        map[string]interface{}{"type": "string", "format": "uri"},
+					"installMethods": map[string]interface{}{"type": "array", "items": map[string]interface{}{"$ref": "#/components/schemas/InstallMethod"}},
+					"prerequisites":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+					"securityNotes":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+					"trustLevel":     map[string]interface{}{"$ref": "#/components/schemas/MarketTrustLevel"},
+					"visibility":     map[string]interface{}{"$ref": "#/components/schemas/MarketVisibility"},
+					"reviewedBy":     map[string]interface{}{"type": "string"},
+					"reviewedAt":     map[string]interface{}{"type": "string", "format": "date-time"},
+					"publishedAt":    map[string]interface{}{"type": "string", "format": "date-time"},
+					"createdAt":      map[string]interface{}{"type": "string", "format": "date-time"},
+					"updatedAt":      map[string]interface{}{"type": "string", "format": "date-time"},
+				},
+			},
+			"McpServerListResponse": map[string]interface{}{
+				"type":     "object",
+				"required": []string{"items"},
+				"properties": map[string]interface{}{
+					"items":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"$ref": "#/components/schemas/McpServer"}},
+					"pageInfo": map[string]interface{}{"type": "object", "properties": map[string]interface{}{"limit": map[string]interface{}{"type": "integer"}, "nextCursor": map[string]interface{}{"type": "string"}}},
+				},
+			},
+		},
+	}
+}
+
+func serverListOperation() map[string]interface{} {
+	out := operation("List MCP servers", false)
+	out["parameters"] = []map[string]interface{}{
+		queryParameter("limit", map[string]interface{}{"type": "integer", "minimum": 1, "maximum": 100}),
+		queryParameter("cursor", map[string]interface{}{"type": "string"}),
+		queryParameter("environment", map[string]interface{}{"type": "string", "enum": []string{"dev", "stg", "prod", "shared"}}),
+		queryParameter("risk_level", map[string]interface{}{"type": "string", "enum": []string{"low", "medium", "high", "critical"}}),
+		queryParameter("owner_team_id", map[string]interface{}{"type": "string"}),
+		queryParameter("transport", map[string]interface{}{"type": "string", "enum": []string{"streamable_http", "sse_legacy", "stdio_adapter", "external"}}),
+		queryParameter("enabled", map[string]interface{}{"type": "boolean"}),
+		queryParameter("published", map[string]interface{}{"type": "boolean"}),
+		queryParameter("category", map[string]interface{}{"$ref": "#/components/schemas/MarketCategory"}),
+		queryParameter("tag", map[string]interface{}{"type": "string"}),
+		queryParameter("trust_level", map[string]interface{}{"$ref": "#/components/schemas/MarketTrustLevel"}),
+		queryParameter("visibility", map[string]interface{}{"$ref": "#/components/schemas/MarketVisibility"}),
+		queryParameter("install_method", map[string]interface{}{"$ref": "#/components/schemas/InstallMethod"}),
+		queryParameter("q", map[string]interface{}{"type": "string"}),
+	}
+	out["responses"].(map[string]interface{})["200"] = map[string]interface{}{"description": "Paginated server list", "content": map[string]interface{}{"application/json": map[string]interface{}{"schema": map[string]interface{}{"$ref": "#/components/schemas/McpServerListResponse"}}}}
+	return out
 }
 
 func operation(summary string, audit bool, statuses ...int) map[string]interface{} {
