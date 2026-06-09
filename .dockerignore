@@ -4,7 +4,6 @@ dist
 **/dist
 .next
 **/.next
-.turbo
 coverage
 .git
 .env
