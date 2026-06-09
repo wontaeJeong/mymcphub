@@ -283,6 +283,7 @@ export async function AdminServerDetailPageContent({ params }: ServerDetailPageP
                     showSchema
                     showAccess
                     actionSlot={ToolControls}
+                    audience="admin-detail"
                   />
                   <div className="grid">
                     <ToolTestLab options={toolTestOptions} />
