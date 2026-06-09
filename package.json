@@ -25,7 +25,7 @@
     "security:sbom": "scripts/security/sbom-sign-images.sh",
     "security:secrets": "scripts/security/scan-secrets.sh",
     "security:k8s": "scripts/security/scan-k8s-manifests.sh",
-    "security:mcp-manifests": "go run ./scripts/security/check-mcp-manifest.go",
+    "security:mcp-manifests": "go run ./tools/cmd/check-mcp-manifest",
     "security:check": "scripts/security/check-all.sh",
     "ci": "make ci",
     "test:unit": "go test ./internal/... && pnpm --filter @mcp-hub/ui test && pnpm --filter @mcp-hub/web test:unit",

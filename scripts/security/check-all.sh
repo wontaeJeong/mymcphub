@@ -23,6 +23,6 @@ run_check "container image and Dockerfile scan" "${ROOT_DIR}/scripts/security/sc
 run_check "SBOM generation and image signing evidence" "${ROOT_DIR}/scripts/security/sbom-sign-images.sh"
 run_check "secret scan" "${ROOT_DIR}/scripts/security/scan-secrets.sh"
 run_check "Kubernetes manifest hardening scan" "${ROOT_DIR}/scripts/security/scan-k8s-manifests.sh"
-run_check "MCP manifest risk review" go run ./scripts/security/check-mcp-manifest.go
+run_check "MCP manifest risk review" go run ./tools/cmd/check-mcp-manifest
 
 exit "${STATUS}"

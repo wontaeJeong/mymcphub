@@ -1,6 +1,6 @@
 # Scripts
 
-Local automation scripts for development, CI, generation, and release support live here. Operator actions move to `mcphubctl`, the Web UI, or the Control Plane API.
+Local automation scripts for development, CI, generation, and release support live here. Go command implementations used by these wrappers live under `../tools/cmd`. Operator actions move to `mcphubctl`, the Web UI, or the Control Plane API.
 
 Security scan and hardening checks are in [security/](security/). Run all security checks from the repository root with:
 

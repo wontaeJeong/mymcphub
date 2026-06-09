@@ -101,7 +101,7 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 	requireUUIDString(manifest["ownerTeamId"], label, "missing ownerTeamId", "invalid ownerTeamId UUID", findings)
 	requireRiskLevel(manifest["riskLevel"], label, "missing manifest riskLevel", "invalid manifest riskLevel", findings)
 
-	tools, ok := manifest["tools"].([]interface{})
+	tools, ok := manifest["tools"].([]any)
 	if !ok {
 		addError(findings, label, "tools must be an array")
 		return
@@ -111,7 +111,7 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 	}
 	checkSecretBindings(manifest["secrets"], label, findings)
 	for index, rawTool := range tools {
-		tool, ok := rawTool.(map[string]interface{})
+		tool, ok := rawTool.(map[string]any)
 		toolLabel := fmt.Sprintf("%s tools[%d]", label, index)
 		if !ok {
 			addError(findings, toolLabel, "tool must be an object")
@@ -124,7 +124,7 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 		namedToolLabel := fmt.Sprintf("%s %s", label, toolName)
 		toolRiskLevel := requireRiskLevel(tool["riskLevel"], namedToolLabel, "missing tool riskLevel", "invalid tool riskLevel", findings)
 
-		inputSchema, ok := tool["inputSchema"].(map[string]interface{})
+		inputSchema, ok := tool["inputSchema"].(map[string]any)
 		if !ok {
 			addError(findings, namedToolLabel, "invalid tool inputSchema object")
 		} else if inputSchema["type"] != "object" {
@@ -151,17 +151,17 @@ func checkManifest(rootDir, file string, findings *[]finding) {
 	}
 }
 
-func checkSecretBindings(value interface{}, label string, findings *[]finding) {
+func checkSecretBindings(value any, label string, findings *[]finding) {
 	if value == nil {
 		return
 	}
-	secrets, ok := value.([]interface{})
+	secrets, ok := value.([]any)
 	if !ok {
 		addError(findings, label, "secrets must be an array when present")
 		return
 	}
 	for index, rawSecret := range secrets {
-		secret, ok := rawSecret.(map[string]interface{})
+		secret, ok := rawSecret.(map[string]any)
 		secretLabel := fmt.Sprintf("%s secrets[%d]", label, index)
 		if !ok {
 			addError(findings, secretLabel, "secret binding must be an object")
@@ -184,13 +184,13 @@ func checkSecretBindings(value interface{}, label string, findings *[]finding) {
 	}
 }
 
-func readJSON(file, label string, findings *[]finding) (map[string]interface{}, bool) {
+func readJSON(file, label string, findings *[]finding) (map[string]any, bool) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		addError(findings, label, "unable to read or parse manifest: "+err.Error())
 		return nil, false
 	}
-	manifest := map[string]interface{}{}
+	manifest := map[string]any{}
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		addError(findings, label, "unable to read or parse manifest: "+err.Error())
 		return nil, false
@@ -198,14 +198,14 @@ func readJSON(file, label string, findings *[]finding) (map[string]interface{}, 
 	return manifest, true
 }
 
-func requireNonEmptyString(value interface{}, file string, message string, findings *[]finding) {
+func requireNonEmptyString(value any, file string, message string, findings *[]finding) {
 	text, ok := value.(string)
 	if !ok || strings.TrimSpace(text) == "" {
 		addError(findings, file, message)
 	}
 }
 
-func requireUUIDString(value interface{}, file, missingMessage, invalidMessage string, findings *[]finding) {
+func requireUUIDString(value any, file, missingMessage, invalidMessage string, findings *[]finding) {
 	text, ok := value.(string)
 	if !ok || strings.TrimSpace(text) == "" {
 		addError(findings, file, missingMessage)
@@ -235,7 +235,7 @@ func looksLikeUUID(value string) bool {
 	return true
 }
 
-func requireRiskLevel(value interface{}, file, missingMessage, invalidMessage string, findings *[]finding) string {
+func requireRiskLevel(value any, file, missingMessage, invalidMessage string, findings *[]finding) string {
 	text, ok := value.(string)
 	if !ok || strings.TrimSpace(text) == "" {
 		addError(findings, file, missingMessage)
@@ -248,22 +248,22 @@ func requireRiskLevel(value interface{}, file, missingMessage, invalidMessage st
 	return text
 }
 
-func hasDescription(value interface{}) bool {
+func hasDescription(value any) bool {
 	text, ok := value.(string)
 	return ok && strings.TrimSpace(text) != ""
 }
 
-func containsKeyword(value interface{}, keyword string) bool {
+func containsKeyword(value any, keyword string) bool {
 	switch typed := value.(type) {
 	case string:
 		return strings.Contains(strings.ToLower(typed), keyword)
-	case []interface{}:
+	case []any:
 		for _, item := range typed {
 			if containsKeyword(item, keyword) {
 				return true
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		for entryKey, entryValue := range typed {
 			if strings.Contains(strings.ToLower(entryKey), keyword) || containsKeyword(entryValue, keyword) {
 				return true

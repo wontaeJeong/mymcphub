@@ -15,12 +15,12 @@ if [ "${1:-}" = "--check" ]; then
   json_tmp="$(mktemp)"
   ts_tmp="$(mktemp)"
   trap 'rm -f "$json_tmp" "$ts_tmp"' EXIT
-  go run ./scripts/gen/openapi_json.go json > "$json_tmp"
+  go run ./tools/cmd/openapi-json json > "$json_tmp"
   cmp -s "$json_tmp" "$JSON_TARGET" || {
     echo "OpenAPI JSON artifact is out of date. Run scripts/gen/openapi.sh." >&2
     exit 1
   }
-  go run ./scripts/gen/openapi_json.go ts > "$ts_tmp"
+  go run ./tools/cmd/openapi-json ts > "$ts_tmp"
   cmp -s "$ts_tmp" "$TARGET" || {
     echo "Generated TypeScript API client is out of date. Run scripts/gen/openapi.sh." >&2
     exit 1
@@ -39,7 +39,7 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 test -s "$SOURCE"
-go run ./scripts/gen/openapi_json.go json > "$JSON_TARGET"
-go run ./scripts/gen/openapi_json.go ts > "$TARGET"
+go run ./tools/cmd/openapi-json json > "$JSON_TARGET"
+go run ./tools/cmd/openapi-json ts > "$TARGET"
 test -s "$TARGET"
 echo "OpenAPI runtime JSON artifact and TypeScript client were generated."
