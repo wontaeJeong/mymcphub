@@ -22,7 +22,7 @@ packages/
 internal/           Go shared auth, audit, config, db, policy, MCP, redaction, telemetry packages
 schemas/            OpenAPI and JSON Schema source of truth
 config/             Local development config data consumed by Compose
-deploy/             Helm chart and GitOps overlays
+deploy/             Helm chart, GitOps overlays, and container build files
 docs/               Architecture, operation, security, and runbook documentation
 scripts/            dev, ci, gen, release, and deprecated helper scripts only
 tests/              Go e2e/security tests and TS contract smoke tests
