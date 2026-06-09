@@ -36,8 +36,7 @@ export function ClientConfigForm({
     <form className="form-card" action={formAction}>
       <h2>클라이언트 설정 생성</h2>
       <p>
-        선택한 활성 서버에 대한 설정 스니펫을 제어 플레인 API에서 바로
-        생성합니다.
+        서버와 클라이언트만 선택하면 게이트웨이를 통하는 설정을 생성합니다.
       </p>
       <div className="form-grid">
         <div className="field">
@@ -60,62 +59,56 @@ export function ClientConfigForm({
             <option value="vscode">VS Code</option>
           </select>
         </div>
+      </div>
+      <details className="schema-viewer">
+        <summary>고급 프로필 옵션</summary>
         <div className="field">
-          <label htmlFor="profile">클라이언트 프로필</label>
+          <label htmlFor="profile">프로필 이름</label>
           <input
             id="profile"
             name="profile"
             defaultValue={selectedProfile}
-            placeholder="local, prod, incident-response"
+            placeholder="예: local, prod, incident-response"
           />
         </div>
-      </div>
+      </details>
       <div className="form-actions">
         <button className="button" type="submit" disabled={pending}>
           {pending ? "생성 중..." : "설정 생성"}
         </button>
         {state.message ? <span className="muted">{state.message}</span> : null}
       </div>
-      <div className="config-summary">
-        <p>
-          <strong>선택한 서버:</strong>{" "}
-          {selectedServer?.displayName ?? "선택한 서버 없음"}
-        </p>
-        <p>
-          <strong>선택한 클라이언트:</strong> {selectedClient}
-        </p>
-        <p>
-          <strong>클라이언트 프로필:</strong> {selectedProfile}
-        </p>
-        <p>
-          <strong>게이트웨이 URL:</strong>{" "}
+      {state.gatewayUrl || state.payload ? (
+        <div className="config-summary">
+          <p>
+            <strong>생성된 서버:</strong>{" "}
+            {selectedServer?.displayName ?? "선택한 서버 없음"}
+          </p>
+          <p>
+            <strong>클라이언트:</strong> {selectedClient} · {selectedProfile}
+          </p>
           {state.gatewayUrl ? (
-            <CopyButton value={state.gatewayUrl} label="URL 복사" />
-          ) : (
-            <span className="muted">
-              생성된 제어 플레인 응답에서 확인할 수 없음
-            </span>
-          )}
-        </p>
-        <p>
-          <strong>테스트 안내:</strong>{" "}
+            <p>
+              <strong>게이트웨이 URL:</strong> <CopyButton value={state.gatewayUrl} label="URL 복사" />
+            </p>
+          ) : null}
           {state.gatewayUrl ? (
-            <code>
-              mcphubctl --profile {selectedProfile} health && mcp inspector{" "}
-              {state.gatewayUrl}
-            </code>
-          ) : (
-            <span className="muted">
-              설정을 생성하면 게이트웨이 테스트 명령을 확인할 수 있습니다.
-            </span>
-          )}
-        </p>
-      </div>
+            <details className="schema-viewer">
+              <summary>테스트 명령 보기</summary>
+              <code>
+                mcphubctl --profile {selectedProfile} health && mcp inspector{" "}
+                {state.gatewayUrl}
+              </code>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
       {state.payload ? (
-        <div className="grid">
+        <details className="schema-viewer">
+          <summary>설정 JSON 보기</summary>
           <CopyButton value={state.payload} label="설정 복사" />
           <pre className="code-block">{state.payload}</pre>
-        </div>
+        </details>
       ) : null}
     </form>
   );

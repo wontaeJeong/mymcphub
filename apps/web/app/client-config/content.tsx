@@ -20,7 +20,7 @@ export async function ClientConfigPageContent({
 
   return (
     <div className="page-stack">
-      <PageHero eyebrow="클라이언트 설정 생성기" title="승인된 서버를 클라이언트 설정으로 변환하세요." description="opencode, Claude Code, Codex, VS Code 또는 일반 원격 MCP 클라이언트를 위한 실제 /api/client-config/generate 요청을 전송합니다." />
+      <PageHero eyebrow="클라이언트 설정 생성기" title="승인된 서버를 클라이언트에 연결하세요." description="서버와 클라이언트를 선택하면 게이트웨이를 경유하는 설정을 생성합니다." />
       {servers.ok && enabledServers.length > 0 ? <ClientConfigForm servers={enabledServers} initialValues={initialValues} /> : servers.ok ? <EmptyState title="활성 서버 없음" description="클라이언트 설정은 활성 서버에 대해서만 생성할 수 있습니다." /> : <ErrorState message={servers.error} />}
     </div>
   );
